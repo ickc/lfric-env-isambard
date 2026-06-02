@@ -118,9 +118,18 @@ self-contained.
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `SPACK_JOBS` | `8` | Parallel Spack install jobs |
+| `SPACK_JOBS` | `8` | Parallel Spack make jobs (raise on a dedicated compute node; keep modest on a shared login node) |
+| `HEAVY_JOBS` | `6` | Make jobs for LLVM/V8-bundling packages (`node-js`, `rust`); capped to avoid OOM (see below) |
+| `HEAVY_PKGS` | `node-js rust` | Packages built first at `HEAVY_JOBS` before the rest |
 | `MAKE_JOBS` | `8` | Parallel make jobs for `lfric_atm` |
 | `LFRIC_WORKING_DIR` | `<repo>/working_dir` | Where build output lands |
 | `GCC_MODULE` | `gcc-native/12.3` | Module providing `gcc@12.3.0` |
 | `RUN_XIOS_VERIFICATION` | `1` | Set `0` to skip the XIOS network check in `build` |
 | `CYLC_RUN_BASE` | `$PROJECTDIR/$USER/cylc-run` | Cylc run directory |
+
+**Memory / OOM.** `node-js` (V8) and `rust` (LLVM) have translation units that use
+several GB each; at high `-j` on a swapless or shared node they get OOM-killed
+(`cc1plus: Killed signal`). `build` therefore installs the `HEAVY_PKGS` first at
+`HEAVY_JOBS` (default 6) and the rest at `SPACK_JOBS`. On a busy login node use a
+modest `SPACK_JOBS` (≤16); on a dedicated compute node with plenty of RAM you can
+raise both.

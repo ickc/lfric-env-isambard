@@ -5,18 +5,21 @@
 # pixi.toml) and usable directly. It is a deliberate NO-OP until the
 # environment has been built, so `pixi run build` works on a clean checkout.
 #
-# The expensive parts (resolving package prefixes) are precomputed once by
-# build.sh into working_dir/env-runtime.sh, so activation stays fast.
+# We intentionally do NOT source spack's setup-env.sh or call `spack env
+# activate` here: those export bash shell functions (spack, _spack_shell_wrapper)
+# that error noisily when pixi runs a command under /bin/sh. Everything we need
+# is achieved without them:
+#   - SPACK_ENV=<dir>           makes `pixi run spack ...` operate on this env
+#   - working_dir/env-runtime.sh puts the view (rose/cylc/psyclone/...) on PATH
+#     and sets SHUMLIB/FC/LD_* (precomputed once by build.sh, so this is fast)
+# The vendored `spack` binary is already on PATH via common.sh.
 
 _act_here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
 # shellcheck source=scripts/common.sh
 . "$_act_here/common.sh"
 
-# env-runtime.sh is written by build.sh only after a successful build.
-if [ -f "$WORKING_DIR/env-runtime.sh" ] && [ -f "$SPACK_ROOT/share/spack/setup-env.sh" ]; then
-  # shellcheck source=/dev/null
-  . "$SPACK_ROOT/share/spack/setup-env.sh" 2>/dev/null || true
-  spack env activate -d "$SPACK_ENV_DIR" 2>/dev/null || true
+if [ -f "$WORKING_DIR/env-runtime.sh" ]; then
+  export SPACK_ENV="$SPACK_ENV_DIR"
   # shellcheck source=/dev/null
   . "$WORKING_DIR/env-runtime.sh" 2>/dev/null || true
 fi

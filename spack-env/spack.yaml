@@ -8,17 +8,19 @@ spack:
   #   - the vendored Spack builtin package repo (spack/spack-packages submodule),
   #     pinned so the build does not fetch packages from the network.
   repos:
-  - ../spack-repo/lfric-isambard
-  - ../vendor/simit-spack/repos/metoffice
-  - ../vendor/spack-packages/repos/spack_repo/builtin
+    lfric: ../spack-repo/lfric-isambard
+    metoffice: ../vendor/simit-spack/repos/metoffice
+    builtin: ../vendor/spack-packages/repos/spack_repo/builtin
   packages:
+    gcc:
+      externals: []
     all:
-      require: ["%gcc@12.3.0"]
+      require: ['%gcc@12.3.0']
       providers:
         mpi: [mpich]
     python:
       variants: +shared
     py-setuptools:
-      version: [":79"]
+      version: [:79]
   specs:
   - lfric-apps-isambard
