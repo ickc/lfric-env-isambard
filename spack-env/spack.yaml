@@ -12,10 +12,15 @@ spack:
     metoffice: ../vendor/simit-spack/repos/metoffice
     builtin: ../vendor/spack-packages/repos/spack_repo/builtin
   packages:
-    gcc:
-      externals: []
+    # In Spack 1.0 the "%compiler" form in "all: require" causes an internal
+    # concretizer error. The recommended form is per-language virtual requires.
+    c:
+      require: ['gcc@12.3.0']
+    cxx:
+      require: ['gcc@12.3.0']
+    fortran:
+      require: ['gcc@12.3.0']
     all:
-      require: ['%gcc@12.3.0']
       providers:
         mpi: [mpich]
     python:
