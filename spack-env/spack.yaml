@@ -1,0 +1,24 @@
+spack:
+  view: true
+  concretizer:
+    unify: when_possible
+  # Repo paths are resolved relative to this file (the environment directory).
+  #   - the local LFRic bundle package repo
+  #   - the MetOffice simit-spack package repo (patched in place)
+  #   - the vendored Spack builtin package repo (spack/spack-packages submodule),
+  #     pinned so the build does not fetch packages from the network.
+  repos:
+  - ../spack-repo/lfric-isambard
+  - ../vendor/simit-spack/repos/metoffice
+  - ../vendor/spack-packages/repos/spack_repo/builtin
+  packages:
+    all:
+      require: ["%gcc@12.3.0"]
+      providers:
+        mpi: [mpich]
+    python:
+      variants: +shared
+    py-setuptools:
+      version: [":79"]
+  specs:
+  - lfric-apps-isambard

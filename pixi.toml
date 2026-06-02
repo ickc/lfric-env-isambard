@@ -1,0 +1,50 @@
+[workspace]
+name = "lfric-env-isambard"
+version = "0.1.0"
+description = "Pixi-driven, submodule-based reproducible build of the LFRic Apps Spack environment for Isambard 3 (GCC 12.3)."
+channels = ["conda-forge"]
+platforms = ["linux-aarch64"]
+
+[dependencies]
+# Pixi bootstraps Python. This Python RUNS Spack, so it must be < 3.12: Spack
+# 1.0 uses ast.Str, removed in Python 3.12. (The LFRic environment itself builds
+# its own Python 3.12 via Spack — that is independent of this one.)
+python = "3.11.*"
+
+# Auto-activate the built Spack environment on every `pixi run` / `pixi shell`.
+# scripts/activate.sh is a NO-OP until `pixi run build` has produced the
+# environment, so it is safe to have configured before the first build. It also
+# puts the vendored `spack` on PATH, so `pixi run spack ...` works immediately.
+[activation]
+scripts = ["scripts/activate.sh"]
+
+[tasks]
+# One-time: clone the pinned submodules. You are responsible for clone access
+# (an SSH key authorized for the private Met Office repos, or an HTTPS
+# credential helper). See README for the simit-spack SSO note.
+submodule-init = "git submodule update --init --recursive --jobs 4"
+
+# Apply every patches/*-patch.sh, in sorted order (idempotent). `build` runs
+# this automatically; this task is for applying patches on their own.
+patch = "bash scripts/patch-all.sh"
+
+# Revert all patches by resetting the patched submodules to their pinned commit.
+unpatch = "bash scripts/unpatch.sh"
+
+# Build the Spack environment — the bulk of the work (~2-4 h from scratch on a
+# login node; re-runs are incremental). Applies patches first, then concretizes
+# and installs into working_dir/.
+build = "bash scripts/build.sh"
+
+# Optional: compile lfric_atm and run its example. Separate from `build` because
+# it clones private physics repos (casim/jules/socrates) over SSH.
+build-lfric-atm = "bash scripts/build-lfric-atm.sh"
+
+# Activate the environment and report tool versions (rose / cylc / psyclone).
+activate = "bash scripts/print-versions.sh"
+
+# Verify the migrated XIOS source matches the pinned commit (network check).
+verify-xios = "bash scripts/xios-verification.sh"
+
+# Remove repo-local build output (keeps submodules and applied patches).
+clean = "rm -rf working_dir"
