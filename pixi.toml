@@ -21,7 +21,7 @@ scripts = ["scripts/activate.sh"]
 [tasks]
 # One-time: clone the pinned submodules. You are responsible for clone access
 # (an SSH key authorized for the private Met Office repos, or an HTTPS
-# credential helper). See README for the simit-spack SSO note.
+# credential helper). See README for the MetOffice SSO note.
 submodule-init = "git submodule update --init --recursive --jobs 4"
 
 # Apply every patches/*-patch.sh, in sorted order (idempotent). `build` runs

@@ -10,6 +10,6 @@
 [submodule "vendor/lfric_core"]
 	path = vendor/lfric_core
 	url = git@github.com:MetOffice/lfric_core.git
-[submodule "vendor/simit-spack"]
-	path = vendor/simit-spack
-	url = git@github.com:MetOffice/simit-spack.git
+[submodule "vendor/mo-spack-packages"]
+	path = vendor/mo-spack-packages
+	url = git@github.com:MetOffice/mo-spack-packages.git

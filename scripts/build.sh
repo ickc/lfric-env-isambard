@@ -20,9 +20,9 @@ SPACK_JOBS="${SPACK_JOBS:-8}"
 # Build those at a capped -j (HEAVY_JOBS) before the rest. HEAVY_PKGS lists them.
 HEAVY_JOBS="${HEAVY_JOBS:-${NODE_JS_JOBS:-6}}"
 HEAVY_PKGS=(${HEAVY_PKGS:-node-js rust})
-COMPILER_SPEC="${COMPILER_SPEC:-gcc@12.3.0}"
+COMPILER_SPEC="${COMPILER_SPEC:-gcc@14.3.0}"
 COMPILER_SPEC="${COMPILER_SPEC#%}"
-GCC_MODULE="${GCC_MODULE:-gcc-native/12.3}"
+GCC_MODULE="${GCC_MODULE:-gcc-native/14}"
 
 info() { echo "INFO: $*"; }
 warn() { echo "WARN: $*" >&2; }
@@ -31,7 +31,7 @@ die()  { echo "ERROR: $*" >&2; exit 1; }
 mkdir -p "$WORKING_DIR" "$SPACK_USER_CONFIG_PATH" "$SPACK_USER_CACHE_PATH"
 
 # --- 0. Submodules present? ------------------------------------------------
-for sub in spack spack-packages lfric_apps lfric_core simit-spack; do
+for sub in spack spack-packages lfric_apps lfric_core mo-spack-packages; do
   git -C "$REPO_ROOT/vendor/$sub" rev-parse --git-dir >/dev/null 2>&1 \
     || die "Submodule vendor/$sub is missing. Run: pixi run submodule-init"
 done
@@ -40,7 +40,12 @@ done
 info "Applying patches"
 bash "$_here/patch-all.sh" || die "patch-all failed"
 
-# --- 2. GCC 12.3 module ----------------------------------------------------
+# --- 2. GCC toolchain ------------------------------------------------------
+# The Spack environment pins gcc to an explicit external (spack-env/spack.yaml),
+# currently /usr/bin/gcc-14 + g++-14 + gfortran-14 (gcc@14.3.0). That toolchain
+# exists on the login and grace compute nodes regardless of modules, so the
+# module load below is only a best-effort nicety. We verify the external's
+# Fortran compiler is actually present (LFRic is Fortran-heavy).
 if ! command -v module >/dev/null 2>&1; then
   for f in /etc/profile.d/lmod.sh /etc/profile.d/modules.sh \
            /usr/share/lmod/lmod/init/bash /opt/cray/pe/lmod/lmod/init/bash; do
@@ -48,16 +53,13 @@ if ! command -v module >/dev/null 2>&1; then
     [ -f "$f" ] && . "$f" && break
   done
 fi
-if command -v module >/dev/null 2>&1; then
-  module load "$GCC_MODULE" 2>/dev/null || warn "module load $GCC_MODULE failed; relying on PATH gcc"
+command -v module >/dev/null 2>&1 && module load "$GCC_MODULE" 2>/dev/null || true
+GCC_FC="${GCC_FC:-/usr/bin/gfortran-14}"
+if [ -x "$GCC_FC" ]; then
+  info "gcc (external): $("$GCC_FC" --version 2>/dev/null | head -1)"
 else
-  warn "no 'module' command found; relying on PATH gcc"
+  warn "$GCC_FC missing — the env's gcc external (spack.yaml) may not build Fortran"
 fi
-info "gcc: $(gcc --version 2>/dev/null | head -1)"
-case "$(gcc -dumpfullversion -dumpversion 2>/dev/null)" in
-  12.3*) : ;;
-  *) warn "gcc is not 12.3.x; Spack may not find $COMPILER_SPEC (load $GCC_MODULE)" ;;
-esac
 
 # --- 3. XIOS source verification (non-fatal) -------------------------------
 if [ "${RUN_XIOS_VERIFICATION:-1}" = "1" ]; then
@@ -86,9 +88,11 @@ config:
 EOF
 
 # --- 6. Compilers ----------------------------------------------------------
-spack compiler find || true
-spack compilers 2>/dev/null | grep -q "$COMPILER_SPEC" \
-  || warn "compiler $COMPILER_SPEC not found by Spack; load the matching module or set COMPILER_SPEC"
+# The compiler is declared as an explicit external in spack-env/spack.yaml
+# (gcc@14.3.0) and pinned via per-language requires, so we deliberately do NOT
+# run `spack compiler find`: with the env active (pixi activates it) that would
+# rewrite the tracked spack.yaml, and a stray gcc on PATH could derail the solve.
+info "Using gcc external pinned in spack.yaml ($COMPILER_SPEC)"
 
 # --- 7. Sanity: environment repos resolve (incl. vendored builtin) ---------
 info "Environment package repos:"
@@ -126,6 +130,13 @@ spack -e "$SPACK_ENV_DIR" install -j 1 yaxt || die "install yaxt failed"
 for hp in "${HEAVY_PKGS[@]}"; do
   if spack -e "$SPACK_ENV_DIR" find "$hp" >/dev/null 2>&1; then
     continue   # already installed
+  fi
+  # Only pre-build heavy pkgs that are actually in the concretized environment.
+  # (node-js/rust used to be pulled in by cylc-uiserver, which the Spack 1.0 port
+  # dropped, so they are no longer present — skip rather than fail.)
+  if ! grep -q "\"name\": \"$hp\"" "$SPACK_ENV_DIR/spack.lock" 2>/dev/null; then
+    info "$hp not in the concretized environment; skipping heavy pre-build"
+    continue
   fi
   info "Installing $hp (-j $HEAVY_JOBS; bundles LLVM/V8 — capped to avoid OOM)"
   spack -e "$SPACK_ENV_DIR" install -j "$HEAVY_JOBS" "$hp" || die "install $hp failed"
