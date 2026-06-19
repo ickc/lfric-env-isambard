@@ -10,8 +10,9 @@ _here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
 # shellcheck source=scripts/common.sh
 . "$_here/common.sh"
 
-# Only the submodules that patches touch. lfric_apps and spack are not patched.
-for sub in lfric_core simit-spack spack-packages; do
+# Only the submodules that patches touch. lfric_apps, spack and the package
+# repo mo-spack-packages is not patched.
+for sub in lfric_core spack-packages; do
   d="$REPO_ROOT/vendor/$sub"
   if git -C "$d" rev-parse --git-dir >/dev/null 2>&1; then
     echo ">>> resetting vendor/$sub to pinned commit"
@@ -21,4 +22,4 @@ for sub in lfric_core simit-spack spack-packages; do
     echo "skip vendor/$sub (not initialized)"
   fi
 done
-echo "unpatch complete: lfric_core, simit-spack, spack-packages restored."
+echo "unpatch complete: lfric_core, spack-packages restored."

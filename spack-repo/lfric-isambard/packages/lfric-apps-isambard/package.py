@@ -30,11 +30,15 @@ class LfricAppsIsambard(Package):
     depends_on("py-psyclone@3.2.2")
     depends_on("py-jinja2")
     depends_on("py-pyyaml")
-    depends_on("rose-picker")
-    depends_on("metomi-rose")
-    depends_on("cylc-flow")
-    depends_on("cylc-rose")
-    depends_on("cylc-uiserver")
+    # Spack 1.0 renamed the Met Office Python apps with a py- prefix. rose-picker
+    # comes from mo-spack-packages (py-rose-picker); the cylc/rose workflow tools
+    # now ship in the Spack builtin repo (py-metomi-rose/py-cylc-flow/...).
+    # cylc-uiserver (the Jupyter web GUI) has no Spack 1.0 package in either repo
+    # and is not needed for an HPC build/run environment, so it is dropped.
+    depends_on("py-rose-picker")
+    depends_on("py-metomi-rose")
+    depends_on("py-cylc-flow")
+    depends_on("py-cylc-rose")
     depends_on("py-ansimarkup")
     depends_on("py-colorama")
 

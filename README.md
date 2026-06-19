@@ -1,7 +1,12 @@
 # lfric-env-isambard
 
 A [pixi](https://pixi.sh)-driven, submodule-based, reproducible build of the
-**LFRic Apps Spack environment** for **Isambard 3** (GCC 12.3).
+**LFRic Apps Spack environment** for **Isambard 3** (GCC 14.3).
+
+> The Met Office packages come from
+> [`mo-spack-packages`](https://github.com/MetOffice/mo-spack-packages) (the
+> Spack-1.0-native successor to `simit-spack`); the cylc/rose workflow tools come
+> from the vendored Spack builtin repo. See [Pinned versions](#pinned-versions).
 
 This is a refactor of a single large `install.sh` driver into:
 
@@ -24,11 +29,12 @@ After `build`, **every** `pixi run ...` (and `pixi shell`) auto-activates the
 environment, so e.g. `pixi run rose --version` or `pixi run spack find` work
 directly. Before the build, auto-activation is a no-op (so `build` can run).
 
-Expected result after a complete build:
+Expected result after a complete build (exact rose/cylc versions track the
+vendored Spack builtin repo; psyclone comes from mo-spack-packages):
 
 ```
-rose 2.5.1
-cylc 8.6.2
+rose 2.4.2
+cylc 8.4.2
 PSyclone version: 3.2.2
 ```
 
@@ -54,13 +60,13 @@ is tracked; the generated `.spack-env/` view is git-ignored).
 ```
 pixi.toml                 # pixi project: deps, activation hook, tasks
 spack-env/spack.yaml      # the tracked Spack environment definition
-spack-repo/lfric-isambard # local "lfric-apps-isambard" bundle package repo
+spack-repo/lfric-isambard # local repo: "lfric-apps-isambard" bundle, xios, foxml
 vendor/                   # submodules (pinned)
   spack/                  # spack/spack
   spack-packages/         # spack/spack-packages (Spack builtin packages)
   lfric_apps/             # MetOffice/lfric_apps
   lfric_core/             # MetOffice/lfric_core
-  simit-spack/            # MetOffice/simit-spack
+  mo-spack-packages/      # MetOffice/mo-spack-packages (the "metoffice" repo)
 patches/                  # one *-patch.sh per upstream patch (sorted by prefix)
 scripts/                  # common.sh, activate.sh, build.sh, build-lfric-atm.sh, ...
 working_dir/              # git-ignored: Spack install tree, caches, env view, logs
@@ -68,13 +74,16 @@ working_dir/              # git-ignored: Spack install tree, caches, env view, l
 
 ## Pinned versions
 
+The authoritative pins live in the git index (`git submodule status`); the
+table below is a convenience snapshot:
+
 | Submodule | Commit |
 |-----------|--------|
-| `vendor/spack` | `73eaea13` (Backports v1.0.0) |
-| `vendor/spack-packages` | `18eacd03` |
-| `vendor/lfric_apps` | `e906813e` (Release vn3.0) |
-| `vendor/lfric_core` | `da8a9264` |
-| `vendor/simit-spack` | `ece4c481` |
+| `vendor/spack` | `7ae1d68c` (develop, Spack 1.0.x) |
+| `vendor/spack-packages` | `7e330489` (builtin, 2025-11-12) |
+| `vendor/lfric_apps` | `b5aee0b1` (vn3.1.1-88) |
+| `vendor/lfric_core` | `bf236737` (2026.03.2-38) |
+| `vendor/mo-spack-packages` | `5e8359e0` (the `metoffice` package repo) |
 
 ## Patches
 
@@ -82,18 +91,23 @@ Each patch is a standalone, idempotent `patches/<NN>-<target>-patch.sh`,
 applied in sorted order by `patch-all.sh` (discovered dynamically — names are
 not hardcoded):
 
-- `10-lfric_core-*` — Fortran/Make fixes in `vendor/lfric_core`.
-- `20-spack-packages-papi-*` — papi build fixes in `vendor/spack-packages`
-  (no-ops at the pinned commit, kept as guards against a submodule bump).
-- `30-simit-*` — (re)write `simit-spack` package definitions for Spack 1.0.
-- `40-simit-spack-imports-patch.sh` — repo-wide API/import normalisation that
-  must run after the per-package patches.
+- `10-lfric_core-*`, `11-lfric_core-*` — Fortran/Make fixes in `vendor/lfric_core`.
+- `20-spack-packages-papi-*`, `21-spack-packages-papi-*` — papi build fixes in
+  `vendor/spack-packages` (no-ops at the pinned commit, kept as guards against a
+  submodule bump).
+- `22-spack-packages-gdbm-automake-patch.sh` — gdbm `automake` build fix in
+  `vendor/spack-packages`.
 
-Because every patch modifies files **inside a submodule** (overwriting tracked
-files or adding package directories), `pixi run unpatch` reverts them all by
-`git reset --hard && git clean -fd` on `lfric_core`, `simit-spack`, and
-`spack-packages`. `build` re-applies patches automatically, so it is always
-self-contained.
+The Met Office package definitions are **no longer patched**: the old
+`simit-spack` repo (Spack < 1.0) needed ~40 `30-/40-simit-*` patch scripts to
+work under Spack 1.0, but its replacement, `mo-spack-packages`, is Spack-1.0
+native (`api: v2.0`), and the cylc/rose workflow tools it used to carry now ship
+in the Spack builtin repo. Those patches were therefore removed in the port.
+
+Because every remaining patch modifies files **inside a submodule** (overwriting
+tracked files), `pixi run unpatch` reverts them all by `git reset --hard &&
+git clean -fd` on `lfric_core` and `spack-packages`. `build` re-applies patches
+automatically, so it is always self-contained.
 
 ## Notes / caveats
 
@@ -102,14 +116,25 @@ self-contained.
   cache there too (`SPACK_USER_CONFIG_PATH`, `SPACK_USER_CACHE_PATH`), so it
   neither reads nor writes your global `~/.spack`. Put the repo on a filesystem
   with space (e.g. `$SCRATCH`), or set `LFRIC_WORKING_DIR` to relocate output.
-- **GCC 12.3.** `build` runs `module load gcc-native/12.3` (override with
-  `GCC_MODULE`). Spack's `compiler find` must see `gcc@12.3.0`.
-- **simit-spack SSH/SSO.** At time of writing, the SSH key on this machine is
-  authorized for `lfric_apps`/`lfric_core` but **not** `simit-spack`
-  (`MetOffice` SAML SSO rejects it), even though the account has pull access.
-  If `submodule-init` fails on `simit-spack`, either authorize your SSH key for
-  it (GitHub → Settings → SSH keys → Configure SSO), or switch that submodule to
-  HTTPS with a credential helper (`gh auth setup-git`).
+- **GCC 14.3.** The compiler is declared as an explicit external in
+  `spack-env/spack.yaml` (`gcc@14.3.0` → `/usr/bin/{gcc,g++,gfortran}-14`) and
+  pinned via per-language `require`s, so the solve is deterministic and `build`
+  does *not* run `spack compiler find`. Isambard 3 previously shipped a complete
+  `gcc@12.3.0` toolchain (used by earlier builds) but that has been reduced to a
+  C-only compiler (no `g++`/`gfortran` 12.3); `gcc@14.3.0` is now the only
+  complete cray-native C/C++/Fortran toolchain. To target a different gcc, edit
+  the external + `require`s in `spack.yaml`.
+- **MetOffice SSH/SSO.** The private Met Office submodules (`lfric_apps`,
+  `lfric_core`, `mo-spack-packages`) are cloned over SSH and
+  require an SSH key authorized for `MetOffice` SAML SSO (GitHub → Settings → SSH
+  keys → Configure SSO), or an HTTPS credential helper (`gh auth setup-git`). If
+  `submodule-init` fails on one of them, that is the usual cause.
+- **Build on a compute node.** The Isambard 3 login nodes cap user processes at
+  `ulimit -u` 900, which a full parallel build (and pixi's first-time env solve)
+  can exhaust (`fork: Resource temporarily unavailable`). Run the build on a
+  `grace` compute node, which has no practical process limit and dedicated cores,
+  e.g. `sbatch` a one-line job that runs `pixi run build` (account `brics.e5a`).
+  Concretization alone is single-process and fine on the login node.
 - **lfric_atm** is intentionally not part of `build`: it clones private physics
   repos (casim/jules/socrates) over SSH. The Spack environment is complete
   without it.
@@ -123,7 +148,7 @@ self-contained.
 | `HEAVY_PKGS` | `node-js rust` | Packages built first at `HEAVY_JOBS` before the rest |
 | `MAKE_JOBS` | `8` | Parallel make jobs for `lfric_atm` |
 | `LFRIC_WORKING_DIR` | `<repo>/working_dir` | Where build output lands |
-| `GCC_MODULE` | `gcc-native/12.3` | Module providing `gcc@12.3.0` |
+| `GCC_MODULE` | `gcc-native/14` | Best-effort `module load` (compiler is pinned as an external in `spack.yaml`, so this is informational only) |
 | `RUN_XIOS_VERIFICATION` | `1` | Set `0` to skip the XIOS network check in `build` |
 | `CYLC_RUN_BASE` | `$PROJECTDIR/$USER/cylc-run` | Cylc run directory |
 
