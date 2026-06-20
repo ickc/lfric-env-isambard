@@ -56,9 +56,27 @@ export LDMPI="${LDMPI:-ftn}"
 export CXX="${CXX:-CC}"
 info "MPI compiler: $("$FC" --version 2>/dev/null | head -1) (FC=$FC LDMPI=$LDMPI CXX=$CXX)"
 
+# External libraries (XIOS, NetCDF, HDF5, YAXT, ...) are built by Spack and live
+# in the env view. The LFRic Makefiles locate them via FFLAGS (-I, for the .mod
+# files like xios.mod) and LDFLAGS (-L + -rpath, for libxios.a/libnetcdff.so/...),
+# mirroring the Met Office Spack build (rose-stem esnz cascade). The Cray ftn
+# wrapper ignores CPATH/LIBRARY_PATH, so these MUST go through F/LDFLAGS. (mpi.mod
+# and the MPI libs come from the ftn wrapper itself.) env-runtime.sh already put
+# shumlib on F/LDFLAGS/LD_LIBRARY_PATH; prepend the view's dirs here.
+_view="$SPACK_ENV_DIR/.spack-env/view"
+[ -d "$_view/include" ] || die "Spack env view missing at $_view — run: pixi run build"
+export FFLAGS="-I$_view/include${FFLAGS:+ $FFLAGS}"
+export LDFLAGS="-L$_view/lib -L$_view/lib64 -Wl,-rpath=$_view/lib -Wl,-rpath=$_view/lib64${LDFLAGS:+ $LDFLAGS}"
+export LD_LIBRARY_PATH="$_view/lib:$_view/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+info "External libs (view): FFLAGS/LDFLAGS point at $_view"
+
 APPS_ROOT_DIR="${APPS_ROOT_DIR:-$REPO_ROOT/vendor/lfric_apps}"
 CORE_ROOT_DIR="${CORE_ROOT_DIR:-$REPO_ROOT/vendor/lfric_core}"
-LFRIC_TARGET_PLATFORM="${LFRIC_TARGET_PLATFORM:-meto-spice}"
+# PSyclone optimisation set: a dir under applications/lfric_atm/optimisation/.
+# "minimum" is the Makefile's portable baseline (and its default); override with
+# e.g. meto-ex1a for Cray-EX-tuned transforms. Upstream replaced the old
+# -u/--target_platform flag with -p/PSYCLONE_TRANSFORMATION.
+PSYCLONE_TRANSFORMATION="${PSYCLONE_TRANSFORMATION:-minimum}"
 MAKE_JOBS="${MAKE_JOBS:-8}"
 PROJECT="${PROJECT:-lfric_atm}"
 
@@ -95,30 +113,19 @@ LOCAL_BUILD_WORKING_DIR="$APPS_ROOT_DIR/applications/lfric_atm/working"
 LOCAL_BUILD_LOG="$WORKING_DIR/lfric_atm-make.log"
 [ "${CLEAN_BUILD_WORKING:-1}" != "0" ] && rm -rf "$LOCAL_BUILD_WORKING_DIR/build_lfric_atm"
 
-build_once() {
-  local with_target="$1"
+build_lfric_atm() {
   local cmd=(
     "$PYTHON_BIN" "$APPS_ROOT_DIR/build/local_build.py" lfric_atm
     -c "$CORE_ROOT_DIR" -w "$LOCAL_BUILD_WORKING_DIR" -j "$MAKE_JOBS" -t build
+    -p "$PSYCLONE_TRANSFORMATION"
   )
-  [ "$with_target" = "1" ] && cmd+=(-u "$LFRIC_TARGET_PLATFORM")
   [ "${VERBOSE_BUILD:-0}" = "1" ] && cmd+=(-v)
   ( cd "$APPS_ROOT_DIR" && "${cmd[@]}" ) |& tee "$LOCAL_BUILD_LOG"
   return "${PIPESTATUS[0]}"
 }
 
-added_target=1
-help_txt="$("$PYTHON_BIN" "$APPS_ROOT_DIR/build/local_build.py" -h 2>&1 || true)"
-printf '%s\n' "$help_txt" | grep -qE '(^|[[:space:]])-u([[:space:],]|$)|--target' || added_target=0
-
-info "Building lfric_atm (target platform: $LFRIC_TARGET_PLATFORM, -u included: $added_target)"
-build_once "$added_target"
-status=$?
-if [ "$status" -ne 0 ] && [ "$added_target" -eq 1 ] && grep -q "unrecognized arguments: -u" "$LOCAL_BUILD_LOG"; then
-  warn "local_build.py rejected -u; retrying without target platform"
-  build_once 0; status=$?
-fi
-[ "$status" -eq 0 ] || die "local_build.py failed for lfric_atm (exit $status). See $LOCAL_BUILD_LOG"
+info "Building lfric_atm (PSYCLONE_TRANSFORMATION=$PSYCLONE_TRANSFORMATION, -j $MAKE_JOBS)"
+build_lfric_atm || die "local_build.py failed for lfric_atm. See $LOCAL_BUILD_LOG"
 
 APP_BIN="$APPS_ROOT_DIR/applications/$PROJECT/bin/$PROJECT"
 [ -x "$APP_BIN" ] || die "Executable not found at $APP_BIN"
