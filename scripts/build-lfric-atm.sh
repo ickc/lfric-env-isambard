@@ -20,16 +20,42 @@ die()  { echo "ERROR: $*" >&2; exit 1; }
 # Accept new host keys non-interactively for the physics-repo clones.
 export GIT_SSH_COMMAND="${GIT_SSH_COMMAND:-ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes}"
 
-# Load GCC 12.3 for the compile (same as build.sh).
-GCC_MODULE="${GCC_MODULE:-gcc-native/12.3}"
+# --- Cray PrgEnv-gnu toolchain + cray-mpich --------------------------------
+# lfric_atm is compiled here directly via local_build.py (NOT through Spack), so
+# this step needs the same Cray PE GNU stack build.sh uses: gcc@14.3.0
+# (gcc-native/14) + the system cray-mpich. Loading PrgEnv-gnu is REQUIRED: it
+# puts the Cray compiler wrappers (ftn/cc/CC) on PATH and sets PE_ENV/CRAY_*.
+# env-runtime.sh deliberately does NOT pin FC (the MPI compiler is the Cray ftn
+# wrapper), so we load PrgEnv-gnu and set the MPI compiler vars here.
+PRGENV_MODULE="${PRGENV_MODULE:-PrgEnv-gnu}"
+CRAYPE_TARGET="${CRAYPE_TARGET:-craype-arm-grace}"
 if ! command -v module >/dev/null 2>&1; then
-  for f in /etc/profile.d/lmod.sh /etc/profile.d/modules.sh \
-           /usr/share/lmod/lmod/init/bash /opt/cray/pe/lmod/lmod/init/bash; do
+  for f in /opt/cray/pe/lmod/lmod/init/bash /etc/profile.d/lmod.sh \
+           /etc/profile.d/modules.sh /usr/share/lmod/lmod/init/bash; do
     # shellcheck source=/dev/null
     [ -f "$f" ] && . "$f" && break
   done
 fi
-command -v module >/dev/null 2>&1 && module load "$GCC_MODULE" 2>/dev/null || true
+command -v module >/dev/null 2>&1 \
+  || die "no 'module' command found — cannot load $PRGENV_MODULE for the Cray ftn/cray-mpich wrappers"
+module load "$PRGENV_MODULE" || die "could not 'module load $PRGENV_MODULE'"
+module load "$CRAYPE_TARGET" 2>/dev/null \
+  || warn "could not load $CRAYPE_TARGET (target may default to aarch64)"
+if [ -z "${CRAY_MPICH_DIR:-}" ] || [ ! -d "${CRAY_MPICH_DIR:-/nonexistent}" ]; then
+  die "CRAY_MPICH_DIR unset/missing after 'module load $PRGENV_MODULE' — Cray MPI wrappers cannot resolve"
+fi
+info "cray-mpich: $CRAY_MPICH_DIR (v${CRAY_MPICH_VERSION:-?})"
+
+# LFRic's Makefiles require FC (fortran.mk errors if unset) and LDMPI (the MPI
+# linker; compile.mk provides no default). On the Cray PE the MPI Fortran
+# compiler/linker is the `ftn` wrapper (gfortran-14 + cray-mpich) and the C++ one
+# is `CC`. PE_ENV=GNU makes lfric.mk set CRAY_ENVIRONMENT, so fortran/cxx.mk
+# select the gfortran/g++ flag sets for those wrappers. (FPP comes from
+# env-runtime.sh.)
+export FC="${FC:-ftn}"
+export LDMPI="${LDMPI:-ftn}"
+export CXX="${CXX:-CC}"
+info "MPI compiler: $("$FC" --version 2>/dev/null | head -1) (FC=$FC LDMPI=$LDMPI CXX=$CXX)"
 
 APPS_ROOT_DIR="${APPS_ROOT_DIR:-$REPO_ROOT/vendor/lfric_apps}"
 CORE_ROOT_DIR="${CORE_ROOT_DIR:-$REPO_ROOT/vendor/lfric_core}"
