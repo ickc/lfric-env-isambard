@@ -85,6 +85,50 @@ spack:
       - spec: cray-pmi@6.1.15
         prefix: /opt/cray/pe/pmi/6.1.15
         modules: [cray-pmi/6.1.15]
+    # --- Cray parallel I/O stack (HDF5 + netCDF) ---------------------------
+    # Same story as cray-mpich above: Cray ships these only as gnu/12.3 builds,
+    # but maps gcc-native/14 onto them and their Fortran .mod files are module
+    # format v15 (which gcc@14.3.0 reads). We externalize the *parallel* (MPI)
+    # builds — /opt/cray/pe/{hdf5-parallel,netcdf-hdf5parallel} — whose
+    # unsuffixed libhdf5.so/libnetcdf.so resolve to the MPI variants (libhdf5.so
+    # -> libhdf5_parallel_gnu.so, which NEEDs libmpi_gnu.so.12 == cray-mpich@9.1.0).
+    # Versions match the cray-hdf5-parallel/1.14.3.9 + cray-netcdf-hdf5parallel/
+    # 4.9.2.3 modules that build.sh / build-lfric-atm.sh load (their dirs then
+    # also land on CRAY_LD_LIBRARY_PATH -> env-runtime.sh, and the Cray ftn/CC
+    # wrappers auto-inject them for the non-Spack lfric_atm compile). As with
+    # cray-mpich, Spack prunes the external's deps, so the lib dirs are pinned on
+    # LIBRARY_PATH/LD_LIBRARY_PATH here. netcdf-c and netcdf-fortran share one
+    # Cray prefix.
+    hdf5:
+      buildable: false
+      externals:
+      - spec: hdf5@1.14.3 +mpi+fortran+hl~cxx
+        prefix: /opt/cray/pe/hdf5-parallel/1.14.3.9/gnu/12.3
+        extra_attributes:
+          environment:
+            prepend_path:
+              LIBRARY_PATH: /opt/cray/pe/hdf5-parallel/1.14.3.9/gnu/12.3/lib
+              LD_LIBRARY_PATH: /opt/cray/pe/hdf5-parallel/1.14.3.9/gnu/12.3/lib
+    netcdf-c:
+      buildable: false
+      externals:
+      - spec: netcdf-c@4.9.2 +mpi~dap
+        prefix: /opt/cray/pe/netcdf-hdf5parallel/4.9.2.3/gnu/12.3
+        extra_attributes:
+          environment:
+            prepend_path:
+              LIBRARY_PATH: /opt/cray/pe/netcdf-hdf5parallel/4.9.2.3/gnu/12.3/lib
+              LD_LIBRARY_PATH: /opt/cray/pe/netcdf-hdf5parallel/4.9.2.3/gnu/12.3/lib
+    netcdf-fortran:
+      buildable: false
+      externals:
+      - spec: netcdf-fortran@4.6.1
+        prefix: /opt/cray/pe/netcdf-hdf5parallel/4.9.2.3/gnu/12.3
+        extra_attributes:
+          environment:
+            prepend_path:
+              LIBRARY_PATH: /opt/cray/pe/netcdf-hdf5parallel/4.9.2.3/gnu/12.3/lib
+              LD_LIBRARY_PATH: /opt/cray/pe/netcdf-hdf5parallel/4.9.2.3/gnu/12.3/lib
     python:
       variants: +shared
     py-setuptools:

@@ -27,6 +27,12 @@ COMPILER_SPEC="${COMPILER_SPEC#%}"
 # craype-arm-grace selects the Neoverse-V2 (Grace) CPU target.
 PRGENV_MODULE="${PRGENV_MODULE:-PrgEnv-gnu}"
 CRAYPE_TARGET="${CRAYPE_TARGET:-craype-arm-grace}"
+# Cray parallel HDF5 + netCDF-C/Fortran, used as Spack externals (spack.yaml).
+# Not part of the default PrgEnv-gnu: they live under the cray-mpich module
+# hierarchy (load AFTER PrgEnv-gnu) and default to an older version — so pin
+# them. Versions must match the external prefixes in spack-env/spack.yaml.
+HDF5_MODULE="${HDF5_MODULE:-cray-hdf5-parallel/1.14.3.9}"
+NETCDF_MODULE="${NETCDF_MODULE:-cray-netcdf-hdf5parallel/4.9.2.3}"
 
 info() { echo "INFO: $*"; }
 warn() { echo "WARN: $*" >&2; }
@@ -63,6 +69,13 @@ command -v module >/dev/null 2>&1 \
 module load "$PRGENV_MODULE" || die "could not 'module load $PRGENV_MODULE'"
 module load "$CRAYPE_TARGET" 2>/dev/null \
   || warn "could not load $CRAYPE_TARGET (target may default to aarch64)"
+# cray-hdf5-parallel / cray-netcdf-hdf5parallel back the hdf5/netcdf-c/
+# netcdf-fortran externals in spack.yaml. Spack resolves those via their pinned
+# prefixes, but loading the modules here puts the same (parallel, gnu/12.3) lib
+# dirs on CRAY_LD_LIBRARY_PATH/PKG_CONFIG_PATH — which env-runtime.sh captures so
+# view binaries linking HDF5/netCDF resolve their .so at runtime.
+module load "$HDF5_MODULE" "$NETCDF_MODULE" \
+  || die "could not load $HDF5_MODULE / $NETCDF_MODULE (parallel Cray HDF5/netCDF backing the spack.yaml externals)"
 GCC_FC="${GCC_FC:-/usr/bin/gfortran-14}"
 if [ -x "$GCC_FC" ]; then
   info "gcc (external): $("$GCC_FC" --version 2>/dev/null | head -1)"
@@ -128,6 +141,16 @@ if grep -qE '"name":[[:space:]]*"(mpich|openmpi)"' "$SPACK_ENV_DIR/spack.lock" 2
   die "a from-source MPI (mpich/openmpi) entered the solve; expected only cray-mpich. Is PrgEnv-gnu loaded and the cray-mpich external resolving?"
 fi
 info "MPI provider: cray-mpich (external) — OK"
+
+# Likewise assert the Cray parallel HDF5/netCDF externals resolved: their prefixes
+# must appear in the solve. If an external stopped resolving, Spack would silently
+# build hdf5/netcdf-c from source — defeating the system-library switch and risking
+# a gfortran .mod mismatch against gcc@14.3.0.
+for _ext in /opt/cray/pe/hdf5-parallel /opt/cray/pe/netcdf-hdf5parallel; do
+  grep -q "$_ext" "$SPACK_ENV_DIR/spack.lock" 2>/dev/null \
+    || die "expected external prefix $_ext in the solve; hdf5/netcdf may have gone from-source. Are cray-hdf5-parallel/cray-netcdf-hdf5parallel loaded and the spack.yaml externals resolving?"
+done
+info "HDF5/netCDF provider: cray-hdf5-parallel + cray-netcdf-hdf5parallel (external) — OK"
 
 if [ "${STOP_AFTER_CONCRETIZE:-0}" = "1" ]; then
   info "STOP_AFTER_CONCRETIZE=1 — concretization succeeded; stopping before install."
