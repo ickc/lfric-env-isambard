@@ -46,7 +46,7 @@ PSyclone version: 3.2.2
 | `patch` | Apply every `patches/*-patch.sh` (sorted, idempotent). |
 | `unpatch` | Revert all patches by resetting the patched submodules. |
 | `build` | Build the Spack environment (applies patches, concretizes, installs). |
-| `build-lfric-atm` | Optionally compile `lfric_atm` + run its example (needs SSH to physics repos). |
+| `build-lfric-atm` | Optionally compile `lfric_atm` + run its example (uses the pinned `vendor/physics/` submodules; no build-time SSH). |
 | `activate` | Activate + print rose/cylc/psyclone versions. |
 | `verify-xios` | Check the migrated XIOS source matches the pinned commit. |
 | `clean` | Remove `working_dir/` (keeps submodules and patches). |
@@ -134,10 +134,11 @@ automatically, so it is always self-contained.
   external's dependencies, the `libfabric`/`pmi`/`pals` library directories are
   injected through cray-mpich's `extra_attributes` so dependents link and run.
 - **MetOffice SSH/SSO.** The private Met Office submodules (`lfric_apps`,
-  `lfric_core`, `mo-spack-packages`) are cloned over SSH and
-  require an SSH key authorized for `MetOffice` SAML SSO (GitHub → Settings → SSH
-  keys → Configure SSO), or an HTTPS credential helper (`gh auth setup-git`). If
-  `submodule-init` fails on one of them, that is the usual cause.
+  `lfric_core`, `mo-spack-packages`, and the physics repos under
+  `vendor/physics/`: `casim`, `jules`, `socrates`, `ukca`) are cloned over SSH
+  and require an SSH key authorized for `MetOffice` SAML SSO (GitHub → Settings →
+  SSH keys → Configure SSO), or an HTTPS credential helper (`gh auth setup-git`).
+  If `submodule-init` fails on one of them, that is the usual cause.
 - **Build on a compute node — keep the job small and short.** The Isambard 3
   login nodes cap user processes at `ulimit -u` 900, which a full parallel build
   (and pixi's first-time env solve) can exhaust (`fork: Resource temporarily
@@ -166,9 +167,10 @@ automatically, so it is always self-contained.
   push the job behind the partition's reservations. `SPACK_JOBS` defaults to
   `$SLURM_CPUS_PER_TASK`. Concretization alone is single-process and fine on the
   login node.
-- **lfric_atm** is intentionally not part of `build`: it clones private physics
-  repos (casim/jules/socrates) over SSH. The Spack environment is complete
-  without it.
+- **lfric_atm** is intentionally not part of `build`: it needs the private
+  physics repos (casim/jules/socrates/ukca), vendored as pinned submodules under
+  `vendor/physics/` and consumed via `PHYSICS_ROOT`, so the compile itself does
+  no build-time cloning. The Spack environment is complete without it.
 
 ## Useful overrides
 

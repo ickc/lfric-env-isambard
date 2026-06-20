@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # build-lfric-atm.sh — compile lfric_atm and run its example.
 #
-# Separate from `build` because this step clones private Met Office physics
-# repos (casim, jules, socrates) over SSH during the build. You need a running
-# SSH agent whose key is authorized for those repos. The Spack environment from
+# Separate from `build` because lfric_atm needs the private Met Office physics
+# repos (casim, jules, socrates, ukca). Those are vendored as pinned submodules
+# under vendor/physics/ and fed to the LFRic extract step via PHYSICS_ROOT, so
+# the compile does NOT clone anything over SSH — it is offline/reproducible once
+# `pixi run submodule-init` has populated them. The Spack environment from
 # `pixi run build` is complete and usable without this step.
 set -uo pipefail
 
@@ -16,9 +18,6 @@ warn() { echo "WARN: $*" >&2; }
 die()  { echo "ERROR: $*" >&2; exit 1; }
 
 [ -f "$WORKING_DIR/env-runtime.sh" ] || die "Environment not built. Run: pixi run build"
-
-# Accept new host keys non-interactively for the physics-repo clones.
-export GIT_SSH_COMMAND="${GIT_SSH_COMMAND:-ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes}"
 
 # --- Cray PrgEnv-gnu toolchain + cray-mpich --------------------------------
 # lfric_atm is compiled here directly via local_build.py (NOT through Spack), so
@@ -62,6 +61,18 @@ CORE_ROOT_DIR="${CORE_ROOT_DIR:-$REPO_ROOT/vendor/lfric_core}"
 LFRIC_TARGET_PLATFORM="${LFRIC_TARGET_PLATFORM:-meto-spice}"
 MAKE_JOBS="${MAKE_JOBS:-8}"
 PROJECT="${PROJECT:-lfric_atm}"
+
+# Physics sources: vendored, pinned submodules under vendor/physics/ instead of
+# build-time SSH clones. lfric_apps' extract step (build/extract/extract_science.py,
+# used for casim/ukca and the jules/socrates interfaces) reads $PHYSICS_ROOT/<dep>
+# directly when PHYSICS_ROOT is set, skipping clone_and_merge entirely. lfric_core
+# is supplied separately as a local path via -c below (also no network).
+export PHYSICS_ROOT="${PHYSICS_ROOT:-$REPO_ROOT/vendor/physics}"
+for _dep in casim jules socrates ukca; do
+  [ -e "$PHYSICS_ROOT/$_dep/.git" ] \
+    || die "physics submodule '$_dep' not initialized under $PHYSICS_ROOT — run: pixi run submodule-init"
+done
+info "Physics sources (PHYSICS_ROOT): $PHYSICS_ROOT (casim/jules/socrates/ukca, pinned submodules)"
 
 # local_build.py invokes `python`; ensure one exists on PATH.
 PYTHON_BIN="${PYTHON:-}"

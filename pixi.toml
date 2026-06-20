@@ -37,7 +37,9 @@ unpatch = "bash scripts/unpatch.sh"
 build = "bash scripts/build.sh"
 
 # Optional: compile lfric_atm and run its example. Separate from `build` because
-# it clones private physics repos (casim/jules/socrates) over SSH.
+# it needs the private physics repos (casim/jules/socrates/ukca) — now vendored
+# as pinned submodules under vendor/physics/ and consumed via PHYSICS_ROOT, so
+# the compile itself does no network/SSH (run `submodule-init` once beforehand).
 build-lfric-atm = "bash scripts/build-lfric-atm.sh"
 
 # Activate the environment and report tool versions (rose / cylc / psyclone).
