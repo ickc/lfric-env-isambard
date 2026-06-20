@@ -41,7 +41,15 @@ unpatch = "bash scripts/unpatch.sh"
 # Build the Spack environment — the bulk of the work (~2-4 h from scratch on a
 # login node; re-runs are incremental). Applies patches first, then concretizes
 # and installs into working_dir/.
+#
+# Two dependency variants share one install tree (working_dir/opt), selected by
+# LFRIC_STACK (default "cray"; see scripts/common.sh):
+#   pixi run build                     # cray: system cray-mpich + Cray HDF5/netCDF
+#   pixi run build-spack               # spack: mpich + HDF5/netCDF from source
+# The convenience tasks below just set LFRIC_STACK; equivalently prefix any task,
+# e.g. `LFRIC_STACK=spack pixi run build-lfric-atm`.
 build = "bash scripts/build.sh"
+build-spack = "LFRIC_STACK=spack bash scripts/build.sh"
 
 # Optional: compile lfric_atm and run its example. Separate from `build` because
 # it needs the private physics repos (casim/jules/socrates/ukca) — now vendored
@@ -50,7 +58,9 @@ build = "bash scripts/build.sh"
 build-lfric-atm = "bash scripts/build-lfric-atm.sh"
 
 # Activate the environment and report tool versions (rose / cylc / psyclone).
+# activate-spack reports the from-source variant; either is a no-op until built.
 activate = "bash scripts/print-versions.sh"
+activate-spack = "LFRIC_STACK=spack bash scripts/print-versions.sh"
 
 # Verify the migrated XIOS source matches the pinned commit (network check).
 verify-xios = "bash scripts/xios-verification.sh"

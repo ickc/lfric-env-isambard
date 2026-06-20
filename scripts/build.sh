@@ -27,16 +27,25 @@ COMPILER_SPEC="${COMPILER_SPEC#%}"
 # craype-arm-grace selects the Neoverse-V2 (Grace) CPU target.
 PRGENV_MODULE="${PRGENV_MODULE:-PrgEnv-gnu}"
 CRAYPE_TARGET="${CRAYPE_TARGET:-craype-arm-grace}"
-# Cray parallel HDF5 + netCDF-C/Fortran, used as Spack externals (spack.yaml).
-# Not part of the default PrgEnv-gnu: they live under the cray-mpich module
-# hierarchy (load AFTER PrgEnv-gnu) and default to an older version — so pin
-# them. Versions must match the external prefixes in spack-env/spack.yaml.
+# Cray parallel HDF5 + netCDF-C/Fortran modules (cray variant only), backing the
+# externals in spack-env/cray/spack.yaml. Not part of the default PrgEnv-gnu:
+# they live under the cray-mpich module hierarchy (load AFTER PrgEnv-gnu) and
+# default to an older version — so pin them. Versions must match the external
+# prefixes in spack-env/cray/spack.yaml.
 HDF5_MODULE="${HDF5_MODULE:-cray-hdf5-parallel/1.14.3.9}"
 NETCDF_MODULE="${NETCDF_MODULE:-cray-netcdf-hdf5parallel/4.9.2.3}"
 
 info() { echo "INFO: $*"; }
 warn() { echo "WARN: $*" >&2; }
 die()  { echo "ERROR: $*" >&2; exit 1; }
+
+# Dependency stack variant (cray | spack), set in common.sh. Validate here (an
+# executed script, where die is safe) and report which environment we build.
+case "$LFRIC_STACK" in
+  cray|spack) ;;
+  *) die "LFRIC_STACK must be 'cray' or 'spack' (got '$LFRIC_STACK')" ;;
+esac
+info "Dependency stack variant: LFRIC_STACK=$LFRIC_STACK (env: $SPACK_ENV_DIR)"
 
 mkdir -p "$WORKING_DIR" "$SPACK_USER_CONFIG_PATH" "$SPACK_USER_CACHE_PATH"
 
@@ -50,42 +59,48 @@ done
 info "Applying patches"
 bash "$_here/patch-all.sh" || die "patch-all failed"
 
-# --- 2. Cray PrgEnv-gnu toolchain + cray-mpich -----------------------------
-# The environment builds on the Cray PE GNU stack: gcc@14.3.0 (== gcc-native/14
-# == /usr/bin/gcc-14) as the compiler and the system cray-mpich as the MPI —
-# both pinned as externals in spack-env/spack.yaml. Loading PrgEnv-gnu is now
-# REQUIRED (not a nicety): it puts cray-mpich/libfabric/cray-pmi on the module
-# path so their externals resolve, and sets the CRAY_* lib paths needed at
-# build/link time. craype-arm-grace selects the Neoverse-V2 (Grace) target.
-if ! command -v module >/dev/null 2>&1; then
-  for f in /opt/cray/pe/lmod/lmod/init/bash /etc/profile.d/lmod.sh \
-           /etc/profile.d/modules.sh /usr/share/lmod/lmod/init/bash; do
-    # shellcheck source=/dev/null
-    [ -f "$f" ] && . "$f" && break
-  done
+# --- 2. Toolchain + MPI/IO stack -------------------------------------------
+# The compiler is gcc@14.3.0 (== gcc-native/14 == /usr/bin/gcc-14), an explicit
+# external in spack-env/common.yaml, for BOTH variants. LFRIC_STACK decides the
+# MPI + parallel I/O provider:
+#   cray  - system cray-mpich + Cray parallel HDF5/netCDF (externals). Loading
+#           PrgEnv-gnu is REQUIRED (not a nicety): it puts cray-mpich/libfabric/
+#           cray-pmi on the module path so their externals resolve, and sets the
+#           CRAY_* lib paths needed at build/link time. craype-arm-grace selects
+#           the Neoverse-V2 (Grace) target. cray-hdf5-parallel/cray-netcdf-
+#           hdf5parallel back the hdf5/netcdf externals: loading them puts the
+#           same (parallel, gnu/12.3) lib dirs on CRAY_LD_LIBRARY_PATH, which the
+#           runtime snippet captures so view binaries resolve their .so at run.
+#   spack - mpich + HDF5/netCDF built from source; no Cray modules are loaded
+#           (the gcc external is the always-present system /usr/bin/gcc-14).
+if [ "$LFRIC_STACK" = cray ]; then
+  if ! command -v module >/dev/null 2>&1; then
+    for f in /opt/cray/pe/lmod/lmod/init/bash /etc/profile.d/lmod.sh \
+             /etc/profile.d/modules.sh /usr/share/lmod/lmod/init/bash; do
+      # shellcheck source=/dev/null
+      [ -f "$f" ] && . "$f" && break
+    done
+  fi
+  command -v module >/dev/null 2>&1 \
+    || die "no 'module' command found — cannot load $PRGENV_MODULE; cray-mpich external will not resolve"
+  module load "$PRGENV_MODULE" || die "could not 'module load $PRGENV_MODULE'"
+  module load "$CRAYPE_TARGET" 2>/dev/null \
+    || warn "could not load $CRAYPE_TARGET (target may default to aarch64)"
+  module load "$HDF5_MODULE" "$NETCDF_MODULE" \
+    || die "could not load $HDF5_MODULE / $NETCDF_MODULE (parallel Cray HDF5/netCDF backing the cray/spack.yaml externals)"
+  if [ -n "${CRAY_MPICH_DIR:-}" ] && [ -d "${CRAY_MPICH_DIR:-/nonexistent}" ]; then
+    info "cray-mpich: $CRAY_MPICH_DIR (v${CRAY_MPICH_VERSION:-?})"
+  else
+    die "CRAY_MPICH_DIR unset/missing after 'module load $PRGENV_MODULE' — cray-mpich external cannot resolve"
+  fi
+else
+  info "LFRIC_STACK=spack: building mpich + HDF5/netCDF from source; loading no Cray modules"
 fi
-command -v module >/dev/null 2>&1 \
-  || die "no 'module' command found — cannot load $PRGENV_MODULE; cray-mpich external will not resolve"
-module load "$PRGENV_MODULE" || die "could not 'module load $PRGENV_MODULE'"
-module load "$CRAYPE_TARGET" 2>/dev/null \
-  || warn "could not load $CRAYPE_TARGET (target may default to aarch64)"
-# cray-hdf5-parallel / cray-netcdf-hdf5parallel back the hdf5/netcdf-c/
-# netcdf-fortran externals in spack.yaml. Spack resolves those via their pinned
-# prefixes, but loading the modules here puts the same (parallel, gnu/12.3) lib
-# dirs on CRAY_LD_LIBRARY_PATH/PKG_CONFIG_PATH — which env-runtime.sh captures so
-# view binaries linking HDF5/netCDF resolve their .so at runtime.
-module load "$HDF5_MODULE" "$NETCDF_MODULE" \
-  || die "could not load $HDF5_MODULE / $NETCDF_MODULE (parallel Cray HDF5/netCDF backing the spack.yaml externals)"
 GCC_FC="${GCC_FC:-/usr/bin/gfortran-14}"
 if [ -x "$GCC_FC" ]; then
   info "gcc (external): $("$GCC_FC" --version 2>/dev/null | head -1)"
 else
-  warn "$GCC_FC missing — the env's gcc external (spack.yaml) may not build Fortran"
-fi
-if [ -n "${CRAY_MPICH_DIR:-}" ] && [ -d "${CRAY_MPICH_DIR:-/nonexistent}" ]; then
-  info "cray-mpich: $CRAY_MPICH_DIR (v${CRAY_MPICH_VERSION:-?})"
-else
-  die "CRAY_MPICH_DIR unset/missing after 'module load $PRGENV_MODULE' — cray-mpich external cannot resolve"
+  warn "$GCC_FC missing — the env's gcc external (common.yaml) may not build Fortran"
 fi
 
 # --- 3. XIOS source verification (non-fatal) -------------------------------
@@ -115,15 +130,15 @@ config:
 EOF
 
 # --- 6. Compilers ----------------------------------------------------------
-# The compiler is declared as an explicit external in spack-env/spack.yaml
+# The compiler is declared as an explicit external in spack-env/common.yaml
 # (gcc@14.3.0) and pinned via per-language requires, so we deliberately do NOT
 # run `spack compiler find`: with the env active (pixi activates it) that would
-# rewrite the tracked spack.yaml, and a stray gcc on PATH could derail the solve.
+# rewrite the tracked manifest, and a stray gcc on PATH could derail the solve.
 info "Using gcc external pinned in spack.yaml ($COMPILER_SPEC)"
 
 # --- 7. Sanity: environment repos resolve (incl. vendored builtin) ---------
 info "Environment package repos:"
-spack -e "$SPACK_ENV_DIR" repo list || die "spack repo list failed (check spack-env/spack.yaml repo paths)"
+spack -e "$SPACK_ENV_DIR" repo list || die "spack repo list failed (check spack-env/common.yaml repo paths)"
 
 # --- 8. Concretize ---------------------------------------------------------
 # --fresh: this is a pinned, reproducible env (submodule-pinned spack +
@@ -133,24 +148,41 @@ spack -e "$SPACK_ENV_DIR" repo list || die "spack repo list failed (check spack-
 info "Concretizing $ENV_NAME"
 spack -e "$SPACK_ENV_DIR" concretize -f --fresh || die "concretize failed"
 
-# MPI must be the system cray-mpich (see providers in spack.yaml). Fail loudly
-# if a from-source mpich/openmpi entered the DAG (e.g. the external stopped
-# resolving): that defeats the cray-mpich switch and risks a gfortran .mod
-# mismatch against our gcc@14.3.0.
-if grep -qE '"name":[[:space:]]*"(mpich|openmpi)"' "$SPACK_ENV_DIR/spack.lock" 2>/dev/null; then
-  die "a from-source MPI (mpich/openmpi) entered the solve; expected only cray-mpich. Is PrgEnv-gnu loaded and the cray-mpich external resolving?"
+# Assert the solve matches the requested variant, so a silently mis-resolved
+# external (or a leaking PrgEnv) can never produce the wrong stack.
+if [ "$LFRIC_STACK" = cray ]; then
+  # MPI must be the system cray-mpich (providers in cray/spack.yaml). Fail loudly
+  # if a from-source mpich/openmpi entered the DAG (e.g. the external stopped
+  # resolving): that defeats the cray-mpich switch and risks a gfortran .mod
+  # mismatch against our gcc@14.3.0.
+  if grep -qE '"name":[[:space:]]*"(mpich|openmpi)"' "$SPACK_ENV_DIR/spack.lock" 2>/dev/null; then
+    die "a from-source MPI (mpich/openmpi) entered the solve; expected only cray-mpich. Is PrgEnv-gnu loaded and the cray-mpich external resolving?"
+  fi
+  info "MPI provider: cray-mpich (external) — OK"
+  # Likewise assert the Cray parallel HDF5/netCDF externals resolved: their
+  # prefixes must appear in the solve. If an external stopped resolving, Spack
+  # would silently build hdf5/netcdf-c from source — defeating the system-library
+  # switch and risking a gfortran .mod mismatch against gcc@14.3.0.
+  for _ext in /opt/cray/pe/hdf5-parallel /opt/cray/pe/netcdf-hdf5parallel; do
+    grep -q "$_ext" "$SPACK_ENV_DIR/spack.lock" 2>/dev/null \
+      || die "expected external prefix $_ext in the solve; hdf5/netcdf may have gone from-source. Are cray-hdf5-parallel/cray-netcdf-hdf5parallel loaded and the cray/spack.yaml externals resolving?"
+  done
+  info "HDF5/netCDF provider: cray-hdf5-parallel + cray-netcdf-hdf5parallel (external) — OK"
+else
+  # spack variant: the inverse — ensure we did NOT silently pick up the Cray
+  # externals (e.g. a stray PrgEnv in the environment), so this really is the
+  # from-source stack it claims to be.
+  if grep -qE '"name":[[:space:]]*"cray-mpich"' "$SPACK_ENV_DIR/spack.lock" 2>/dev/null; then
+    die "cray-mpich entered the LFRIC_STACK=spack solve; expected a from-source mpich. Is a Cray PrgEnv leaking into the environment?"
+  fi
+  if ! grep -qE '"name":[[:space:]]*"mpich"' "$SPACK_ENV_DIR/spack.lock" 2>/dev/null; then
+    die "no from-source mpich in the LFRIC_STACK=spack solve (MPI provider did not resolve to mpich)."
+  fi
+  if grep -qE '/opt/cray/pe/(hdf5-parallel|netcdf-hdf5parallel)' "$SPACK_ENV_DIR/spack.lock" 2>/dev/null; then
+    die "a Cray HDF5/netCDF external prefix entered the LFRIC_STACK=spack solve; expected from-source hdf5/netcdf."
+  fi
+  info "MPI/IO provider: from-source mpich + hdf5/netcdf — OK"
 fi
-info "MPI provider: cray-mpich (external) — OK"
-
-# Likewise assert the Cray parallel HDF5/netCDF externals resolved: their prefixes
-# must appear in the solve. If an external stopped resolving, Spack would silently
-# build hdf5/netcdf-c from source — defeating the system-library switch and risking
-# a gfortran .mod mismatch against gcc@14.3.0.
-for _ext in /opt/cray/pe/hdf5-parallel /opt/cray/pe/netcdf-hdf5parallel; do
-  grep -q "$_ext" "$SPACK_ENV_DIR/spack.lock" 2>/dev/null \
-    || die "expected external prefix $_ext in the solve; hdf5/netcdf may have gone from-source. Are cray-hdf5-parallel/cray-netcdf-hdf5parallel loaded and the spack.yaml externals resolving?"
-done
-info "HDF5/netCDF provider: cray-hdf5-parallel + cray-netcdf-hdf5parallel (external) — OK"
 
 if [ "${STOP_AFTER_CONCRETIZE:-0}" = "1" ]; then
   info "STOP_AFTER_CONCRETIZE=1 — concretization succeeded; stopping before install."
@@ -195,10 +227,10 @@ if ! spack -e "$SPACK_ENV_DIR" env view regenerate; then
   spack -e "$SPACK_ENV_DIR" env view regenerate || die "view regenerate failed"
 fi
 
-# --- 11. Resolve runtime env once -> working_dir/env-runtime.sh ------------
-info "Writing runtime snippet (working_dir/env-runtime.sh)"
+# --- 11. Resolve runtime env once -> working_dir/env-runtime-<variant>.sh --
+info "Writing runtime snippet ($ENV_RUNTIME)"
 view="$SPACK_ENV_DIR/.spack-env/view"
-runtime="$WORKING_DIR/env-runtime.sh"
+runtime="$ENV_RUNTIME"
 {
   echo "# Generated by build.sh on $(date -u '+%Y-%m-%dT%H:%M:%SZ'). Do not edit."
   echo "export PATH=\"$view/bin:\$PATH\""
@@ -216,13 +248,13 @@ runtime="$WORKING_DIR/env-runtime.sh"
       echo "export LD_LIBRARY_PATH=\"$shumlib_prefix/lib\${LD_LIBRARY_PATH:+:\$LD_LIBRARY_PATH}\""
     fi
   fi
-  # Cray MPI stack (cray-mpich + libfabric + cray-pmi) runtime libraries. They
-  # live under /opt/cray (off the default loader path); CRAY_LD_LIBRARY_PATH —
-  # set by the PrgEnv-gnu modules build.sh loaded — aggregates them. Export it so
-  # view binaries that link MPI resolve their .so at runtime. (The MPI compiler
-  # on this system is the Cray `ftn` wrapper from PrgEnv-gnu; build-lfric-atm.sh
-  # loads PrgEnv-gnu itself, so FC is not pinned here.)
-  if [ -n "${CRAY_MPICH_DIR:-}" ]; then
+  # Cray MPI stack (cray-mpich + libfabric + cray-pmi) runtime libraries — cray
+  # variant only. They live under /opt/cray (off the default loader path);
+  # CRAY_LD_LIBRARY_PATH — set by the PrgEnv-gnu modules build.sh loaded —
+  # aggregates them. Export it so view binaries that link MPI resolve their .so
+  # at runtime. (The spack variant links a from-source mpich from the view, which
+  # Spack RPATHs into the binaries, so no export is needed there.)
+  if [ "$LFRIC_STACK" = cray ] && [ -n "${CRAY_MPICH_DIR:-}" ]; then
     _cray_libs="$CRAY_MPICH_DIR/lib${CRAY_LD_LIBRARY_PATH:+:$CRAY_LD_LIBRARY_PATH}"
     echo "export LD_LIBRARY_PATH=\"$_cray_libs\${LD_LIBRARY_PATH:+:\$LD_LIBRARY_PATH}\""
   fi

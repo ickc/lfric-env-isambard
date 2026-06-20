@@ -1,0 +1,33 @@
+# LFRic Apps environment — "spack" variant: build the dependency stack from
+# source with Spack, using no Cray PE libraries. MPI is a from-source mpich and
+# HDF5/netCDF are built by Spack. Selected by LFRIC_STACK=spack; build.sh loads
+# NO Cray modules for this variant (the gcc@14.3.0 external is the system
+# /usr/bin/gcc-14, always present). This is the portable fallback to the default
+# cray variant (../cray/spack.yaml); it shares the install tree (working_dir/opt)
+# with it, so the large MPI-independent subtree (python/rose/cylc/psyclone/...)
+# is built once and reused. The shared config (repos, gcc, python) is in
+# ../common.yaml.
+#
+# HDF5/netCDF are pinned to the SAME versions the cray variant externalizes
+# (cray-hdf5-parallel/1.14.3.9 -> 1.14.3, cray-netcdf-hdf5parallel/4.9.2.3 ->
+# netcdf-c 4.9.2 / netcdf-fortran 4.6.1) with matching +mpi variants, so the
+# downstream DAG (yaxt/xios/shumlib/lfric) concretizes identically and the two
+# variants stay apples-to-apples. mpich is left unpinned: it is a different
+# package from cray-mpich (both provide mpi) so the versions are not comparable;
+# Spack's default mpich matches the prior from-source behaviour on `main`.
+spack:
+  view: true
+  include:
+  - ../common.yaml
+  packages:
+    all:
+      providers:
+        mpi: [mpich]
+    hdf5:
+      require: ['@1.14.3 +mpi+fortran+hl~cxx']
+    netcdf-c:
+      require: ['@4.9.2 +mpi~dap']
+    netcdf-fortran:
+      require: ['@4.6.1']
+  specs:
+  - lfric-apps-isambard

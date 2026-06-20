@@ -17,7 +17,7 @@ info() { echo "INFO: $*"; }
 warn() { echo "WARN: $*" >&2; }
 die()  { echo "ERROR: $*" >&2; exit 1; }
 
-[ -f "$WORKING_DIR/env-runtime.sh" ] || die "Environment not built. Run: pixi run build"
+[ -f "$ENV_RUNTIME" ] || die "Environment '$LFRIC_STACK' not built. Run: ${LFRIC_STACK:+LFRIC_STACK=$LFRIC_STACK }pixi run build"
 
 # Ensure patches are applied (idempotent). In particular this applies the
 # lfric_apps local-sources patch so local_build.py uses the staged submodules in
@@ -29,63 +29,80 @@ bash "$_here/patch-all.sh" || die "patch-all failed"
 # symlinks them); keep them pristine by not dropping __pycache__ into the tree.
 export PYTHONDONTWRITEBYTECODE=1
 
-# --- Cray PrgEnv-gnu toolchain + cray-mpich --------------------------------
+# --- Toolchain + MPI/IO compiler wrappers ----------------------------------
 # lfric_atm is compiled here directly via local_build.py (NOT through Spack), so
-# this step needs the same Cray PE GNU stack build.sh uses: gcc@14.3.0
-# (gcc-native/14) + the system cray-mpich. Loading PrgEnv-gnu is REQUIRED: it
-# puts the Cray compiler wrappers (ftn/cc/CC) on PATH and sets PE_ENV/CRAY_*.
-# env-runtime.sh deliberately does NOT pin FC (the MPI compiler is the Cray ftn
-# wrapper), so we load PrgEnv-gnu and set the MPI compiler vars here.
-PRGENV_MODULE="${PRGENV_MODULE:-PrgEnv-gnu}"
-CRAYPE_TARGET="${CRAYPE_TARGET:-craype-arm-grace}"
-# Parallel Cray HDF5 + netCDF. With these loaded the ftn/CC wrappers auto-add the
-# (parallel, gnu/12.3) -I/-L/-l for HDF5/netCDF — the same prefixes spack.yaml
-# externalizes — so the compile needs no hardcoded HDF5/netCDF flags (exactly how
-# MPI is handled). Pinned: they live under the cray-mpich hierarchy and default
-# to an older version.
-HDF5_MODULE="${HDF5_MODULE:-cray-hdf5-parallel/1.14.3.9}"
-NETCDF_MODULE="${NETCDF_MODULE:-cray-netcdf-hdf5parallel/4.9.2.3}"
-if ! command -v module >/dev/null 2>&1; then
-  for f in /opt/cray/pe/lmod/lmod/init/bash /etc/profile.d/lmod.sh \
-           /etc/profile.d/modules.sh /usr/share/lmod/lmod/init/bash; do
-    # shellcheck source=/dev/null
-    [ -f "$f" ] && . "$f" && break
-  done
+# this step needs the same MPI/IO stack as the active environment (LFRIC_STACK).
+# Either way the compiler is gcc@14.3.0; LFRic's Makefiles require FC (fortran.mk
+# errors if unset), LDMPI (the MPI linker; compile.mk has no default) and CXX.
+#   cray  - Cray PE GNU stack. Loading PrgEnv-gnu is REQUIRED: it puts the Cray
+#           compiler wrappers (ftn/cc/CC) on PATH and sets PE_ENV/CRAY_*. The
+#           cray-hdf5-parallel/cray-netcdf-hdf5parallel modules make ftn/CC inject
+#           the parallel HDF5/netCDF -I/-L/-l automatically (those are Cray
+#           externals, not in the view — exactly how MPI is handled). PE_ENV=GNU
+#           makes lfric.mk set CRAY_ENVIRONMENT so fortran/cxx.mk pick the
+#           gfortran/g++ flag sets. FC/LDMPI=ftn, CXX=CC.
+#   spack - from-source mpich + HDF5/netCDF, all in the env view. The MPI compiler
+#           wrappers are the view's mpif90 + mpic++ (which wrap gfortran-14 /
+#           g++-14); HDF5/netCDF/XIOS/shumlib come from the view via FFLAGS/
+#           LDFLAGS below. No Cray modules; with PE_ENV unset, lfric.mk uses the
+#           non-Cray profile. lfric_core picks its per-compiler flag set from the
+#           wrapper LEAF NAME (fortran/<fc>.mk, cxx/<cxx>.mk): it ships mpif90.mk
+#           and mpic++.mk, which each run `<wrapper> --version` and map the real
+#           compiler (GNU) to gfortran.mk / g++.mk. So CXX must be `mpic++` — NOT
+#           mpich's `mpicxx` alias, for which there is no cxx/mpicxx.mk.
+if [ "$LFRIC_STACK" = cray ]; then
+  PRGENV_MODULE="${PRGENV_MODULE:-PrgEnv-gnu}"
+  CRAYPE_TARGET="${CRAYPE_TARGET:-craype-arm-grace}"
+  HDF5_MODULE="${HDF5_MODULE:-cray-hdf5-parallel/1.14.3.9}"
+  NETCDF_MODULE="${NETCDF_MODULE:-cray-netcdf-hdf5parallel/4.9.2.3}"
+  if ! command -v module >/dev/null 2>&1; then
+    for f in /opt/cray/pe/lmod/lmod/init/bash /etc/profile.d/lmod.sh \
+             /etc/profile.d/modules.sh /usr/share/lmod/lmod/init/bash; do
+      # shellcheck source=/dev/null
+      [ -f "$f" ] && . "$f" && break
+    done
+  fi
+  command -v module >/dev/null 2>&1 \
+    || die "no 'module' command found — cannot load $PRGENV_MODULE for the Cray ftn/cray-mpich wrappers"
+  module load "$PRGENV_MODULE" || die "could not 'module load $PRGENV_MODULE'"
+  module load "$CRAYPE_TARGET" 2>/dev/null \
+    || warn "could not load $CRAYPE_TARGET (target may default to aarch64)"
+  module load "$HDF5_MODULE" "$NETCDF_MODULE" \
+    || die "could not load $HDF5_MODULE / $NETCDF_MODULE — Cray ftn/CC wrappers cannot resolve HDF5/netCDF"
+  if [ -z "${CRAY_MPICH_DIR:-}" ] || [ ! -d "${CRAY_MPICH_DIR:-/nonexistent}" ]; then
+    die "CRAY_MPICH_DIR unset/missing after 'module load $PRGENV_MODULE' — Cray MPI wrappers cannot resolve"
+  fi
+  info "cray-mpich: $CRAY_MPICH_DIR (v${CRAY_MPICH_VERSION:-?})"
+  info "cray HDF5/netCDF: ${HDF5_ROOT:-?} | ${NETCDF_DIR:-?}"
+  export FC="${FC:-ftn}"
+  export LDMPI="${LDMPI:-ftn}"
+  export CXX="${CXX:-CC}"
+else
+  info "LFRIC_STACK=spack: compiling lfric_atm with the view's mpich wrappers (mpif90 + mpic++, wrapping gcc@14.3)"
+  _mpifc=""; for _c in mpif90 mpifort; do command -v "$_c" >/dev/null 2>&1 && { _mpifc="$_c"; break; }; done
+  [ -n "$_mpifc" ] || die "no mpich Fortran wrapper (mpif90/mpifort) on PATH — is the spack env built and active?"
+  # CXX must be `mpic++`: lfric_core ships cxx/mpic++.mk (it runs the wrapper's
+  # --version and maps GNU -> g++.mk) but no cxx/mpicxx.mk, so mpich's `mpicxx`
+  # alias would fail at cxx.mk. mpif90.mk handles the Fortran side likewise.
+  command -v mpic++ >/dev/null 2>&1 \
+    || die "no mpich C++ wrapper 'mpic++' on PATH — is the spack env built and active? (cxx/mpic++.mk is the only MPI C++ profile lfric_core ships)"
+  export FC="${FC:-$_mpifc}"
+  export LDMPI="${LDMPI:-$_mpifc}"
+  export CXX="${CXX:-mpic++}"
 fi
-command -v module >/dev/null 2>&1 \
-  || die "no 'module' command found — cannot load $PRGENV_MODULE for the Cray ftn/cray-mpich wrappers"
-module load "$PRGENV_MODULE" || die "could not 'module load $PRGENV_MODULE'"
-module load "$CRAYPE_TARGET" 2>/dev/null \
-  || warn "could not load $CRAYPE_TARGET (target may default to aarch64)"
-module load "$HDF5_MODULE" "$NETCDF_MODULE" \
-  || die "could not load $HDF5_MODULE / $NETCDF_MODULE — Cray ftn/CC wrappers cannot resolve HDF5/netCDF"
-if [ -z "${CRAY_MPICH_DIR:-}" ] || [ ! -d "${CRAY_MPICH_DIR:-/nonexistent}" ]; then
-  die "CRAY_MPICH_DIR unset/missing after 'module load $PRGENV_MODULE' — Cray MPI wrappers cannot resolve"
-fi
-info "cray-mpich: $CRAY_MPICH_DIR (v${CRAY_MPICH_VERSION:-?})"
-info "cray HDF5/netCDF: ${HDF5_ROOT:-?} | ${NETCDF_DIR:-?}"
-
-# LFRic's Makefiles require FC (fortran.mk errors if unset) and LDMPI (the MPI
-# linker; compile.mk provides no default). On the Cray PE the MPI Fortran
-# compiler/linker is the `ftn` wrapper (gfortran-14 + cray-mpich) and the C++ one
-# is `CC`. PE_ENV=GNU makes lfric.mk set CRAY_ENVIRONMENT, so fortran/cxx.mk
-# select the gfortran/g++ flag sets for those wrappers. (FPP comes from
-# env-runtime.sh.)
-export FC="${FC:-ftn}"
-export LDMPI="${LDMPI:-ftn}"
-export CXX="${CXX:-CC}"
 info "MPI compiler: $("$FC" --version 2>/dev/null | head -1) (FC=$FC LDMPI=$LDMPI CXX=$CXX)"
 
 # Spack-built libraries (XIOS, YAXT, shumlib, pFUnit, ...) live in the env view;
 # the LFRic Makefiles locate them via FFLAGS (-I, for .mod files like xios.mod)
 # and LDFLAGS (-L + -rpath, for libxios.a/libyaxt.so/...), mirroring the Met
 # Office Spack build (rose-stem esnz cascade). The Cray ftn wrapper ignores
-# CPATH/LIBRARY_PATH, so these MUST go through F/LDFLAGS. HDF5 and netCDF are no
-# longer in the view (they are Cray externals now): the cray-hdf5-parallel /
-# cray-netcdf-hdf5parallel modules loaded above make the ftn/CC wrappers inject
-# their -I/-L/-l automatically — exactly like mpi.mod and the MPI libs.
-# env-runtime.sh already put shumlib on F/LDFLAGS/LD_LIBRARY_PATH; prepend the
-# view's dirs here.
+# CPATH/LIBRARY_PATH, so these MUST go through F/LDFLAGS. For the cray variant
+# HDF5 and netCDF are NOT in the view (they are Cray externals): the cray-hdf5-
+# parallel / cray-netcdf-hdf5parallel modules loaded above make the ftn/CC
+# wrappers inject their -I/-L/-l automatically — exactly like mpi.mod and the MPI
+# libs. For the spack variant HDF5/netCDF ARE in the view, so the same -I$view/
+# include / -L$view/lib below already covers them. The env-runtime snippet
+# already put shumlib on F/LDFLAGS/LD_LIBRARY_PATH; prepend the view's dirs here.
 _view="$SPACK_ENV_DIR/.spack-env/view"
 [ -d "$_view/include" ] || die "Spack env view missing at $_view — run: pixi run build"
 export FFLAGS="-I$_view/include${FFLAGS:+ $FFLAGS}"
