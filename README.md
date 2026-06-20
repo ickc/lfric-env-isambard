@@ -43,6 +43,7 @@ PSyclone version: 3.2.2
 | Task | What it does |
 |------|--------------|
 | `submodule-init` | Clone the pinned submodules under `vendor/`. Run once. |
+| `stage-physics` | Set the physics + `lfric_core` submodules to their `dependencies.yaml` refs (then commit the gitlinks). The explicit way to pull in new science. |
 | `patch` | Apply every `patches/*-patch.sh` (sorted, idempotent). |
 | `unpatch` | Revert all patches by resetting the patched submodules. |
 | `build` | Build the Spack environment (applies patches, concretizes, installs). |
@@ -171,6 +172,15 @@ automatically, so it is always self-contained.
   physics repos (casim/jules/socrates/ukca), vendored as pinned submodules under
   `vendor/physics/` and consumed via `PHYSICS_ROOT`, so the compile itself does
   no build-time cloning. The Spack environment is complete without it.
+- **Reproducible, offline science sources.** `local_build.py` upstream
+  auto-clones/rsyncs/git-fetches the science sources during the build (which can
+  silently change the stack). `patches/30-lfric_apps-local-sources-patch.sh`
+  disables that: `get_source()` now symlinks the **staged** submodules in place
+  and sanity-checks them — a remote source raises instead of fetching. So the
+  compile is a pure function of the checked-out submodule SHAs (`lfric_core` +
+  `vendor/physics/*`). To pull in new science, bump the refs in
+  `vendor/lfric_apps/dependencies.yaml`, run `pixi run stage-physics`, and commit
+  the updated gitlinks — never a silent build-time change.
 
 ## Useful overrides
 

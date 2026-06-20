@@ -19,6 +19,16 @@ die()  { echo "ERROR: $*" >&2; exit 1; }
 
 [ -f "$WORKING_DIR/env-runtime.sh" ] || die "Environment not built. Run: pixi run build"
 
+# Ensure patches are applied (idempotent). In particular this applies the
+# lfric_apps local-sources patch so local_build.py uses the staged submodules in
+# place (no clone/rsync/git-fetch). `pixi run build` also applies these, but
+# build-lfric-atm.sh can be re-run on its own, so make it self-contained.
+bash "$_here/patch-all.sh" || die "patch-all failed"
+
+# Use the staged submodule source trees in place (the local-sources patch
+# symlinks them); keep them pristine by not dropping __pycache__ into the tree.
+export PYTHONDONTWRITEBYTECODE=1
+
 # --- Cray PrgEnv-gnu toolchain + cray-mpich --------------------------------
 # lfric_atm is compiled here directly via local_build.py (NOT through Spack), so
 # this step needs the same Cray PE GNU stack build.sh uses: gcc@14.3.0

@@ -24,6 +24,13 @@ scripts = ["scripts/activate.sh"]
 # credential helper). See README for the MetOffice SSO note.
 submodule-init = "git submodule update --init --recursive --jobs 4"
 
+# Stage/update the pinned physics + lfric_core submodules to the refs in
+# vendor/lfric_apps/dependencies.yaml, then commit the gitlinks. This is the
+# explicit, reproducible way to pull in new science: local_build.py no longer
+# auto-clones (patches/30-lfric_apps-local-sources-patch.sh), so the build only
+# reads what you stage. See scripts/stage-physics.sh.
+stage-physics = "bash scripts/stage-physics.sh"
+
 # Apply every patches/*-patch.sh, in sorted order (idempotent). `build` runs
 # this automatically; this task is for applying patches on their own.
 patch = "bash scripts/patch-all.sh"
