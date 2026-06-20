@@ -124,17 +124,48 @@ automatically, so it is always self-contained.
   C-only compiler (no `g++`/`gfortran` 12.3); `gcc@14.3.0` is now the only
   complete cray-native C/C++/Fortran toolchain. To target a different gcc, edit
   the external + `require`s in `spack.yaml`.
+- **Cray MPI (`cray-mpich`).** The environment uses the system **cray-mpich**
+  (Cray PE, `PrgEnv-gnu`) as its MPI instead of building `mpich` from source:
+  `spack.yaml` sets `mpi: [cray-mpich]` and declares `cray-mpich`/`libfabric`/
+  `cray-pmi` as externals, and `build` loads `PrgEnv-gnu` + `craype-arm-grace`.
+  cray-mpich 9.1.0 is a `gnu/12.3` build, but its Fortran modules are *GFORTRAN
+  module version 15* — which `gcc@14.3.0` also emits — so `use mpi` / `use
+  mpi_f08` compile cleanly against it. Because the concretizer prunes an
+  external's dependencies, the `libfabric`/`pmi`/`pals` library directories are
+  injected through cray-mpich's `extra_attributes` so dependents link and run.
 - **MetOffice SSH/SSO.** The private Met Office submodules (`lfric_apps`,
   `lfric_core`, `mo-spack-packages`) are cloned over SSH and
   require an SSH key authorized for `MetOffice` SAML SSO (GitHub → Settings → SSH
   keys → Configure SSO), or an HTTPS credential helper (`gh auth setup-git`). If
   `submodule-init` fails on one of them, that is the usual cause.
-- **Build on a compute node.** The Isambard 3 login nodes cap user processes at
-  `ulimit -u` 900, which a full parallel build (and pixi's first-time env solve)
-  can exhaust (`fork: Resource temporarily unavailable`). Run the build on a
-  `grace` compute node, which has no practical process limit and dedicated cores,
-  e.g. `sbatch` a one-line job that runs `pixi run build` (account `brics.e5a`).
-  Concretization alone is single-process and fine on the login node.
+- **Build on a compute node — keep the job small and short.** The Isambard 3
+  login nodes cap user processes at `ulimit -u` 900, which a full parallel build
+  (and pixi's first-time env solve) can exhaust (`fork: Resource temporarily
+  unavailable`). Run the build on a `grace` compute node with the provided batch
+  script:
+
+  ```bash
+  sbatch scripts/build.sbatch        # from the repo root; account brics.e5a
+  ```
+
+  The `grace` partition is usually full, so request a **small, short,
+  non-exclusive** job: it backfills into the schedule far sooner than a
+  whole-node (`--exclusive`) reservation, and the build is not CPU-bound past
+  ~16 cores (past builds finished in ~50–70 min on 16–32 cores). The directives
+  `build.sbatch` uses — copy these if rolling your own job:
+
+  ```bash
+  #SBATCH --partition=grace
+  #SBATCH --account=brics.e5a
+  #SBATCH --ntasks=1
+  #SBATCH --cpus-per-task=16     # backfills fast; raise to 32 only if the queue is empty
+  #SBATCH --time=03:30:00        # builds take <70 min; a short limit backfills sooner
+  ```
+
+  Avoid `--exclusive`/whole-node requests and multi-hour `--time` limits — both
+  push the job behind the partition's reservations. `SPACK_JOBS` defaults to
+  `$SLURM_CPUS_PER_TASK`. Concretization alone is single-process and fine on the
+  login node.
 - **lfric_atm** is intentionally not part of `build`: it clones private physics
   repos (casim/jules/socrates) over SSH. The Spack environment is complete
   without it.
@@ -148,7 +179,8 @@ automatically, so it is always self-contained.
 | `HEAVY_PKGS` | `node-js rust` | Packages built first at `HEAVY_JOBS` before the rest |
 | `MAKE_JOBS` | `8` | Parallel make jobs for `lfric_atm` |
 | `LFRIC_WORKING_DIR` | `<repo>/working_dir` | Where build output lands |
-| `GCC_MODULE` | `gcc-native/14` | Best-effort `module load` (compiler is pinned as an external in `spack.yaml`, so this is informational only) |
+| `PRGENV_MODULE` | `PrgEnv-gnu` | Cray PE module loaded by `build`; provides the `gcc@14.3` compiler + the `cray-mpich`/`libfabric`/`cray-pmi` externals (required) |
+| `CRAYPE_TARGET` | `craype-arm-grace` | Cray CPU-target module (Grace / Neoverse-V2) |
 | `RUN_XIOS_VERIFICATION` | `1` | Set `0` to skip the XIOS network check in `build` |
 | `CYLC_RUN_BASE` | `$PROJECTDIR/$USER/cylc-run` | Cylc run directory |
 

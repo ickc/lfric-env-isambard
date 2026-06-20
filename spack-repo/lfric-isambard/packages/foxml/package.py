@@ -29,3 +29,8 @@ class Foxml(CMakePackage):
         commit="6f60cf178d0776b21406303e91f1e6b42ff0f204",
         preferred=True,
     )
+
+    # FoX is Fortran 95 (its CMake build also enables C); Spack 1.x requires the
+    # language build deps to be declared so the compiler wrappers get configured.
+    depends_on("c", type="build")
+    depends_on("fortran", type="build")

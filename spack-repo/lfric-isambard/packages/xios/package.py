@@ -30,6 +30,7 @@ class Xios(Package):
     patch("gcc12_remap_standard_headers.patch", when="@2252")
 
     depends_on("c", type="build")
+    depends_on("cxx", type="build")  # XIOS is heavily C++; Spack 1.x needs this declared
     depends_on("fortran", type="build")
 
     depends_on("netcdf-c+mpi")

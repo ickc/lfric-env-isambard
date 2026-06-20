@@ -47,7 +47,44 @@ spack:
       require: ['@14.3.0']
     all:
       providers:
-        mpi: [mpich]
+        mpi: [cray-mpich]
+    # --- Cray MPI stack (PrgEnv-gnu) ---------------------------------------
+    # Use the system cray-mpich instead of building mpich from source. build.sh
+    # loads `PrgEnv-gnu` + `craype-arm-grace` so these prefixes/modules resolve
+    # on the compute node. cray-mpich@9.1.0 is the gnu/12.3 build; its Fortran
+    # modules are "GFORTRAN module version 15", which gcc@14.3.0 also emits, so
+    # `use mpi` / `use mpi_f08` compile cleanly against it (verified on-node).
+    # cray-mpich depends_on cray-pmi + libfabric, so both are declared external.
+    cray-mpich:
+      buildable: false
+      externals:
+      - spec: cray-mpich@9.1.0
+        prefix: /opt/cray/pe/mpich/9.1.0/ofi/gnu/12.3
+        # cray-mpich is external, so Spack prunes its libfabric/cray-pmi deps from
+        # the DAG, and its bundled mpicc/mpifort call gcc-14 directly (bypassing
+        # Spack's wrapper). libmpi_gnu.so NEEDs libfabric.so.1, libpmi/libpmi2
+        # (/opt/cray/pe/lib64) and libpals (/opt/cray/pals), so put those dirs on
+        # the link (LIBRARY_PATH) and run/link (LD_LIBRARY_PATH) search paths —
+        # otherwise dependents fail to link ("libfabric.so.1 ... not found").
+        extra_attributes:
+          environment:
+            prepend_path:
+              LIBRARY_PATH: /opt/cray/libfabric/2.3.1/lib64:/opt/cray/pe/lib64:/opt/cray/pals/1.8/lib
+              LD_LIBRARY_PATH: /opt/cray/libfabric/2.3.1/lib64:/opt/cray/pe/lib64:/opt/cray/pals/1.8/lib
+    # Declared so the system libs are known to Spack; cray-mpich's bundled mpicc
+    # links them and their dirs are injected via cray-mpich's environment above.
+    libfabric:
+      buildable: false
+      externals:
+      - spec: libfabric@2.3.1 fabrics=cxi
+        prefix: /opt/cray/libfabric/2.3.1
+        modules: [libfabric/2.3.1]
+    cray-pmi:
+      buildable: false
+      externals:
+      - spec: cray-pmi@6.1.15
+        prefix: /opt/cray/pe/pmi/6.1.15
+        modules: [cray-pmi/6.1.15]
     python:
       variants: +shared
     py-setuptools:
