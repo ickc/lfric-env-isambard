@@ -185,7 +185,7 @@ automatically, so it is always self-contained.
   script:
 
   ```bash
-  sbatch scripts/build.sbatch        # from the repo root; account brics.e5a
+  sbatch scripts/build.sbatch        # from the repo root
   ```
 
   The `grace` partition is usually full, so request a **small, short,
@@ -198,7 +198,6 @@ automatically, so it is always self-contained.
 
   ```bash
   #SBATCH --partition=grace
-  #SBATCH --account=brics.e5a
   #SBATCH --ntasks=1
   #SBATCH --cpus-per-task=12     # project default; raise only if the queue is empty
   #SBATCH --time=03:30:00        # builds take <70 min; a short limit backfills sooner

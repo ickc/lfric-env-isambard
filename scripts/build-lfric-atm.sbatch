@@ -1,6 +1,5 @@
 #!/bin/bash
 #SBATCH --job-name=lfric-atm
-#SBATCH --account=brics.e5a
 #SBATCH --partition=grace
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=12
