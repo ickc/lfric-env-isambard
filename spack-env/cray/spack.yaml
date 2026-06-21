@@ -1,0 +1,98 @@
+# LFRic Apps environment — "cray" variant: use the system Cray PE libraries.
+# MPI is the system cray-mpich and parallel HDF5/netCDF are the Cray builds, all
+# declared as Spack externals (buildable: false). Selected by LFRIC_STACK=cray
+# (the default); build.sh loads PrgEnv-gnu + the cray-hdf5/cray-netcdf modules so
+# these prefixes resolve on-node. The shared, variant-independent config (repos,
+# gcc external, python) is in ../common.yaml.
+spack:
+  view: true
+  include:
+  - ../common.yaml
+  packages:
+    all:
+      providers:
+        mpi: [cray-mpich]
+    # --- Cray MPI stack (PrgEnv-gnu) ---------------------------------------
+    # Use the system cray-mpich instead of building mpich from source. build.sh
+    # loads `PrgEnv-gnu` + `craype-arm-grace` so these prefixes/modules resolve
+    # on the compute node. cray-mpich@9.1.0 is the gnu/12.3 build; its Fortran
+    # modules are "GFORTRAN module version 15", which gcc@14.3.0 also emits, so
+    # `use mpi` / `use mpi_f08` compile cleanly against it (verified on-node).
+    # cray-mpich depends_on cray-pmi + libfabric, so both are declared external.
+    cray-mpich:
+      buildable: false
+      externals:
+      - spec: cray-mpich@9.1.0
+        prefix: /opt/cray/pe/mpich/9.1.0/ofi/gnu/12.3
+        # cray-mpich is external, so Spack prunes its libfabric/cray-pmi deps from
+        # the DAG, and its bundled mpicc/mpifort call gcc-14 directly (bypassing
+        # Spack's wrapper). libmpi_gnu.so NEEDs libfabric.so.1, libpmi/libpmi2
+        # (/opt/cray/pe/lib64) and libpals (/opt/cray/pals), so put those dirs on
+        # the link (LIBRARY_PATH) and run/link (LD_LIBRARY_PATH) search paths —
+        # otherwise dependents fail to link ("libfabric.so.1 ... not found").
+        extra_attributes:
+          environment:
+            prepend_path:
+              LIBRARY_PATH: /opt/cray/libfabric/2.3.1/lib64:/opt/cray/pe/lib64:/opt/cray/pals/1.8/lib
+              LD_LIBRARY_PATH: /opt/cray/libfabric/2.3.1/lib64:/opt/cray/pe/lib64:/opt/cray/pals/1.8/lib
+    # Declared so the system libs are known to Spack; cray-mpich's bundled mpicc
+    # links them and their dirs are injected via cray-mpich's environment above.
+    libfabric:
+      buildable: false
+      externals:
+      - spec: libfabric@2.3.1 fabrics=cxi
+        prefix: /opt/cray/libfabric/2.3.1
+        modules: [libfabric/2.3.1]
+    cray-pmi:
+      buildable: false
+      externals:
+      - spec: cray-pmi@6.1.15
+        prefix: /opt/cray/pe/pmi/6.1.15
+        modules: [cray-pmi/6.1.15]
+    # --- Cray parallel I/O stack (HDF5 + netCDF) ---------------------------
+    # Same story as cray-mpich above: Cray ships these only as gnu/12.3 builds,
+    # but maps gcc-native/14 onto them and their Fortran .mod files are module
+    # format v15 (which gcc@14.3.0 reads). We externalize the *parallel* (MPI)
+    # builds — /opt/cray/pe/{hdf5-parallel,netcdf-hdf5parallel} — whose
+    # unsuffixed libhdf5.so/libnetcdf.so resolve to the MPI variants (libhdf5.so
+    # -> libhdf5_parallel_gnu.so, which NEEDs libmpi_gnu.so.12 == cray-mpich@9.1.0).
+    # Versions match the cray-hdf5-parallel/1.14.3.9 + cray-netcdf-hdf5parallel/
+    # 4.9.2.3 modules that build.sh / build-lfric-atm.sh load (their dirs then
+    # also land on CRAY_LD_LIBRARY_PATH -> env-runtime.sh, and the Cray ftn/CC
+    # wrappers auto-inject them for the non-Spack lfric_atm compile). As with
+    # cray-mpich, Spack prunes the external's deps, so the lib dirs are pinned on
+    # LIBRARY_PATH/LD_LIBRARY_PATH here. netcdf-c and netcdf-fortran share one
+    # Cray prefix. The spack variant (../spack/spack.yaml) pins these same
+    # versions from source for an apples-to-apples downstream DAG.
+    hdf5:
+      buildable: false
+      externals:
+      - spec: hdf5@1.14.3 +mpi+fortran+hl~cxx
+        prefix: /opt/cray/pe/hdf5-parallel/1.14.3.9/gnu/12.3
+        extra_attributes:
+          environment:
+            prepend_path:
+              LIBRARY_PATH: /opt/cray/pe/hdf5-parallel/1.14.3.9/gnu/12.3/lib
+              LD_LIBRARY_PATH: /opt/cray/pe/hdf5-parallel/1.14.3.9/gnu/12.3/lib
+    netcdf-c:
+      buildable: false
+      externals:
+      - spec: netcdf-c@4.9.2 +mpi~dap
+        prefix: /opt/cray/pe/netcdf-hdf5parallel/4.9.2.3/gnu/12.3
+        extra_attributes:
+          environment:
+            prepend_path:
+              LIBRARY_PATH: /opt/cray/pe/netcdf-hdf5parallel/4.9.2.3/gnu/12.3/lib
+              LD_LIBRARY_PATH: /opt/cray/pe/netcdf-hdf5parallel/4.9.2.3/gnu/12.3/lib
+    netcdf-fortran:
+      buildable: false
+      externals:
+      - spec: netcdf-fortran@4.6.1
+        prefix: /opt/cray/pe/netcdf-hdf5parallel/4.9.2.3/gnu/12.3
+        extra_attributes:
+          environment:
+            prepend_path:
+              LIBRARY_PATH: /opt/cray/pe/netcdf-hdf5parallel/4.9.2.3/gnu/12.3/lib
+              LD_LIBRARY_PATH: /opt/cray/pe/netcdf-hdf5parallel/4.9.2.3/gnu/12.3/lib
+  specs:
+  - lfric-apps-isambard

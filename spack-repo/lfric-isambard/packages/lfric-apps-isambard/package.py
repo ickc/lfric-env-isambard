@@ -12,7 +12,8 @@ class LfricAppsIsambard(Package):
 
     version("0.1.0")
 
-    depends_on("mpich")
+    # Satisfied by the Cray MPI (cray-mpich) external; see spack.yaml providers.
+    depends_on("mpi")
     depends_on("hdf5+fortran+mpi")
     depends_on("netcdf-c+mpi~dap")
     depends_on("netcdf-fortran")

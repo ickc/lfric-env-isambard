@@ -1,7 +1,7 @@
 [workspace]
 name = "lfric-env-isambard"
 version = "0.1.0"
-description = "Pixi-driven, submodule-based reproducible build of the LFRic Apps Spack environment for Isambard 3 (GCC 12.3)."
+description = "Pixi-driven, submodule-based reproducible build of the LFRic Apps Spack environment for Isambard 3 (GCC 14.3)."
 channels = ["conda-forge"]
 platforms = ["linux-aarch64"]
 
@@ -24,6 +24,13 @@ scripts = ["scripts/activate.sh"]
 # credential helper). See README for the MetOffice SSO note.
 submodule-init = "git submodule update --init --recursive --jobs 4"
 
+# Stage/update the pinned physics + lfric_core submodules to the refs in
+# vendor/lfric_apps/dependencies.yaml, then commit the gitlinks. This is the
+# explicit, reproducible way to pull in new science: local_build.py no longer
+# auto-clones (patches/30-lfric_apps-local-sources-patch.sh), so the build only
+# reads what you stage. See scripts/stage-physics.sh.
+stage-physics = "bash scripts/stage-physics.sh"
+
 # Apply every patches/*-patch.sh, in sorted order (idempotent). `build` runs
 # this automatically; this task is for applying patches on their own.
 patch = "bash scripts/patch-all.sh"
@@ -34,14 +41,26 @@ unpatch = "bash scripts/unpatch.sh"
 # Build the Spack environment — the bulk of the work (~2-4 h from scratch on a
 # login node; re-runs are incremental). Applies patches first, then concretizes
 # and installs into working_dir/.
+#
+# Two dependency variants share one install tree (working_dir/opt), selected by
+# LFRIC_STACK (default "cray"; see scripts/common.sh):
+#   pixi run build                     # cray: system cray-mpich + Cray HDF5/netCDF
+#   pixi run build-spack               # spack: mpich + HDF5/netCDF from source
+# The convenience tasks below just set LFRIC_STACK; equivalently prefix any task,
+# e.g. `LFRIC_STACK=spack pixi run build-lfric-atm`.
 build = "bash scripts/build.sh"
+build-spack = "LFRIC_STACK=spack bash scripts/build.sh"
 
 # Optional: compile lfric_atm and run its example. Separate from `build` because
-# it clones private physics repos (casim/jules/socrates) over SSH.
+# it needs the private physics repos (casim/jules/socrates/ukca) — now vendored
+# as pinned submodules under vendor/physics/ and consumed via PHYSICS_ROOT, so
+# the compile itself does no network/SSH (run `submodule-init` once beforehand).
 build-lfric-atm = "bash scripts/build-lfric-atm.sh"
 
 # Activate the environment and report tool versions (rose / cylc / psyclone).
+# activate-spack reports the from-source variant; either is a no-op until built.
 activate = "bash scripts/print-versions.sh"
+activate-spack = "LFRIC_STACK=spack bash scripts/print-versions.sh"
 
 # Verify the migrated XIOS source matches the pinned commit (network check).
 verify-xios = "bash scripts/xios-verification.sh"

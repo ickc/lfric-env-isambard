@@ -23,6 +23,12 @@ This is a refactor of a single large `install.sh` driver into:
 pixi run submodule-init   # one-time: clone the pinned submodules (needs repo access)
 pixi run build            # build the Spack environment (~2-4 h from scratch)
 pixi run activate         # report rose / cylc / psyclone versions
+
+# Optional second variant: build the dependency stack from source (mpich +
+# HDF5/netCDF) instead of the Cray PE libraries. It coexists with the default
+# and shares one install tree, so only the MPI subtree is rebuilt:
+LFRIC_STACK=spack pixi run build      # or: pixi run build-spack
+LFRIC_STACK=spack pixi run activate   # or: pixi run activate-spack
 ```
 
 After `build`, **every** `pixi run ...` (and `pixi shell`) auto-activates the
@@ -43,23 +49,31 @@ PSyclone version: 3.2.2
 | Task | What it does |
 |------|--------------|
 | `submodule-init` | Clone the pinned submodules under `vendor/`. Run once. |
+| `stage-physics` | Set the physics + `lfric_core` submodules to their `dependencies.yaml` refs (then commit the gitlinks). The explicit way to pull in new science. |
 | `patch` | Apply every `patches/*-patch.sh` (sorted, idempotent). |
 | `unpatch` | Revert all patches by resetting the patched submodules. |
-| `build` | Build the Spack environment (applies patches, concretizes, installs). |
-| `build-lfric-atm` | Optionally compile `lfric_atm` + run its example (needs SSH to physics repos). |
-| `activate` | Activate + print rose/cylc/psyclone versions. |
+| `build` | Build the Spack environment, **cray** variant (applies patches, concretizes, installs). |
+| `build-spack` | Same, **spack** variant — `mpich` + HDF5/netCDF from source (`LFRIC_STACK=spack`). |
+| `build-lfric-atm` | Optionally compile `lfric_atm` + run its example (uses the pinned `vendor/physics/` submodules; no build-time SSH). |
+| `activate` | Activate + print rose/cylc/psyclone versions (cray variant). |
+| `activate-spack` | Same for the spack variant (`LFRIC_STACK=spack`). |
 | `verify-xios` | Check the migrated XIOS source matches the pinned commit. |
 | `clean` | Remove `working_dir/` (keeps submodules and patches). |
 
 `pixi run spack ...` works because activation puts the vendored Spack on `PATH`
-(`vendor/spack`). The Spack environment lives in `spack-env/` (the `spack.yaml`
-is tracked; the generated `.spack-env/` view is git-ignored).
+(`vendor/spack`). The Spack environments live in `spack-env/<variant>/` (the
+`spack.yaml` manifests and shared `common.yaml` are tracked; the generated
+`.spack-env/` view + lockfile are git-ignored). `LFRIC_STACK` (default `cray`)
+selects which variant every task operates on.
 
 ## Layout
 
 ```
 pixi.toml                 # pixi project: deps, activation hook, tasks
-spack-env/spack.yaml      # the tracked Spack environment definition
+spack-env/                # Spack environments (manifests tracked; .spack-env/ ignored)
+  common.yaml             #   shared config included by both variants (repos, gcc, python)
+  cray/spack.yaml         #   variant: system cray-mpich + Cray HDF5/netCDF (default)
+  spack/spack.yaml        #   variant: mpich + HDF5/netCDF built from source
 spack-repo/lfric-isambard # local repo: "lfric-apps-isambard" bundle, xios, foxml
 vendor/                   # submodules (pinned)
   spack/                  # spack/spack
@@ -67,6 +81,7 @@ vendor/                   # submodules (pinned)
   lfric_apps/             # MetOffice/lfric_apps
   lfric_core/             # MetOffice/lfric_core
   mo-spack-packages/      # MetOffice/mo-spack-packages (the "metoffice" repo)
+  physics/                # MetOffice casim/jules/socrates/ukca (lfric_atm science)
 patches/                  # one *-patch.sh per upstream patch (sorted by prefix)
 scripts/                  # common.sh, activate.sh, build.sh, build-lfric-atm.sh, ...
 working_dir/              # git-ignored: Spack install tree, caches, env view, logs
@@ -84,6 +99,10 @@ table below is a convenience snapshot:
 | `vendor/lfric_apps` | `b5aee0b1` (vn3.1.1-88) |
 | `vendor/lfric_core` | `bf236737` (2026.03.2-38) |
 | `vendor/mo-spack-packages` | `5e8359e0` (the `metoffice` package repo) |
+| `vendor/physics/casim` | `b0a6e38f` (2026.03.2) |
+| `vendor/physics/jules` | `3647a429` (2026.03.2-14) |
+| `vendor/physics/socrates` | `fb97f50a` (2026.03.2) |
+| `vendor/physics/ukca` | `1cdb9c26` (2026.03.2-5) |
 
 ## Patches
 
@@ -97,6 +116,10 @@ not hardcoded):
   submodule bump).
 - `22-spack-packages-gdbm-automake-patch.sh` — gdbm `automake` build fix in
   `vendor/spack-packages`.
+- `30-lfric_apps-local-sources-patch.sh` — rewrites `get_source()` in
+  `vendor/lfric_apps` so the build stages the pinned `lfric_core` + physics
+  submodules in place instead of cloning/fetching them at build time (see
+  *Reproducible, offline science sources* under Notes).
 
 The Met Office package definitions are **no longer patched**: the old
 `simit-spack` repo (Spack < 1.0) needed ~40 `30-/40-simit-*` patch scripts to
@@ -106,8 +129,8 @@ in the Spack builtin repo. Those patches were therefore removed in the port.
 
 Because every remaining patch modifies files **inside a submodule** (overwriting
 tracked files), `pixi run unpatch` reverts them all by `git reset --hard &&
-git clean -fd` on `lfric_core` and `spack-packages`. `build` re-applies patches
-automatically, so it is always self-contained.
+git clean -fd` on `lfric_core`, `lfric_apps`, and `spack-packages`. `build`
+re-applies patches automatically, so it is always self-contained.
 
 ## Notes / caveats
 
@@ -117,38 +140,116 @@ automatically, so it is always self-contained.
   neither reads nor writes your global `~/.spack`. Put the repo on a filesystem
   with space (e.g. `$SCRATCH`), or set `LFRIC_WORKING_DIR` to relocate output.
 - **GCC 14.3.** The compiler is declared as an explicit external in
-  `spack-env/spack.yaml` (`gcc@14.3.0` → `/usr/bin/{gcc,g++,gfortran}-14`) and
+  `spack-env/common.yaml` (`gcc@14.3.0` → `/usr/bin/{gcc,g++,gfortran}-14`) and
   pinned via per-language `require`s, so the solve is deterministic and `build`
-  does *not* run `spack compiler find`. Isambard 3 previously shipped a complete
-  `gcc@12.3.0` toolchain (used by earlier builds) but that has been reduced to a
-  C-only compiler (no `g++`/`gfortran` 12.3); `gcc@14.3.0` is now the only
-  complete cray-native C/C++/Fortran toolchain. To target a different gcc, edit
-  the external + `require`s in `spack.yaml`.
+  does *not* run `spack compiler find`. It is shared by both variants. Isambard 3
+  previously shipped a complete `gcc@12.3.0` toolchain (used by earlier builds)
+  but that has been reduced to a C-only compiler (no `g++`/`gfortran` 12.3);
+  `gcc@14.3.0` is now the only complete cray-native C/C++/Fortran toolchain. To
+  target a different gcc, edit the external + `require`s in `common.yaml`.
+- **Dependency variants (`cray` / `spack`).** The MPI + parallel I/O stack is
+  selectable via **`LFRIC_STACK`** (default `cray`). Each variant is its own Spack
+  directory environment under `spack-env/<variant>/`, both `include:`-ing the
+  shared `spack-env/common.yaml` (repos, the `gcc@14.3.0` external, python). They
+  **share one install tree** (`working_dir/opt`): Spack's content-addressed store
+  builds the large MPI-independent subtree (python/rose/cylc/psyclone/…) once and
+  links both views to it; only the MPI-dependent subtree (mpi, hdf5, netcdf, yaxt,
+  xios, shumlib, lfric) is built per variant. So both environments coexist and
+  activate independently (`pixi run activate` vs `LFRIC_STACK=spack pixi run
+  activate`) without rebuilding the world. `build` asserts the concretized lock
+  actually matches the requested variant, so a mis-resolved external can't
+  silently produce the wrong stack.
+  - **`cray`** (default) uses the system **cray-mpich** (Cray PE, `PrgEnv-gnu`)
+    plus the Cray **parallel HDF5/netCDF** as externals (`buildable: false`);
+    `build` loads `PrgEnv-gnu` + `craype-arm-grace` + `cray-hdf5-parallel` +
+    `cray-netcdf-hdf5parallel`. cray-mpich 9.1.0 is a `gnu/12.3` build, but its
+    Fortran modules are *GFORTRAN module version 15* — which `gcc@14.3.0` also
+    emits — so `use mpi` / `use mpi_f08` compile cleanly against it. Because the
+    concretizer prunes an external's dependencies, the `libfabric`/`pmi`/`pals`
+    library directories are injected through the externals' `extra_attributes` so
+    dependents link and run.
+  - **`spack`** builds **`mpich` + HDF5/netCDF from source**, loading no Cray
+    modules (the `gcc` external is the always-present `/usr/bin/gcc-14`). HDF5,
+    netCDF-c and netCDF-fortran are pinned to the **same versions** the cray
+    variant externalizes (`1.14.3` / `4.9.2` / `4.6.1`, with matching `+mpi`
+    variants) so the downstream DAG concretizes identically — the two stay
+    apples-to-apples. It is the portable fallback; from-source `mpich` will not
+    use the Slingshot/`cxi` fabric unless built with libfabric, so it is for
+    correctness/CI/comparison rather than production runs. The `build-lfric-atm`
+    compile for this variant uses the view's `mpif90`/`mpic++` wrappers (which
+    lfric_core maps to its gfortran/g++ flag sets via `fortran/mpif90.mk` /
+    `cxx/mpic++.mk`) instead of the Cray `ftn`/`CC`. Both variants are validated
+    end-to-end on a `grace` node (env build + `lfric_atm` compile + example run;
+    spack on `mpich@5.0.1`).
 - **MetOffice SSH/SSO.** The private Met Office submodules (`lfric_apps`,
-  `lfric_core`, `mo-spack-packages`) are cloned over SSH and
-  require an SSH key authorized for `MetOffice` SAML SSO (GitHub → Settings → SSH
-  keys → Configure SSO), or an HTTPS credential helper (`gh auth setup-git`). If
-  `submodule-init` fails on one of them, that is the usual cause.
-- **Build on a compute node.** The Isambard 3 login nodes cap user processes at
-  `ulimit -u` 900, which a full parallel build (and pixi's first-time env solve)
-  can exhaust (`fork: Resource temporarily unavailable`). Run the build on a
-  `grace` compute node, which has no practical process limit and dedicated cores,
-  e.g. `sbatch` a one-line job that runs `pixi run build` (account `brics.e5a`).
-  Concretization alone is single-process and fine on the login node.
-- **lfric_atm** is intentionally not part of `build`: it clones private physics
-  repos (casim/jules/socrates) over SSH. The Spack environment is complete
-  without it.
+  `lfric_core`, `mo-spack-packages`, and the physics repos under
+  `vendor/physics/`: `casim`, `jules`, `socrates`, `ukca`) are cloned over SSH
+  and require an SSH key authorized for `MetOffice` SAML SSO (GitHub → Settings →
+  SSH keys → Configure SSO), or an HTTPS credential helper (`gh auth setup-git`).
+  If `submodule-init` fails on one of them, that is the usual cause.
+- **Build on a compute node — keep the job small and short.** The Isambard 3
+  login nodes cap user processes at `ulimit -u` 900, which a full parallel build
+  (and pixi's first-time env solve) can exhaust (`fork: Resource temporarily
+  unavailable`). Run the build on a `grace` compute node with the provided batch
+  script:
+
+  ```bash
+  sbatch scripts/build.sbatch        # from the repo root
+  ```
+
+  The `grace` partition is usually full, so request a **small, short,
+  non-exclusive** job: it backfills into the schedule far sooner than a
+  whole-node (`--exclusive`) reservation, and the build is not CPU-bound past
+  ~16 cores (past builds finished in ~50–70 min on 16–32 cores). This project
+  standardises on **12 cores** (so `SPACK_JOBS`/`MAKE_JOBS=12`) — a good
+  backfill/throughput balance. The directives `build.sbatch` uses — copy these if
+  rolling your own job:
+
+  ```bash
+  #SBATCH --partition=grace
+  #SBATCH --ntasks=1
+  #SBATCH --cpus-per-task=12     # project default; raise only if the queue is empty
+  #SBATCH --time=03:30:00        # builds take <70 min; a short limit backfills sooner
+  ```
+
+  Build the **spack** variant on a node by passing the selector through Slurm:
+
+  ```bash
+  sbatch --export=ALL,LFRIC_STACK=spack scripts/build.sbatch
+  sbatch --export=ALL,LFRIC_STACK=spack scripts/build-lfric-atm.sbatch
+  ```
+
+  Avoid `--exclusive`/whole-node requests and multi-hour `--time` limits — both
+  push the job behind the partition's reservations. `SPACK_JOBS` defaults to
+  `$SLURM_CPUS_PER_TASK`. Concretization alone is single-process and fine on the
+  login node.
+- **lfric_atm** is intentionally not part of `build`: it needs the private
+  physics repos (casim/jules/socrates/ukca), vendored as pinned submodules under
+  `vendor/physics/` and consumed via `PHYSICS_ROOT`, so the compile itself does
+  no build-time cloning. The Spack environment is complete without it.
+- **Reproducible, offline science sources.** `local_build.py` upstream
+  auto-clones/rsyncs/git-fetches the science sources during the build (which can
+  silently change the stack). `patches/30-lfric_apps-local-sources-patch.sh`
+  disables that: `get_source()` now symlinks the **staged** submodules in place
+  and sanity-checks them — a remote source raises instead of fetching. So the
+  compile is a pure function of the checked-out submodule SHAs (`lfric_core` +
+  `vendor/physics/*`). To pull in new science, bump the refs in
+  `vendor/lfric_apps/dependencies.yaml`, run `pixi run stage-physics`, and commit
+  the updated gitlinks — never a silent build-time change.
 
 ## Useful overrides
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
+| `LFRIC_STACK` | `cray` | Dependency variant: `cray` (system cray-mpich + Cray HDF5/netCDF) or `spack` (mpich + HDF5/netCDF from source). Selects the `spack-env/<variant>/` environment for every task |
 | `SPACK_JOBS` | `8` | Parallel Spack make jobs (raise on a dedicated compute node; keep modest on a shared login node) |
 | `HEAVY_JOBS` | `6` | Make jobs for LLVM/V8-bundling packages (`node-js`, `rust`); capped to avoid OOM (see below) |
 | `HEAVY_PKGS` | `node-js rust` | Packages built first at `HEAVY_JOBS` before the rest |
 | `MAKE_JOBS` | `8` | Parallel make jobs for `lfric_atm` |
 | `LFRIC_WORKING_DIR` | `<repo>/working_dir` | Where build output lands |
-| `GCC_MODULE` | `gcc-native/14` | Best-effort `module load` (compiler is pinned as an external in `spack.yaml`, so this is informational only) |
+| `PRGENV_MODULE` | `PrgEnv-gnu` | _cray variant only_: Cray PE module loaded by `build`; puts the `cray-mpich`/`libfabric`/`cray-pmi` externals on the module path + sets the `CRAY_*` lib paths (required) |
+| `CRAYPE_TARGET` | `craype-arm-grace` | _cray variant only_: Cray CPU-target module (Grace / Neoverse-V2) |
+| `HDF5_MODULE` / `NETCDF_MODULE` | `cray-hdf5-parallel/1.14.3.9` / `cray-netcdf-hdf5parallel/4.9.2.3` | _cray variant only_: parallel Cray HDF5/netCDF modules backing the `hdf5`/`netcdf` externals |
 | `RUN_XIOS_VERIFICATION` | `1` | Set `0` to skip the XIOS network check in `build` |
 | `CYLC_RUN_BASE` | `$PROJECTDIR/$USER/cylc-run` | Cylc run directory |
 

@@ -26,10 +26,21 @@ export WORKING_DIR="${LFRIC_WORKING_DIR:-$REPO_ROOT/working_dir}"
 export SPACK_USER_CONFIG_PATH="${SPACK_USER_CONFIG_PATH:-$WORKING_DIR/spack-config}"
 export SPACK_USER_CACHE_PATH="${SPACK_USER_CACHE_PATH:-$WORKING_DIR/spack-cache}"
 
-# Directory (anonymous) Spack environment. spack-env/spack.yaml is tracked; the
-# generated spack-env/.spack-env/ (view + lockfile) is git-ignored.
-export SPACK_ENV_DIR="$REPO_ROOT/spack-env"
-export ENV_NAME="lfric-apps-isambard"
+# --- Dependency stack variant (cray | spack) -------------------------------
+# Two coexisting directory environments share one install tree (working_dir/opt):
+#   cray  - system cray-mpich + Cray parallel HDF5/netCDF (externals)  [default]
+#   spack - mpich + HDF5/netCDF built from source (portable fallback)
+# LFRIC_STACK selects which one every pixi task operates on. Each variant lives
+# in spack-env/<variant>/spack.yaml (both including ../common.yaml) with its own
+# git-ignored .spack-env/ (view + lockfile) and its own precomputed runtime
+# snippet working_dir/env-runtime-<variant>.sh. build.sh honours LFRIC_STACK for
+# the module loads / solve assertions; activate.sh sources the matching snippet.
+# (Kept default-only here so this stays side-effect-light; build.sh validates the
+# value.) The variant manifests are tracked; the generated state is not.
+export LFRIC_STACK="${LFRIC_STACK:-cray}"
+export SPACK_ENV_DIR="$REPO_ROOT/spack-env/$LFRIC_STACK"
+export ENV_NAME="lfric-apps-isambard-$LFRIC_STACK"
+export ENV_RUNTIME="$WORKING_DIR/env-runtime-$LFRIC_STACK.sh"
 
 # Make the vendored spack CLI available so `pixi run spack ...` just works.
 case ":${PATH:-}:" in

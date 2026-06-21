@@ -10,16 +10,17 @@
 # that error noisily when pixi runs a command under /bin/sh. Everything we need
 # is achieved without them:
 #   - SPACK_ENV=<dir>           makes `pixi run spack ...` operate on this env
-#   - working_dir/env-runtime.sh puts the view (rose/cylc/psyclone/...) on PATH
-#     and sets SHUMLIB/FC/LD_* (precomputed once by build.sh, so this is fast)
+#   - $ENV_RUNTIME (working_dir/env-runtime-<variant>.sh) puts the view
+#     (rose/cylc/psyclone/...) on PATH and sets SHUMLIB/FC/LD_* (precomputed once
+#     by build.sh per LFRIC_STACK variant, so this is fast)
 # The vendored `spack` binary is already on PATH via common.sh.
 
 _act_here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
 # shellcheck source=scripts/common.sh
 . "$_act_here/common.sh"
 
-if [ -f "$WORKING_DIR/env-runtime.sh" ]; then
+if [ -f "$ENV_RUNTIME" ]; then
   export SPACK_ENV="$SPACK_ENV_DIR"
   # shellcheck source=/dev/null
-  . "$WORKING_DIR/env-runtime.sh" 2>/dev/null || true
+  . "$ENV_RUNTIME" 2>/dev/null || true
 fi

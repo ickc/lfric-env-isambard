@@ -1,0 +1,64 @@
+# Shared configuration included by every variant manifest
+# (spack-env/<variant>/spack.yaml). It holds everything that is identical across
+# the cray / spack dependency variants: the package repos, the gcc@14.3.0 system
+# external + per-language pins, and the python / py-setuptools settings.
+#
+# What differs BETWEEN variants (and therefore lives in each variant's
+# spack.yaml, not here) is only the MPI provider and the HDF5/netCDF stack:
+#   - spack-env/cray/spack.yaml   system cray-mpich + cray parallel HDF5/netCDF
+#   - spack-env/spack/spack.yaml  mpich + HDF5/netCDF built from source
+#
+# Relative paths below resolve against THIS file's directory (spack-env/), not
+# the including manifest's directory — verified against the vendored Spack — so
+# `../spack-repo` / `../vendor` are correct from each nested variant dir.
+#
+# NOTE: view: and specs: are environment-manifest-only keys and cannot live in
+# an included config scope, so each variant's spack.yaml carries its own.
+concretizer:
+  unify: when_possible
+# Repo paths are resolved relative to this file. Order matters: the first repo
+# that defines a package wins.
+#   - lfric: the local LFRic bundle + Isambard xios@2252 + foxml.
+#   - metoffice: MetOffice/mo-spack-packages (Spack 1.0 native, namespace
+#     "metoffice", api v2.0). Provides the MO-maintained mpich/hdf5/netcdf/yaxt/
+#     shumlib/pfunit/blitz and build tools (py-psyclone 3.2.2, py-fparser,
+#     py-rose-picker). Several of its packages extend their builtin counterparts
+#     via import, so the vendored builtin below must stay on the path.
+#   - builtin: the vendored Spack builtin repo (spack/spack-packages submodule),
+#     pinned so the build does not fetch from the network. Now carries the
+#     workflow tools (py-cylc-flow/py-cylc-rose/py-metomi-rose).
+repos:
+  lfric: ../spack-repo/lfric-isambard
+  metoffice: ../vendor/mo-spack-packages/spack_repo/metoffice
+  builtin: ../vendor/spack-packages/repos/spack_repo/builtin
+packages:
+  # Compiler. Isambard 3 dropped the complete gcc 12.3 toolchain earlier builds
+  # used (gcc 12/13 are now C-only — no g++/gfortran); gcc 14.3.0 is the only
+  # complete cray-native C/C++/Fortran toolchain on the system. Define it as an
+  # explicit external (these paths exist on both the login and grace compute
+  # nodes) and pin the whole environment to it, so the solve is deterministic
+  # and never drifts to another gcc that `spack compiler find` might register.
+  gcc:
+    externals:
+    - spec: gcc@14.3.0 languages:='c,c++,fortran'
+      prefix: /usr
+      extra_attributes:
+        compilers:
+          c: /usr/bin/gcc-14
+          cxx: /usr/bin/g++-14
+          fortran: /usr/bin/gfortran-14
+    require: ['@14.3.0']
+  # Per-language virtual requires (the "%compiler" form in "all: require"
+  # triggers an internal concretizer error in Spack 1.0).
+  c:
+    require: ['gcc@14.3.0']
+  cxx:
+    require: ['gcc@14.3.0']
+  fortran:
+    require: ['gcc@14.3.0']
+  gcc-runtime:
+    require: ['@14.3.0']
+  python:
+    variants: +shared
+  py-setuptools:
+    version: [:79]

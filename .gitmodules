@@ -13,3 +13,15 @@
 [submodule "vendor/mo-spack-packages"]
 	path = vendor/mo-spack-packages
 	url = git@github.com:MetOffice/mo-spack-packages.git
+[submodule "vendor/physics/casim"]
+	path = vendor/physics/casim
+	url = git@github.com:MetOffice/casim.git
+[submodule "vendor/physics/jules"]
+	path = vendor/physics/jules
+	url = git@github.com:MetOffice/jules.git
+[submodule "vendor/physics/socrates"]
+	path = vendor/physics/socrates
+	url = git@github.com:MetOffice/socrates.git
+[submodule "vendor/physics/ukca"]
+	path = vendor/physics/ukca
+	url = git@github.com:MetOffice/ukca.git
