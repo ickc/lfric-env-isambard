@@ -17,6 +17,14 @@
 *.err
 /.submodule-add.log
 
+# OS process core dumps (`core`, `core.<pid>`). The kernel writes these to a
+# crashing process's working directory on SIGSEGV/SIGABRT — they are NOT a build
+# artifact or the lfric_atm binary (the one seen at the repo root was a multi-GB
+# dump from the VS Code server's `node` process). Anchored to the repo root;
+# safe to delete to reclaim space.
+/core
+/core.*
+
 # Python / OS cruft
 __pycache__/
 *.pyc
