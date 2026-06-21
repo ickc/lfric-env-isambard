@@ -81,6 +81,7 @@ vendor/                   # submodules (pinned)
   lfric_apps/             # MetOffice/lfric_apps
   lfric_core/             # MetOffice/lfric_core
   mo-spack-packages/      # MetOffice/mo-spack-packages (the "metoffice" repo)
+  physics/                # MetOffice casim/jules/socrates/ukca (lfric_atm science)
 patches/                  # one *-patch.sh per upstream patch (sorted by prefix)
 scripts/                  # common.sh, activate.sh, build.sh, build-lfric-atm.sh, ...
 working_dir/              # git-ignored: Spack install tree, caches, env view, logs
@@ -98,6 +99,10 @@ table below is a convenience snapshot:
 | `vendor/lfric_apps` | `b5aee0b1` (vn3.1.1-88) |
 | `vendor/lfric_core` | `bf236737` (2026.03.2-38) |
 | `vendor/mo-spack-packages` | `5e8359e0` (the `metoffice` package repo) |
+| `vendor/physics/casim` | `b0a6e38f` (2026.03.2) |
+| `vendor/physics/jules` | `3647a429` (2026.03.2-14) |
+| `vendor/physics/socrates` | `fb97f50a` (2026.03.2) |
+| `vendor/physics/ukca` | `1cdb9c26` (2026.03.2-5) |
 
 ## Patches
 
