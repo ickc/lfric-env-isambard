@@ -1,26 +1,33 @@
 #!/usr/bin/env bash
-# Auto-activation of the built LFRic Spack environment.
+# Auto-load the built LFRic environment via Lmod — the one piece of activation
+# pixi cannot do declaratively (an env var can't run `module load`). Sourced by
+# pixi on every `pixi run` / `pixi shell` (see [activation] in pixi.toml), AFTER
+# common.sh — which puts the generated modulefiles on MODULEPATH and sets
+# LFRIC_STACK. So this stays a thin shim; the modulefile is the source of truth.
 #
-# Sourced by pixi on every `pixi run` / `pixi shell` (see [activation] in
-# pixi.toml) and usable directly. It is a deliberate NO-OP until the
-# environment has been built, so `pixi run build` works on a clean checkout.
+# Deliberately a NO-OP until the environment is built: `module load` of a
+# not-yet-generated modulefile just fails quietly. End users without pixi do not
+# need this script at all — they activate the same environment directly with:
+#   module use <repo>/working_dir/modulefiles && module load lfric-env/<variant>
 #
-# We intentionally do NOT source spack's setup-env.sh or call `spack env
-# activate` here: those export bash shell functions (spack, _spack_shell_wrapper)
-# that error noisily when pixi runs a command under /bin/sh. Everything we need
-# is achieved without them:
-#   - SPACK_ENV=<dir>           makes `pixi run spack ...` operate on this env
-#   - $ENV_RUNTIME (working_dir/env-runtime-<variant>.sh) puts the view
-#     (rose/cylc/psyclone/...) on PATH and sets SHUMLIB/FC/LD_* (precomputed once
-#     by build.sh per LFRIC_STACK variant, so this is fast)
-# The vendored `spack` binary is already on PATH via common.sh.
+# We do NOT source spack's setup-env.sh (its exported shell functions error
+# noisily when pixi runs a command under /bin/sh); Lmod's `module` function is
+# /bin/sh-safe, so we use it directly.
 
-_act_here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
-# shellcheck source=scripts/common.sh
-. "$_act_here/common.sh"
+# pixi may source us under /bin/sh, which does not inherit the login shell's
+# `module` function — initialize Lmod when absent (guarded so we never reset an
+# already-set-up Lmod / its MODULEPATH in an interactive shell).
+if ! command -v module >/dev/null 2>&1; then
+  for f in /opt/cray/pe/lmod/lmod/init/sh /etc/profile.d/lmod.sh \
+           /usr/share/lmod/lmod/init/sh /usr/share/lmod/lmod/init/bash; do
+    # shellcheck source=/dev/null
+    [ -f "$f" ] && . "$f" 2>/dev/null && break
+  done
+fi
 
-if [ -f "$ENV_RUNTIME" ]; then
-  export SPACK_ENV="$SPACK_ENV_DIR"
-  # shellcheck source=/dev/null
-  . "$ENV_RUNTIME" 2>/dev/null || true
+# Load the variant selected by LFRIC_STACK (default cray). Quiet in this
+# auto-activation path (mirrors the old silent snippet source); `pixi run
+# activate` / build.sh surface any real problems loudly.
+if command -v module >/dev/null 2>&1; then
+  module load "lfric-env/${LFRIC_STACK:-cray}" 2>/dev/null || true
 fi

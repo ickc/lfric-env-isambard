@@ -32,8 +32,9 @@ LFRIC_STACK=spack pixi run activate   # or: pixi run activate-spack
 ```
 
 After `build`, **every** `pixi run ...` (and `pixi shell`) auto-activates the
-environment, so e.g. `pixi run rose --version` or `pixi run spack find` work
-directly. Before the build, auto-activation is a no-op (so `build` can run).
+environment (via Lmod — see [Activation](#activation)), so e.g.
+`pixi run rose --version` or `pixi run spack find` work directly. Before the
+build, auto-activation is a no-op (so `build` can run).
 
 Expected result after a complete build (exact rose/cylc versions track the
 vendored Spack builtin repo; psyclone comes from mo-spack-packages):
@@ -66,6 +67,40 @@ PSyclone version: 3.2.2
 `.spack-env/` view + lockfile are git-ignored). `LFRIC_STACK` (default `cray`)
 selects which variant every task operates on.
 
+## Activation
+
+The built environment is loaded through **Lmod**, so **pixi is only needed to
+_build_ it** — once built, loading the environment needs nothing but `module`.
+`build` generates one modulefile per variant —
+`working_dir/modulefiles/lfric-env/<variant>.lua` — that is self-contained: it
+bakes the resolved Spack view + package prefixes into
+`PATH`/`PYTHONPATH`/`SHUMLIB_ROOT`/`LD_LIBRARY_PATH`/`SPACK_ENV`/… with no nested
+`module load`, so it is fast and works under `/bin/sh`.
+
+- **Inside pixi** (the usual path): nothing to do — every `pixi run ...` /
+  `pixi shell` auto-activates the `LFRIC_STACK` variant. `common.sh` puts
+  `working_dir/modulefiles` on `MODULEPATH` and `activate.sh` `module load`s
+  `lfric-env/$LFRIC_STACK`.
+- **Outside pixi** (a Slurm job, a plain login shell — no pixi required):
+
+  ```bash
+  module use working_dir/modulefiles   # absolute path also fine
+  module avail lfric-env               # -> lfric-env/cray, lfric-env/spack
+  module load lfric-env/cray           # or lfric-env/spack
+  ```
+
+  The two share the module name `lfric-env`, so loading one **swaps out** the
+  other; bare `module load lfric-env` resolves to the default (`cray`).
+
+The modulefiles live under the git-ignored `working_dir/`, so they are not
+tracked (their paths contain per-build content hashes). Regenerate one without a
+full rebuild — e.g. after moving `working_dir` — with:
+
+```bash
+bash scripts/gen-modulefile.sh                 # cray (default)
+LFRIC_STACK=spack bash scripts/gen-modulefile.sh
+```
+
 ## Layout
 
 ```
@@ -83,8 +118,9 @@ vendor/                   # submodules (pinned)
   mo-spack-packages/      # MetOffice/mo-spack-packages (the "metoffice" repo)
   physics/                # MetOffice casim/jules/socrates/ukca (lfric_atm science)
 patches/                  # one *-patch.sh per upstream patch (sorted by prefix)
-scripts/                  # common.sh, activate.sh, build.sh, build-lfric-atm.sh, ...
+scripts/                  # common.sh, activate.sh, build.sh, gen-modulefile.sh, ...
 working_dir/              # git-ignored: Spack install tree, caches, env view, logs
+  modulefiles/lfric-env/  #   generated Lmod modulefiles (cray.lua, spack.lua)
 ```
 
 ## Pinned versions

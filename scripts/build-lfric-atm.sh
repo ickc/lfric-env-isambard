@@ -10,6 +10,10 @@
 set -uo pipefail
 
 _here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
+# common.sh sets REPO_ROOT/SPACK_ENV_DIR/MODULEFILE/MODULEPATH/...; activate.sh
+# then module-loads the env. (Runnable standalone, not only via pixi activation.)
+# shellcheck source=scripts/common.sh
+. "$_here/common.sh"
 # shellcheck source=scripts/activate.sh
 . "$_here/activate.sh"
 
@@ -17,7 +21,7 @@ info() { echo "INFO: $*"; }
 warn() { echo "WARN: $*" >&2; }
 die()  { echo "ERROR: $*" >&2; exit 1; }
 
-[ -f "$ENV_RUNTIME" ] || die "Environment '$LFRIC_STACK' not built. Run: ${LFRIC_STACK:+LFRIC_STACK=$LFRIC_STACK }pixi run build"
+[ -f "$MODULEFILE" ] || die "Environment '$LFRIC_STACK' not built. Run: ${LFRIC_STACK:+LFRIC_STACK=$LFRIC_STACK }pixi run build"
 
 # Ensure patches are applied (idempotent). In particular this applies the
 # lfric_apps local-sources patch so local_build.py uses the staged submodules in
@@ -101,8 +105,9 @@ info "MPI compiler: $("$FC" --version 2>/dev/null | head -1) (FC=$FC LDMPI=$LDMP
 # parallel / cray-netcdf-hdf5parallel modules loaded above make the ftn/CC
 # wrappers inject their -I/-L/-l automatically — exactly like mpi.mod and the MPI
 # libs. For the spack variant HDF5/netCDF ARE in the view, so the same -I$view/
-# include / -L$view/lib below already covers them. The env-runtime snippet
-# already put shumlib on F/LDFLAGS/LD_LIBRARY_PATH; prepend the view's dirs here.
+# include / -L$view/lib below already covers them. The lfric-env module (loaded
+# by activate.sh) already put shumlib on LDFLAGS/LIBRARY_PATH/LD_LIBRARY_PATH;
+# prepend the view's dirs here.
 _view="$SPACK_ENV_DIR/.spack-env/view"
 [ -d "$_view/include" ] || die "Spack env view missing at $_view — run: pixi run build"
 export FFLAGS="-I$_view/include${FFLAGS:+ $FFLAGS}"
