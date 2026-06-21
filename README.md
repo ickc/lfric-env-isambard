@@ -111,6 +111,10 @@ not hardcoded):
   submodule bump).
 - `22-spack-packages-gdbm-automake-patch.sh` — gdbm `automake` build fix in
   `vendor/spack-packages`.
+- `30-lfric_apps-local-sources-patch.sh` — rewrites `get_source()` in
+  `vendor/lfric_apps` so the build stages the pinned `lfric_core` + physics
+  submodules in place instead of cloning/fetching them at build time (see
+  *Reproducible, offline science sources* under Notes).
 
 The Met Office package definitions are **no longer patched**: the old
 `simit-spack` repo (Spack < 1.0) needed ~40 `30-/40-simit-*` patch scripts to
@@ -120,8 +124,8 @@ in the Spack builtin repo. Those patches were therefore removed in the port.
 
 Because every remaining patch modifies files **inside a submodule** (overwriting
 tracked files), `pixi run unpatch` reverts them all by `git reset --hard &&
-git clean -fd` on `lfric_core` and `spack-packages`. `build` re-applies patches
-automatically, so it is always self-contained.
+git clean -fd` on `lfric_core`, `lfric_apps`, and `spack-packages`. `build`
+re-applies patches automatically, so it is always self-contained.
 
 ## Notes / caveats
 
