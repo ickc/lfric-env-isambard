@@ -1,7 +1,7 @@
 [workspace]
 name = "lfric-env-isambard"
 version = "0.1.0"
-description = "Pixi-driven, submodule-based reproducible build of the LFRic Apps Spack environment for Isambard 3 (GCC 12.3)."
+description = "Pixi-driven, submodule-based reproducible build of the LFRic Apps Spack environment for Isambard 3 (GCC 14.3)."
 channels = ["conda-forge"]
 platforms = ["linux-aarch64"]
 
