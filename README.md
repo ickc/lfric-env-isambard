@@ -71,11 +71,22 @@ selects which variant every task operates on.
 
 The built environment is loaded through **Lmod**, so **pixi is only needed to
 _build_ it** — once built, loading the environment needs nothing but `module`.
-`build` generates one modulefile per variant —
-`working_dir/modulefiles/lfric-env/<variant>.lua` — that is self-contained: it
-bakes the resolved Spack view + package prefixes into
+It is self-contained — it puts the resolved Spack view + package prefixes on
 `PATH`/`PYTHONPATH`/`SHUMLIB_ROOT`/`LD_LIBRARY_PATH`/`SPACK_ENV`/… with no nested
-`module load`, so it is fast and works under `/bin/sh`.
+`module load` — so it is fast and works under `/bin/sh`.
+
+To stay auditable, the modulefile is split in two:
+
+- **Logic** — [`scripts/lfric-env.lua`](scripts/lfric-env.lua): version-controlled,
+  syntax-highlighted Lua holding all the `setenv`/`prepend_path`/`pushenv` rules.
+  Audit it once.
+- **Data** — `working_dir/modulefiles/lfric-env/<variant>.lua` (generated per
+  build by `scripts/gen-modulefile.sh`): a flat table of the per-build paths,
+  ending in `assert(loadfile(".../scripts/lfric-env.lua"))(data)`. Trivial to
+  eyeball/diff.
+
+(Lmod's Lua sandbox forbids `dofile()` but allows `loadfile()` + passing the
+table as an argument, which is how the two halves connect.)
 
 - **Inside pixi** (the usual path): nothing to do — every `pixi run ...` /
   `pixi shell` auto-activates the `LFRIC_STACK` variant. `common.sh` puts
@@ -119,6 +130,7 @@ vendor/                   # submodules (pinned)
   physics/                # MetOffice casim/jules/socrates/ukca (lfric_atm science)
 patches/                  # one *-patch.sh per upstream patch (sorted by prefix)
 scripts/                  # common.sh, activate.sh, build.sh, gen-modulefile.sh, ...
+  lfric-env.lua           #   Lmod modulefile logic (data table generated per build)
 working_dir/              # git-ignored: Spack install tree, caches, env view, logs
   modulefiles/lfric-env/  #   generated Lmod modulefiles (cray.lua, spack.lua)
 ```

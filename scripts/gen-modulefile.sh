@@ -1,23 +1,24 @@
 #!/usr/bin/env bash
-# gen-modulefile.sh — write the Lmod modulefile for the active LFRIC_STACK variant.
+# gen-modulefile.sh — write the per-variant Lmod modulefile for LFRIC_STACK.
 #
-# This replaces the old `working_dir/env-runtime-<variant>.sh` shell snippet: it
-# bakes the fully-resolved Spack view + package prefixes into a generated Lua
-# modulefile, so the environment is loaded with
-#     module use working_dir/modulefiles
-#     module load lfric-env/<variant>          # cray | spack
-# (and pixi auto-activation does the same via scripts/activate.sh). The two
-# variants share the module name "lfric-env", so loading one swaps out the other.
+# This replaces the old `working_dir/env-runtime-<variant>.sh` shell snippet. The
+# environment is loaded with `module load lfric-env/<cray|spack>` (and pixi auto-
+# activation does the same via scripts/activate.sh).
 #
-# The modulefile is deliberately SELF-CONTAINED — only setenv/prepend_path/
-# pushenv, no nested `module load` — so it is fast and works even under /bin/sh
-# (how pixi sources the activation hook), and the cray variant carries no runtime
-# dependency on the Cray PE modules (their lib dirs are baked into LD_LIBRARY_PATH
-# at generate time, exactly as the old snippet did).
+# To keep the modulefile auditable, the LOGIC (what gets put on PATH/LD_*, the
+# conditionals, pushenv composition, ordering) lives in the version-controlled,
+# syntax-highlighted scripts/lfric-env.lua. THIS script only resolves the per-
+# build paths and emits a flat Lua DATA table; the generated file then runs the
+# committed logic with it:
+#     local data = { ... }
+#     assert(loadfile(".../scripts/lfric-env.lua"))(data)
+# (Lmod's sandbox forbids dofile() but allows loadfile() + an argument.)
 #
 # Called by build.sh after `env view regenerate`, but also runnable on its own to
 # regenerate the modulefile without a full rebuild (the env must already be
-# concretized + installed; it uses the vendored `spack` CLI from common.sh).
+# concretized + installed; it uses the vendored `spack` CLI from common.sh). For
+# the cray variant, run with the Cray PE modules loaded (PrgEnv-gnu + cray-hdf5/
+# netcdf) so CRAY_LD_LIBRARY_PATH is populated.
 set -uo pipefail
 
 _here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
@@ -33,92 +34,83 @@ case "$LFRIC_STACK" in
   *) die "LFRIC_STACK must be 'cray' or 'spack' (got '$LFRIC_STACK')" ;;
 esac
 
+logic="$_here/lfric-env.lua"
 view="$SPACK_ENV_DIR/.spack-env/view"
+[ -f "$logic" ] || die "missing modulefile logic: $logic"
 [ -d "$view/bin" ] || die "Spack env view missing at $view — run: pixi run build"
 command -v spack >/dev/null 2>&1 || die "spack CLI not on PATH (common.sh should add it)"
 
-mkdir -p "$(dirname "$MODULEFILE")"
+# --- Lua literal helpers (the only quoting this script does) ----------------
+lua_q()  { local s=${1:-}; s=${s//\\/\\\\}; s=${s//\"/\\\"}; printf '"%s"' "$s"; }
+lua_qn() { if [ -n "${1:-}" ]; then lua_q "$1"; else printf 'nil'; fi; }   # string or nil
+lua_list() {                                                               # args -> { "a", "b" } (none -> {})
+  local x out=""
+  for x in "$@"; do
+    [ -n "$out" ] && out+=", "
+    out+="$(lua_q "$x")"
+  done
+  [ -n "$out" ] && printf '{ %s }' "$out" || printf '{}'
+}
 
-# Resolve the install prefixes we reference by hash (these change every build).
+# --- Resolve the per-build, hash-addressed install prefixes -----------------
 shumlib_prefix="$(spack -e "$SPACK_ENV_DIR" location -i shumlib 2>/dev/null || true)"
 python_prefix="$(spack -e "$SPACK_ENV_DIR" location -i python 2>/dev/null || true)"
 psyclone_prefix="$(spack -e "$SPACK_ENV_DIR" location -i py-psyclone 2>/dev/null || true)"
 rose_picker_prefix="$(spack -e "$SPACK_ENV_DIR" location -i rose-picker 2>/dev/null || true)"
 
+shumlib_lib=""
+[ -n "$shumlib_prefix" ] && [ -d "$shumlib_prefix/lib" ] && shumlib_lib="$shumlib_prefix/lib"
+psyclone_cfg=""
+[ -n "$psyclone_prefix" ] && [ -f "$psyclone_prefix/share/psyclone/psyclone.cfg" ] \
+  && psyclone_cfg="$psyclone_prefix/share/psyclone/psyclone.cfg"
+
+# The view's python site-packages (usually one; glob in case of a version bump).
+pythonpath=()
+for _sp in "$view"/lib/python*/site-packages; do
+  [ -d "$_sp" ] && pythonpath+=("$_sp")
+done
+
+# Cray MPI/IO runtime lib dirs (cray variant only), in final front-to-back order.
+cray_libs=()
+if [ "$LFRIC_STACK" = cray ]; then
+  if [ -n "${CRAY_MPICH_DIR:-}" ]; then
+    _OLDIFS=$IFS; IFS=:
+    for _d in $CRAY_MPICH_DIR/lib${CRAY_LD_LIBRARY_PATH:+:$CRAY_LD_LIBRARY_PATH}; do
+      [ -n "$_d" ] && cray_libs+=("$_d")
+    done
+    IFS=$_OLDIFS
+  else
+    warn "CRAY_MPICH_DIR unset — modulefile will lack the Cray MPI lib paths."
+    warn "Re-run with the Cray PE modules loaded (PrgEnv-gnu + cray-hdf5/netcdf)."
+  fi
+fi
+
+pythonpath_lua='{}'; [ ${#pythonpath[@]} -gt 0 ] && pythonpath_lua="$(lua_list "${pythonpath[@]}")"
+cray_libs_lua='{}';  [ ${#cray_libs[@]}  -gt 0 ] && cray_libs_lua="$(lua_list "${cray_libs[@]}")"
+
+# --- Emit the data table + a call into the committed logic ------------------
+mkdir -p "$(dirname "$MODULEFILE")"
 info "Writing Lmod modulefile ($MODULEFILE)"
-{
-  echo "-- Generated by gen-modulefile.sh on $(date -u '+%Y-%m-%dT%H:%M:%SZ'). Do not edit."
-  echo "-- LFRic Apps environment ($ENV_NAME); dependency stack: $LFRIC_STACK."
-  echo "whatis(\"Name: $ENV_NAME\")"
-  echo "whatis(\"LFRic Apps Spack environment (rose/cylc/psyclone/xios/...), $LFRIC_STACK stack\")"
-  echo "help([[Prebuilt LFRic Apps environment ($LFRIC_STACK variant). Puts rose/cylc/"
-  echo "psyclone and the Spack view on PATH and sets SHUMLIB_ROOT/SPACK_ENV/... ."
-  echo "Built from $REPO_ROOT. Loading the other lfric-env/* version swaps this out.]])"
-  echo ""
-  # SPACK_ENV makes `spack ...` operate on this environment (the old activate.sh
-  # exported it; set it here so a bare `module load lfric-env/<variant>` is enough).
-  echo "setenv(\"SPACK_ENV\", \"$SPACK_ENV_DIR\")"
-  echo "prepend_path(\"PATH\", \"$view/bin\")"
-  # Spack package scripts (e.g. psyclone) carry a shebang to the base python,
-  # whose sys.path lacks the env's site-packages. Export the view's site-packages
-  # so those scripts can import their own modules.
-  for _sp in "$view"/lib/python*/site-packages; do
-    [ -d "$_sp" ] && echo "prepend_path(\"PYTHONPATH\", \"$_sp\")"
-  done
-
-  if [ -n "$shumlib_prefix" ]; then
-    echo "setenv(\"SHUMLIB_ROOT\", \"$shumlib_prefix\")"
-    if [ -d "$shumlib_prefix/lib" ]; then
-      # LDFLAGS is a space-separated flag string (not a path list): compose it and
-      # pushenv so the prior value is restored on unload. LFRic's compile.mk reads
-      # it (build-lfric-atm.sh prepends the view's -L/-rpath on top of this).
-      echo "local _shumlib_ld = \"-L$shumlib_prefix/lib -Wl,-rpath=$shumlib_prefix/lib\""
-      echo "local _ldflags = os.getenv(\"LDFLAGS\")"
-      echo "if _ldflags and _ldflags ~= \"\" then"
-      echo "  pushenv(\"LDFLAGS\", _ldflags .. \" \" .. _shumlib_ld)"
-      echo "else"
-      echo "  pushenv(\"LDFLAGS\", _shumlib_ld)"
-      echo "end"
-      echo "prepend_path(\"LIBRARY_PATH\", \"$shumlib_prefix/lib\")"
-      echo "prepend_path(\"LD_LIBRARY_PATH\", \"$shumlib_prefix/lib\")"
-    fi
-  fi
-
-  # Cray MPI stack (cray-mpich + libfabric + cray-pmi) runtime libraries — cray
-  # variant only. They live under /opt/cray (off the default loader path);
-  # CRAY_LD_LIBRARY_PATH (set by the PrgEnv-gnu modules build.sh loaded) aggregates
-  # them. Bake each dir into LD_LIBRARY_PATH so view binaries that link MPI resolve
-  # their .so at runtime. Emitted in reverse so the final order matches the colon
-  # list left-to-right (prepend_path pushes to the front). The spack variant links
-  # a from-source mpich from the view (RPATH'd by Spack), so nothing is needed.
-  if [ "$LFRIC_STACK" = cray ]; then
-    if [ -n "${CRAY_MPICH_DIR:-}" ]; then
-      _cray_libs="$CRAY_MPICH_DIR/lib${CRAY_LD_LIBRARY_PATH:+:$CRAY_LD_LIBRARY_PATH}"
-      _rev=""
-      _OLDIFS=$IFS; IFS=:
-      for _d in $_cray_libs; do [ -n "$_d" ] && _rev="$_d${_rev:+:$_rev}"; done
-      for _d in $_rev; do [ -n "$_d" ] && echo "prepend_path(\"LD_LIBRARY_PATH\", \"$_d\")"; done
-      IFS=$_OLDIFS
-    else
-      warn "CRAY_MPICH_DIR unset — modulefile will lack the Cray MPI lib paths."
-      warn "Re-run with the Cray PE modules loaded (PrgEnv-gnu + cray-hdf5/netcdf)."
-    fi
-  fi
-
-  [ -n "$python_prefix" ]   && echo "prepend_path(\"PATH\", \"$python_prefix/bin\")"
-  if [ -n "$psyclone_prefix" ]; then
-    echo "prepend_path(\"PATH\", \"$psyclone_prefix/bin\")"
-    # The psyclone launcher's shebang python cannot locate its config; point at it.
-    [ -f "$psyclone_prefix/share/psyclone/psyclone.cfg" ] \
-      && echo "setenv(\"PSYCLONE_CONFIG\", \"$psyclone_prefix/share/psyclone/psyclone.cfg\")"
-  fi
-  [ -n "$rose_picker_prefix" ] && echo "prepend_path(\"PATH\", \"$rose_picker_prefix/bin\")"
-
-  echo "setenv(\"APPS_ROOT_DIR\", \"$REPO_ROOT/vendor/lfric_apps\")"
-  echo "setenv(\"CORE_ROOT_DIR\", \"$REPO_ROOT/vendor/lfric_core\")"
-  echo "setenv(\"LFRIC_TARGET_PLATFORM\", \"${LFRIC_TARGET_PLATFORM:-meto-spice}\")"
-  echo "setenv(\"FPP\", \"${FPP:-cpp -traditional-cpp}\")"
-} > "$MODULEFILE"
+cat > "$MODULEFILE" <<EOF
+-- Generated by gen-modulefile.sh on $(date -u '+%Y-%m-%dT%H:%M:%SZ'). Do not edit.
+-- Per-build path data for the $LFRIC_STACK variant; the logic that consumes it is
+-- version-controlled (and audited) in scripts/lfric-env.lua.
+local data = {
+  variant         = $(lua_q  "$LFRIC_STACK"),
+  repo_root       = $(lua_q  "$REPO_ROOT"),
+  shumlib         = $(lua_qn "$shumlib_prefix"),
+  shumlib_lib     = $(lua_qn "$shumlib_lib"),
+  python          = $(lua_qn "$python_prefix"),
+  psyclone        = $(lua_qn "$psyclone_prefix"),
+  psyclone_cfg    = $(lua_qn "$psyclone_cfg"),
+  rose_picker     = $(lua_qn "$rose_picker_prefix"),
+  pythonpath      = $pythonpath_lua,
+  cray_libs       = $cray_libs_lua,
+  target_platform = $(lua_q  "${LFRIC_TARGET_PLATFORM:-meto-spice}"),
+  fpp             = $(lua_q  "${FPP:-cpp -traditional-cpp}"),
+}
+assert(loadfile($(lua_q "$logic")))(data)
+EOF
 
 # Mark the unversioned `module load lfric-env` default as the project default
 # variant (cray, matching LFRIC_STACK's default). Idempotent; rewritten each build.

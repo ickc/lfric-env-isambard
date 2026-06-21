@@ -228,11 +228,12 @@ if ! spack -e "$SPACK_ENV_DIR" env view regenerate; then
 fi
 
 # --- 11. Resolve runtime env once -> Lmod modulefile (per variant) ---------
-# gen-modulefile.sh bakes the fully-resolved view + package prefixes into a Lua
-# modulefile (working_dir/modulefiles/lfric-env/<variant>.lua) that `module load`
-# uses to activate the environment. It runs here (after the view exists) but is
-# standalone, so the modulefile can be regenerated without a full rebuild. The
-# CRAY_* lib paths it bakes in come from the Cray PE modules loaded in step 2.
+# gen-modulefile.sh resolves the per-build view + package prefixes into a flat
+# Lua data table (working_dir/modulefiles/lfric-env/<variant>.lua) that `module
+# load` runs through the version-controlled logic in scripts/lfric-env.lua. It
+# runs here (after the view exists) but is standalone, so the modulefile can be
+# regenerated without a full rebuild. The CRAY_* lib paths it bakes in come from
+# the Cray PE modules loaded in step 2.
 bash "$_here/gen-modulefile.sh" || die "gen-modulefile.sh failed"
 
 # --- 12. Cylc user config (idempotent; mirrors the old activate.sh) --------
