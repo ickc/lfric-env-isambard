@@ -11,12 +11,17 @@ platforms = ["linux-aarch64"]
 # its own Python 3.12 via Spack — that is independent of this one.)
 python = "3.11.*"
 
-# Auto-activate the built Spack environment on every `pixi run` / `pixi shell`.
-# scripts/activate.sh is a NO-OP until `pixi run build` has produced the
-# environment, so it is safe to have configured before the first build. It also
-# puts the vendored `spack` on PATH, so `pixi run spack ...` works immediately.
+# Auto-activate the built Spack environment on every `pixi run` / `pixi shell`,
+# in two sourced steps:
+#   common.sh    puts the vendored `spack` on PATH + the generated modulefiles on
+#                MODULEPATH (so `pixi run spack ...` and `module load` both work).
+#   activate.sh  `module load`s lfric-env/<LFRIC_STACK> (the generated modulefile
+#                working_dir/modulefiles/lfric-env/<variant>.lua).
+# Both are a NO-OP until `pixi run build` has produced the modulefile, so this is
+# safe before the first build. Order matters: common.sh sets the MODULEPATH that
+# activate.sh relies on.
 [activation]
-scripts = ["scripts/activate.sh"]
+scripts = ["scripts/common.sh", "scripts/activate.sh"]
 
 [tasks]
 # One-time: clone the pinned submodules. You are responsible for clone access
