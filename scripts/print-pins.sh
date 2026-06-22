@@ -27,7 +27,10 @@ printf '|-----------|--------|-------------|-----------|\n'
 git config --file .gitmodules --get-regexp '^submodule\..*\.path$' \
   | awk '{print $2}' \
   | while read -r path; do
-  if ! git -C "$path" rev-parse --git-dir >/dev/null 2>&1; then
+  # An uninitialized submodule is a dir with no .git gitlink. Guard on that
+  # explicitly: `git -C "$path" rev-parse` would otherwise walk UP to the parent
+  # repo and report the superproject's commit for every missing submodule.
+  if [ ! -e "$path/.git" ] || ! git -C "$path" rev-parse --git-dir >/dev/null 2>&1; then
     printf '| `%s` | _(not checked out — run `submodule-init`)_ |  |  |\n' "$path"
     continue
   fi
