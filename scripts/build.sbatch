@@ -39,8 +39,12 @@ export LFRIC_STACK="${LFRIC_STACK:-cray}"
 export SPACK_JOBS="${SPACK_JOBS:-${SLURM_CPUS_PER_TASK:-12}}"
 
 if [ "${LFRIC_USE_PIXI:-1}" = "1" ]; then
-  PIXI="${PIXI:-$HOME/.local/opt/Linux-aarch64/system/bin/pixi}"
-  command -v "$PIXI" >/dev/null 2>&1 || PIXI=pixi
+  PIXI="${PIXI:-pixi}"
+  command -v "$PIXI" >/dev/null 2>&1 || {
+    echo "ERROR: pixi not found (looked for '$PIXI' on PATH). Install it" >&2
+    echo "       (https://pixi.sh) and put it on PATH, set PIXI=/path/to/pixi," >&2
+    echo "       or take the no-pixi path: --export=ALL,LFRIC_USE_PIXI=0." >&2
+    exit 1; }
   echo "host=$(hostname) jobid=${SLURM_JOB_ID:-?} cpus=${SLURM_CPUS_PER_TASK:-?} LFRIC_STACK=$LFRIC_STACK SPACK_JOBS=$SPACK_JOBS pixi=$PIXI"
   exec "$PIXI" run build
 else
