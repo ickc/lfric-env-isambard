@@ -26,7 +26,7 @@ Stage 1, and even there it is optional** — it is not needed to *use* what gets
 built.
 
 ```
-Stage 1 — BUILD the environment        (Python 3.11: pixi, or cray-python/3.11.7)
+Stage 1 — BUILD the environment        (Python 3.7–3.11: pixi, or cray-python/3.11.7)
   pinned submodules ─▶ Spack: concretize ─▶ install ─▶ view ─▶ generate modulefile
                                                                        │
                                                                        ▼
@@ -37,7 +37,7 @@ Stage 2 — USE the environment          (just `module load`; no pixi, no Spack)
                                   └─▶ compile a science suite (scripts/build-lfric-atm.sh)
 ```
 
-**Stage 1 — build (needs Python 3.11 + the submodules).** Spack concretizes and
+**Stage 1 — build (needs Python 3.7–3.11 + the submodules).** Spack concretizes and
 installs the whole stack (rose, cylc, psyclone, xios, mpi, ...) into
 `working_dir/`, regenerates the env view, and — as its final step — writes a
 self-contained **Lmod modulefile**. The only thing pixi contributes is the Python
@@ -54,7 +54,7 @@ is precisely that: load the module, compile `lfric_atm`, run its example.
 
 | | Stage 1 — build | Stage 2 — use / build a suite |
 |---|---|---|
-| Needs | Python 3.11 + submodules + Spack | the Stage-1 Lmod modulefile only |
+| Needs | Python 3.7–3.11 + submodules + Spack | the Stage-1 Lmod modulefile only |
 | With pixi | `pixi run build` | `pixi run build-lfric-atm` |
 | Without pixi | `module load cray-python/3.11.7` → `bash scripts/build.sh` | `module load lfric-env/<v>` → `bash scripts/build-lfric-atm.sh` |
 
@@ -76,7 +76,7 @@ pixi run build            # build the Spack environment (~2-4 h from scratch)
 pixi run activate         # report rose / cylc / psyclone versions
 ```
 
-Without pixi (bring your own Python 3.11 — Spack 1.0 needs CPython <3.12):
+Without pixi (bring your own Python 3.7–3.11 — Spack 1.0 needs CPython <3.12):
 
 ```bash
 module load cray-python/3.11.7                      # or any python3 in [3.7,3.12)
