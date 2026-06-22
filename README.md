@@ -10,31 +10,117 @@ A [pixi](https://pixi.sh)-driven, submodule-based, reproducible build of the
 
 This is a refactor of a single large `install.sh` driver into:
 
-- **pixi** as the Python bootstrap *and* task runner,
+- **pixi** as the Stage-1 Python bootstrap *and* task runner — optional, since the
+  built environment is `module`-loadable without it (see [Architecture](#architecture)),
 - **git submodules** for every upstream source (Spack, the Spack package repo,
   and the Met Office repos), pinned to known-good commits,
 - **standalone patch scripts** (`patches/*-patch.sh`) replacing the inline
   `sed`/`awk`/`perl`/heredoc patching that the driver used to do,
 - a repo-local, git-ignored `working_dir/` for all heavy build output.
 
+## Architecture
+
+The repo turns pinned upstream sources into a **prebuilt, `module`-loadable LFRic
+Apps environment**, in two stages. The key separation: **pixi matters only for
+Stage 1, and even there it is optional** — it is not needed to *use* what gets
+built.
+
+```
+Stage 1 — BUILD the environment        (Python 3.7–3.11: pixi, or cray-python/3.11.7)
+  pinned submodules ─▶ Spack: concretize ─▶ install ─▶ view ─▶ generate modulefile
+                                                                       │
+                                                                       ▼
+            product:  working_dir/modulefiles/lfric-env/<variant>.lua  (self-contained)
+                                                                       │
+Stage 2 — USE the environment          (just `module load`; no pixi, no Spack)
+  module load lfric-env/<variant> ─▶ rose / cylc / psyclone / spack ...
+                                  └─▶ compile a science suite (scripts/build-lfric-atm.sh)
+```
+
+**Stage 1 — build (needs Python 3.7–3.11 + the submodules).** Spack concretizes and
+installs the whole stack (rose, cylc, psyclone, xios, mpi, ...) into
+`working_dir/`, regenerates the env view, and — as its final step — writes a
+self-contained **Lmod modulefile**. The only thing pixi contributes is the Python
+that *runs* Spack (Spack 1.0 needs CPython <3.12); supply that yourself and pixi
+is out of the picture (`build.sh` checks it up front).
+
+**Stage 2 — use (needs only the Stage-1 modulefile).** Everything downstream loads
+the environment with `module load lfric-env/<variant>`. That module is
+self-contained — it puts the Spack view, the env's own Python, rose/cylc/psyclone,
+shumlib and (for the `cray` variant) the Cray MPI/IO libraries on the right paths
+with no nested `module load` — so **neither pixi nor Spack is needed** to use the
+environment or to build a science suite on top of it. `scripts/build-lfric-atm.sh`
+is precisely that: load the module, compile `lfric_atm`, run its example.
+
+| | Stage 1 — build | Stage 2 — use / build a suite |
+|---|---|---|
+| Needs | Python 3.7–3.11 + submodules + Spack | the Stage-1 Lmod modulefile only |
+| With pixi | `pixi run build` | `pixi run build-lfric-atm` |
+| Without pixi | `module load cray-python/3.11.7` → `bash scripts/build.sh` | `module load lfric-env/<variant>` → `bash scripts/build-lfric-atm.sh` |
+
+pixi therefore plays three roles, all confined to Stage 1: it **bootstraps** the
+Python that runs Spack, **auto-activates** the built module on every `pixi run`
+(a convenience — see [Activation](#activation)), and is the **task runner** for
+the table under [Tasks](#tasks). Every task wraps a script in `scripts/`, so each
+has a direct no-pixi equivalent (`bash scripts/<script>`).
+
 ## Quickstart
+
+### Stage 1 — build the environment
+
+With pixi (it supplies the Python that runs Spack):
 
 ```bash
 pixi run submodule-init   # one-time: clone the pinned submodules (needs repo access)
 pixi run build            # build the Spack environment (~2-4 h from scratch)
 pixi run activate         # report rose / cylc / psyclone versions
-
-# Optional second variant: build the dependency stack from source (mpich +
-# HDF5/netCDF) instead of the Cray PE libraries. It coexists with the default
-# and shares one install tree, so only the MPI subtree is rebuilt:
-LFRIC_STACK=spack pixi run build      # or: pixi run build-spack
-LFRIC_STACK=spack pixi run activate   # or: pixi run activate-spack
 ```
 
-After `build`, **every** `pixi run ...` (and `pixi shell`) auto-activates the
-environment (via Lmod — see [Activation](#activation)), so e.g.
-`pixi run rose --version` or `pixi run spack find` work directly. Before the
-build, auto-activation is a no-op (so `build` can run).
+Without pixi (bring your own Python 3.7–3.11 — Spack 1.0 needs CPython <3.12):
+
+```bash
+module load cray-python/3.11.7                      # or any python3 in [3.7,3.12)
+git submodule update --init --recursive --jobs 4    # = submodule-init
+bash scripts/build.sh                               # = build
+bash scripts/print-versions.sh                      # = activate
+```
+
+The second dependency variant (mpich + HDF5/netCDF from source instead of the
+Cray PE libraries) is selected with `LFRIC_STACK=spack`; it coexists with the
+default and shares one install tree, so only the MPI subtree is rebuilt:
+
+```bash
+LFRIC_STACK=spack pixi run build          # or: pixi run build-spack
+LFRIC_STACK=spack bash scripts/build.sh   # no-pixi equivalent
+```
+
+### Stage 2 — use the environment (no pixi required)
+
+Once Stage 1 has written the modulefile, load it for a working environment — no
+pixi, no Spack:
+
+```bash
+module use working_dir/modulefiles    # absolute path also fine
+module load lfric-env/cray            # or lfric-env/spack
+rose --version; cylc --version; psyclone --version
+```
+
+Optionally compile the `lfric_atm` science suite against it (uses the pinned
+`vendor/physics/` submodules; no build-time SSH):
+
+```bash
+bash scripts/build-lfric-atm.sh       # with the module loaded as above
+pixi run build-lfric-atm              # equivalent inside pixi (auto-loads the module)
+```
+
+`build-lfric-atm.sh` compiles against whichever variant you loaded (it adopts the
+loaded module's `LFRIC_STACK`), so `module load lfric-env/spack` then the command
+above builds the spack stack — no extra flag needed.
+
+Inside pixi you can skip the explicit `module load`: after `build`, **every**
+`pixi run ...` (and `pixi shell`) auto-activates the environment via Lmod (see
+[Activation](#activation)), so `pixi run rose --version` / `pixi run spack find`
+work directly.
 
 Expected result after a complete build (exact rose/cylc versions track the
 vendored Spack builtin repo; psyclone comes from mo-spack-packages):
@@ -66,6 +152,10 @@ PSyclone version: 3.2.2
 `spack.yaml` manifests and shared `common.yaml` are tracked; the generated
 `.spack-env/` view + lockfile are git-ignored). `LFRIC_STACK` (default `cray`)
 selects which variant every task operates on.
+
+Each task is a thin wrapper around a script in `scripts/`; without pixi, run that
+script directly for the same effect (e.g. `bash scripts/build.sh`, or
+`git submodule update --init --recursive` for `submodule-init`).
 
 ## Activation
 
@@ -265,6 +355,16 @@ re-applies patches automatically, so it is always self-contained.
   ```bash
   sbatch --export=ALL,LFRIC_STACK=spack scripts/build.sbatch
   sbatch --export=ALL,LFRIC_STACK=spack scripts/build-lfric-atm.sbatch
+  ```
+
+  Both batch scripts honour **`LFRIC_USE_PIXI=0`** for the no-pixi path on a node:
+  the build job then `module load`s `cray-python/3.11.7` (override with
+  `CRAY_PYTHON_MODULE`) and runs `scripts/build.sh` directly; the lfric_atm job
+  just runs `scripts/build-lfric-atm.sh` (the Lmod module supplies its Python):
+
+  ```bash
+  sbatch --export=ALL,LFRIC_USE_PIXI=0 scripts/build.sbatch
+  sbatch --export=ALL,LFRIC_USE_PIXI=0 scripts/build-lfric-atm.sbatch
   ```
 
   Avoid `--exclusive`/whole-node requests and multi-hour `--time` limits — both

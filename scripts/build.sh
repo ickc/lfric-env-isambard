@@ -47,6 +47,23 @@ case "$LFRIC_STACK" in
 esac
 info "Dependency stack variant: LFRIC_STACK=$LFRIC_STACK (env: $SPACK_ENV_DIR)"
 
+# --- Python preflight (this Python RUNS Spack) -----------------------------
+# pixi is optional for the build; the one thing it otherwise provides is a
+# suitable Python. Spack 1.0 needs CPython >=3.7 and <3.12 (it parses sources
+# with ast.Str, removed in 3.12; some deps want >=3.8). common.sh points
+# SPACK_PYTHON at `python3`: under pixi that is the pinned 3.11, without pixi it
+# is whatever you brought (on Isambard: `module load cray-python/3.11.7`). Check
+# it here so a missing/too-new Python fails with a clear hint instead of a deep
+# Spack traceback later.
+_py="${SPACK_PYTHON:-$(command -v python3 2>/dev/null || true)}"
+[ -n "$_py" ] && [ -x "$_py" ] \
+  || die "no Python found to run Spack. Use pixi ('pixi run build'), or bring your own: 'module load cray-python/3.11.7' (or any python3 in [3.7,3.12)) then re-run."
+_pyver="$("$_py" -c 'import sys; print("%d.%d" % sys.version_info[:2])' 2>/dev/null || true)"
+case "$_pyver" in
+  3.7|3.8|3.9|3.10|3.11) info "Spack Python: $_py ($_pyver)" ;;
+  *) die "Spack needs Python >=3.7 and <3.12 (found '${_pyver:-unknown}' at $_py). Use pixi ('pixi run build'), or 'module load cray-python/3.11.7', then re-run." ;;
+esac
+
 mkdir -p "$WORKING_DIR" "$SPACK_USER_CONFIG_PATH" "$SPACK_USER_CACHE_PATH"
 
 # --- 0. Submodules present? ------------------------------------------------

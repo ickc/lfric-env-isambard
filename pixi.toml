@@ -20,6 +20,12 @@ python = "3.11.*"
 # Both are a NO-OP until `pixi run build` has produced the modulefile, so this is
 # safe before the first build. Order matters: common.sh sets the MODULEPATH that
 # activate.sh relies on.
+#
+# This whole block is a CONVENIENCE for working inside pixi, not a requirement:
+# pixi only matters for *building* the environment (Stage 1, where it supplies the
+# Python above). The build's product is a self-contained Lmod modulefile, so the
+# environment is loaded — and a science suite built on top of it (Stage 2) — with
+# nothing but `module load lfric-env/<variant>`, no pixi. See README "Architecture".
 [activation]
 scripts = ["scripts/common.sh", "scripts/activate.sh"]
 

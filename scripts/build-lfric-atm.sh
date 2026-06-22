@@ -10,6 +10,21 @@
 set -uo pipefail
 
 _here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
+
+# No-pixi Stage-2 flow: if a lfric-env module is already loaded
+# (`module load lfric-env/<variant>; bash scripts/build-lfric-atm.sh`) but
+# LFRIC_STACK was not set explicitly, adopt the loaded variant — otherwise
+# common.sh would default it to cray and we'd compile the wrong stack (or fail
+# with "Environment 'cray' not built"). The loaded module exports
+# SPACK_ENV=<repo>/spack-env/<variant>, so read the variant from there. No-op
+# under pixi or when LFRIC_STACK is set explicitly (e.g. LFRIC_STACK=spack ...).
+if [ -z "${LFRIC_STACK:-}" ] && [ -n "${SPACK_ENV:-}" ]; then
+  case "${SPACK_ENV%/}" in
+    */spack-env/spack) export LFRIC_STACK=spack ;;
+    */spack-env/cray)  export LFRIC_STACK=cray  ;;
+  esac
+fi
+
 # common.sh sets REPO_ROOT/SPACK_ENV_DIR/MODULEFILE/MODULEPATH/...; activate.sh
 # then module-loads the env. (Runnable standalone, not only via pixi activation.)
 # shellcheck source=scripts/common.sh
