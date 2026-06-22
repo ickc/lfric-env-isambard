@@ -113,6 +113,10 @@ bash scripts/build-lfric-atm.sh       # with the module loaded as above
 pixi run build-lfric-atm              # equivalent inside pixi (auto-loads the module)
 ```
 
+`build-lfric-atm.sh` compiles against whichever variant you loaded (it adopts the
+loaded module's `LFRIC_STACK`), so `module load lfric-env/spack` then the command
+above builds the spack stack — no extra flag needed.
+
 Inside pixi you can skip the explicit `module load`: after `build`, **every**
 `pixi run ...` (and `pixi shell`) auto-activates the environment via Lmod (see
 [Activation](#activation)), so `pixi run rose --version` / `pixi run spack find`
