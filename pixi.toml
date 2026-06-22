@@ -36,7 +36,7 @@ scripts = ["scripts/common.sh", "scripts/activate.sh"]
 #   --filter=blob:none does a BLOBLESS partial clone: it fetches the full commit
 # graph (so every pinned commit stays reachable — unlike a shallow clone) but
 # skips the hundreds of MB of historical file blobs, downloading only the blobs
-# for the checked-out commit. Drop --filter for a full-history clone.
+# for the checked-out commit. Drop --filter for a complete clone (all blobs).
 submodule-init = "git submodule update --init --recursive --filter=blob:none --jobs 4"
 
 # Stage/update the pinned physics + lfric_core submodules to the refs in

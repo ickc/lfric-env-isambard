@@ -135,7 +135,7 @@ PSyclone version: 3.2.2
 
 | Task | What it does |
 |------|--------------|
-| `submodule-init` | Clone the pinned submodules under `vendor/` (blobless `--filter=blob:none` — full history is not fetched). Run once. |
+| `submodule-init` | Clone the pinned submodules under `vendor/` (blobless `--filter=blob:none` — keeps full commit history, fetches historical file blobs on demand). Run once. |
 | `stage-physics` | Set the physics + `lfric_core` submodules to their `dependencies.yaml` refs (then commit the gitlinks). The explicit way to pull in new science. |
 | `patch` | Apply every `patches/*-patch.sh` (sorted, idempotent). |
 | `unpatch` | Revert all patches by resetting the patched submodules. |
@@ -158,7 +158,8 @@ tracked; only the generated `.spack-env/` view is git-ignored). `LFRIC_STACK`
 
 Each task is a thin wrapper around a script in `scripts/`; without pixi, run that
 script directly for the same effect (e.g. `bash scripts/build.sh`, or
-`git submodule update --init --recursive` for `submodule-init`).
+`git submodule update --init --recursive --filter=blob:none --jobs 4` for
+`submodule-init`).
 
 ## Activation
 
