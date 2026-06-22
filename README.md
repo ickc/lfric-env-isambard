@@ -56,7 +56,7 @@ is precisely that: load the module, compile `lfric_atm`, run its example.
 |---|---|---|
 | Needs | Python 3.7–3.11 + submodules + Spack | the Stage-1 Lmod modulefile only |
 | With pixi | `pixi run build` | `pixi run build-lfric-atm` |
-| Without pixi | `module load cray-python/3.11.7` → `bash scripts/build.sh` | `module load lfric-env/<v>` → `bash scripts/build-lfric-atm.sh` |
+| Without pixi | `module load cray-python/3.11.7` → `bash scripts/build.sh` | `module load lfric-env/<variant>` → `bash scripts/build-lfric-atm.sh` |
 
 pixi therefore plays three roles, all confined to Stage 1: it **bootstraps** the
 Python that runs Spack, **auto-activates** the built module on every `pixi run`
