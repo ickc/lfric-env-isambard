@@ -1,9 +1,16 @@
 #!/usr/bin/env bash
-# Common environment for every pixi task. SOURCE this file; do not execute it.
+# Common environment for the build/task scripts. SOURCE this file; do not run it.
 #
-# Kept deliberately side-effect-light (only env vars + PATH) because it is
-# sourced on every `pixi run` via the activation hook (scripts/activate.sh).
-# Anything heavy (module loads, spack queries) lives in build.sh instead.
+# It sets up the Stage-1 BUILD context (where the vendored Spack lives, where the
+# install tree goes, which variant is selected) AND puts the generated modulefiles
+# on MODULEPATH so the Stage-1 product can be `module load`ed. It does NOT require
+# pixi: pixi sources it via the activation hook, but `bash scripts/build.sh` (no
+# pixi) sources it just the same — REPO_ROOT falls back from this file's path and
+# SPACK_PYTHON from whatever python3 you brought (see build.sh's preflight).
+#
+# Kept deliberately side-effect-light (only env vars + PATH) because it is sourced
+# on every `pixi run` via the activation hook. Anything heavy (module loads, spack
+# queries) lives in build.sh instead.
 
 # --- Repo root -------------------------------------------------------------
 # pixi exports PIXI_PROJECT_ROOT; fall back to deriving it from this file.
