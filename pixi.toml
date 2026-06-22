@@ -33,7 +33,11 @@ scripts = ["scripts/common.sh", "scripts/activate.sh"]
 # One-time: clone the pinned submodules. You are responsible for clone access
 # (an SSH key authorized for the private Met Office repos, or an HTTPS
 # credential helper). See README for the MetOffice SSO note.
-submodule-init = "git submodule update --init --recursive --jobs 4"
+#   --filter=blob:none does a BLOBLESS partial clone: it fetches the full commit
+# graph (so every pinned commit stays reachable — unlike a shallow clone) but
+# skips the hundreds of MB of historical file blobs, downloading only the blobs
+# for the checked-out commit. Drop --filter for a full-history clone.
+submodule-init = "git submodule update --init --recursive --filter=blob:none --jobs 4"
 
 # Stage/update the pinned physics + lfric_core submodules to the refs in
 # vendor/lfric_apps/dependencies.yaml, then commit the gitlinks. This is the
@@ -50,8 +54,10 @@ patch = "bash scripts/patch-all.sh"
 unpatch = "bash scripts/unpatch.sh"
 
 # Build the Spack environment — the bulk of the work (~2-4 h from scratch on a
-# login node; re-runs are incremental). Applies patches first, then concretizes
-# and installs into working_dir/.
+# login node; re-runs are incremental). Applies patches first, then installs
+# straight from the committed lock (spack-env/<variant>/spack.lock) into
+# working_dir/ — it does NOT re-solve unless the lock is missing or
+# LFRIC_RECONCRETIZE=1 (see `concretize` below).
 #
 # Two dependency variants share one install tree (working_dir/opt), selected by
 # LFRIC_STACK (default "cray"; see scripts/common.sh):
@@ -61,6 +67,15 @@ unpatch = "bash scripts/unpatch.sh"
 # e.g. `LFRIC_STACK=spack pixi run build-lfric-atm`.
 build = "bash scripts/build.sh"
 build-spack = "LFRIC_STACK=spack bash scripts/build.sh"
+
+# Concretize only: (re)solve the environment and write the tracked lock
+# (spack-env/<variant>/spack.lock) WITHOUT installing — the Spack analogue of
+# refreshing pixi.lock. `build` installs straight from this lock and never
+# re-solves, so run `concretize` (and commit the regenerated lock) whenever you
+# bump a pinned submodule or edit a manifest (spack.yaml / common.yaml). Stops
+# right after the solve (STOP_AFTER_CONCRETIZE=1).
+concretize = "LFRIC_RECONCRETIZE=1 STOP_AFTER_CONCRETIZE=1 bash scripts/build.sh"
+concretize-spack = "LFRIC_STACK=spack LFRIC_RECONCRETIZE=1 STOP_AFTER_CONCRETIZE=1 bash scripts/build.sh"
 
 # Optional: compile lfric_atm and run its example. Separate from `build` because
 # it needs the private physics repos (casim/jules/socrates/ukca) — now vendored
@@ -75,6 +90,11 @@ activate-spack = "LFRIC_STACK=spack bash scripts/print-versions.sh"
 
 # Verify the migrated XIOS source matches the pinned commit (network check).
 verify-xios = "bash scripts/xios-verification.sh"
+
+# Print the submodule pin table (Markdown) for the README "Pinned versions"
+# section. Generated from `git describe`, so the table never drifts and uses one
+# describe convention (no annotated-vs-lightweight-tag ambiguity).
+print-pins = "bash scripts/print-pins.sh"
 
 # Remove repo-local build output (keeps submodules and applied patches).
 clean = "rm -rf working_dir"

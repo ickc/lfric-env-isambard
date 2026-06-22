@@ -27,7 +27,7 @@ built.
 
 ```
 Stage 1 — BUILD the environment        (Python 3.7–3.11: pixi, or cray-python/3.11.7)
-  pinned submodules ─▶ Spack: concretize ─▶ install ─▶ view ─▶ generate modulefile
+  pinned submodules ─▶ Spack: concretize ─▶ spack.lock ─▶ install ─▶ view ─▶ modulefile
                                                                        │
                                                                        ▼
             product:  working_dir/modulefiles/lfric-env/<variant>.lua  (self-contained)
@@ -80,7 +80,7 @@ Without pixi (bring your own Python 3.7–3.11 — Spack 1.0 needs CPython <3.12
 
 ```bash
 module load cray-python/3.11.7                      # or any python3 in [3.7,3.12)
-git submodule update --init --recursive --jobs 4    # = submodule-init
+git submodule update --init --recursive --filter=blob:none --jobs 4   # = submodule-init
 bash scripts/build.sh                               # = build
 bash scripts/print-versions.sh                      # = activate
 ```
@@ -135,23 +135,26 @@ PSyclone version: 3.2.2
 
 | Task | What it does |
 |------|--------------|
-| `submodule-init` | Clone the pinned submodules under `vendor/`. Run once. |
+| `submodule-init` | Clone the pinned submodules under `vendor/` (blobless `--filter=blob:none` — full history is not fetched). Run once. |
 | `stage-physics` | Set the physics + `lfric_core` submodules to their `dependencies.yaml` refs (then commit the gitlinks). The explicit way to pull in new science. |
 | `patch` | Apply every `patches/*-patch.sh` (sorted, idempotent). |
 | `unpatch` | Revert all patches by resetting the patched submodules. |
-| `build` | Build the Spack environment, **cray** variant (applies patches, concretizes, installs). |
+| `concretize` | (Re)solve the **cray** variant and write the tracked lock `spack-env/cray/spack.lock` — **without** installing. The Spack analogue of refreshing `pixi.lock`; run after bumping a pin/manifest, then commit the lock. |
+| `concretize-spack` | Same for the **spack** variant (`spack-env/spack/spack.lock`). |
+| `build` | Build the Spack environment, **cray** variant: apply patches, then install **from the committed lock** (re-solves only if the lock is missing or `LFRIC_RECONCRETIZE=1`). |
 | `build-spack` | Same, **spack** variant — `mpich` + HDF5/netCDF from source (`LFRIC_STACK=spack`). |
 | `build-lfric-atm` | Optionally compile `lfric_atm` + run its example (uses the pinned `vendor/physics/` submodules; no build-time SSH). |
 | `activate` | Activate + print rose/cylc/psyclone versions (cray variant). |
 | `activate-spack` | Same for the spack variant (`LFRIC_STACK=spack`). |
 | `verify-xios` | Check the migrated XIOS source matches the pinned commit. |
+| `print-pins` | Print the submodule pin table (Markdown) for the "Pinned versions" section. |
 | `clean` | Remove `working_dir/` (keeps submodules and patches). |
 
 `pixi run spack ...` works because activation puts the vendored Spack on `PATH`
 (`vendor/spack`). The Spack environments live in `spack-env/<variant>/` (the
-`spack.yaml` manifests and shared `common.yaml` are tracked; the generated
-`.spack-env/` view + lockfile are git-ignored). `LFRIC_STACK` (default `cray`)
-selects which variant every task operates on.
+`spack.yaml` manifests, shared `common.yaml`, and resolved `spack.lock` are
+tracked; only the generated `.spack-env/` view is git-ignored). `LFRIC_STACK`
+(default `cray`) selects which variant every task operates on.
 
 Each task is a thin wrapper around a script in `scripts/`; without pixi, run that
 script directly for the same effect (e.g. `bash scripts/build.sh`, or
@@ -206,7 +209,7 @@ LFRIC_STACK=spack bash scripts/gen-modulefile.sh
 
 ```
 pixi.toml                 # pixi project: deps, activation hook, tasks
-spack-env/                # Spack environments (manifests tracked; .spack-env/ ignored)
+spack-env/                # Spack envs (manifests + spack.lock tracked; .spack-env/ ignored)
   common.yaml             #   shared config included by both variants (repos, gcc, python)
   cray/spack.yaml         #   variant: system cray-mpich + Cray HDF5/netCDF (default)
   spack/spack.yaml        #   variant: mpich + HDF5/netCDF built from source
@@ -227,20 +230,77 @@ working_dir/              # git-ignored: Spack install tree, caches, env view, l
 
 ## Pinned versions
 
-The authoritative pins live in the git index (`git submodule status`); the
-table below is a convenience snapshot:
+The authoritative pins live in the git index (`git submodule status`); the table
+below is a convenience snapshot, **generated** by `scripts/print-pins.sh`
+(`pixi run print-pins`) so it never drifts. "Nearest ref" is `git describe`
+(annotated tags, matching `git submodule status`); "Pinned at" says whether the
+commit sits exactly on that tag, some commits past it, or on a branch tip.
 
-| Submodule | Commit |
-|-----------|--------|
-| `vendor/spack` | `7ae1d68c` (develop, Spack 1.0.x) |
-| `vendor/spack-packages` | `7e330489` (builtin, 2025-11-12) |
-| `vendor/lfric_apps` | `b5aee0b1` (vn3.1.1-88) |
-| `vendor/lfric_core` | `bf236737` (2026.03.2-38) |
-| `vendor/mo-spack-packages` | `5e8359e0` (the `metoffice` package repo) |
-| `vendor/physics/casim` | `b0a6e38f` (2026.03.2) |
-| `vendor/physics/jules` | `3647a429` (2026.03.2-14) |
-| `vendor/physics/socrates` | `fb97f50a` (2026.03.2) |
-| `vendor/physics/ukca` | `1cdb9c26` (2026.03.2-5) |
+| Submodule | Commit | Nearest ref | Pinned at |
+|-----------|--------|-------------|-----------|
+| `vendor/spack` | `7ae1d68c` | `develop-2026-03-29` | 191 commits past tag |
+| `vendor/spack-packages` | `7e330489` | `develop-2025-11-12` | 2286 commits past tag |
+| `vendor/lfric_apps` | `b5aee0b1` | `vn3.1.1` | 88 commits past tag |
+| `vendor/lfric_core` | `bf236737` | `2026.03.2` | 38 commits past tag |
+| `vendor/mo-spack-packages` | `5e8359e0` | `main` | branch tip (untagged) |
+| `vendor/physics/casim` | `b0a6e38f` | `2026.03.2` | exact tag |
+| `vendor/physics/jules` | `3647a429` | `2026.03.2` | 14 commits past tag |
+| `vendor/physics/socrates` | `fb97f50a` | `2026.03.2` | exact tag |
+| `vendor/physics/ukca` | `1cdb9c26` | `2026.03.2` | 5 commits past tag |
+
+`vendor/spack` and `vendor/spack-packages` track Spack's rolling `develop`, so
+their nearest tag is a dated dev snapshot far behind the pinned commit (not a
+release); `vendor/mo-spack-packages` follows `main` (it publishes no tags). The
+Met Office repos pin a release tag (`vn*` / `YYYY.MM.x`) or a few commits past
+one — those few-commits-past pins come from `lfric_apps/dependencies.yaml` (see
+`stage-physics`). The fully-resolved version of *every* package (not just these
+top-level sources) is the committed lock, `spack-env/<variant>/spack.lock`.
+
+## Key version decisions
+
+Beyond the raw pins above, a few versions are deliberate choices made *in this
+repo* (with the reason), rather than whatever an unconstrained solve would pick:
+
+- **GCC 14.3.0** (`spack-env/common.yaml`). The only *complete* Cray-native
+  C/C++/Fortran toolchain on Isambard 3: the older `gcc@12.3.0` has been reduced
+  to a C-only compiler (no `g++`/`gfortran`). Declared as an explicit external and
+  pinned per-language so the solve never drifts to another gcc.
+- **Two Pythons — 3.11 to *run* Spack, 3.12 *in* the env.** pixi pins Python
+  `3.11.*` (and `cray-python/3.11.7` is the no-pixi equivalent) because Spack 1.0
+  parses recipes with `ast.Str`, removed in CPython 3.12. The built LFRic
+  environment then contains its *own* `python@3.12+shared` (`depends_on` in the
+  `lfric-apps-isambard` bundle) — that is what LFRic uses at runtime, independent
+  of the Python that ran Spack.
+- **XIOS r2252** (`spack-repo/lfric-isambard/packages/xios`). LFRic Apps targets
+  the former SVN revision **r2252** (`depends_on("xios@2252")`, pinned to the
+  migrated Git commit `26cc7d88`). That revision predates newer GCC/libstdc++,
+  which no longer expose some transitive STL headers it relies on, so it carries
+  a small build patch (`gcc12_remap_standard_headers.patch`, applied `when@2252`)
+  to compile under GCC 14. So the pin is *"LFRic needs this specific old XIOS,
+  patched for the new compiler"* — not *"newer XIOS is broken"*. `pixi run
+  verify-xios` checks the upstream commit still matches.
+- **HDF5 1.14.3 / netCDF-c 4.9.2 / netCDF-fortran 4.6.1.** The `cray` variant
+  externalizes the Cray parallel builds at these versions; the `spack` variant
+  pins the *same* versions from source (`spack-env/spack/spack.yaml`) so the two
+  variants concretize an identical downstream DAG (yaxt/xios/shumlib/lfric) and
+  stay apples-to-apples.
+- **cray-mpich 9.1.0** (cray variant). The system MPI; though built with gnu/12.3,
+  its Fortran `.mod` files are format v15, which `gcc@14.3.0` also emits, so
+  `use mpi` / `use mpi_f08` compile cleanly against it.
+- **PSyclone 3.2.2, rose 2.4.2, cylc 8.4.2.** PSyclone is pinned
+  (`py-psyclone@3.2.2`) via `mo-spack-packages`; rose/cylc come from the vendored
+  Spack builtin repo (their exact versions track that pin).
+- **py-setuptools ≤79** (`common.yaml`). Held below 80, which removed
+  `easy_install` and legacy `setup.py` build commands that some Met Office Python
+  packages still rely on.
+- **Spack 1.0.x + `mo-spack-packages`.** The build runs on Spack 1.0 (vendored
+  `develop`), and Met Office packages come from `mo-spack-packages` — the
+  Spack-1.0-native (`api: v2.0`) successor to the pre-1.0 `simit-spack`, which is
+  why the old `simit-*` patch set is gone (see below).
+
+This list is the *decided* set, not the full dependency graph — for the complete
+resolved set of every package and version, read the committed lock
+(`spack-env/<variant>/spack.lock`).
 
 ## Patches
 
@@ -272,6 +332,22 @@ re-applies patches automatically, so it is always self-contained.
 
 ## Notes / caveats
 
+- **Locked, reproducible solve (`spack.lock`).** Each variant's resolved
+  environment is committed as `spack-env/<variant>/spack.lock` — the Spack
+  analogue of `pixi.lock`. `build` installs straight from it, so a fresh checkout
+  reproduces byte-identical specs and skips the multi-minute solve; the lock holds
+  only concrete specs and stable system externals (`/opt/cray/...`,
+  `/usr/bin/gcc-14`), no per-user paths. *Solving* and *installing* are separate
+  steps: refresh the lock with `pixi run concretize` (or `LFRIC_RECONCRETIZE=1`)
+  after bumping a pin or editing a manifest, then commit the new lock — its diff
+  is a reviewable record of what the bump changed.
+- **Blobless submodule clones.** `submodule-init` clones with
+  `--filter=blob:none`: every pinned commit stays reachable (so the historical
+  `spack`/`spack-packages` pins still check out — a plain shallow clone would
+  not) while the hundreds of MB of *historical* file blobs are skipped, fetching
+  only the checked-out commit's blobs (git lazily fetches more if you later run,
+  e.g., `git -C vendor/spack log -p`). It shrinks the download and `.git` size,
+  not the checked-out working trees. Drop `--filter` for a full-history clone.
 - **Build output location.** Everything heavy (~7.5 GB) goes under
   `working_dir/` next to the repo. The build redirects Spack's user config and
   cache there too (`SPACK_USER_CONFIG_PATH`, `SPACK_USER_CACHE_PATH`), so it
@@ -390,6 +466,7 @@ re-applies patches automatically, so it is always self-contained.
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `LFRIC_STACK` | `cray` | Dependency variant: `cray` (system cray-mpich + Cray HDF5/netCDF) or `spack` (mpich + HDF5/netCDF from source). Selects the `spack-env/<variant>/` environment for every task |
+| `LFRIC_RECONCRETIZE` | `0` | Set `1` so `build` re-solves and rewrites `spack.lock` instead of installing from the committed lock (what `pixi run concretize` sets). Use after bumping a pin/manifest |
 | `SPACK_JOBS` | `8` | Parallel Spack make jobs (raise on a dedicated compute node; keep modest on a shared login node) |
 | `HEAVY_JOBS` | `6` | Make jobs for LLVM/V8-bundling packages (`node-js`, `rust`); capped to avoid OOM (see below) |
 | `HEAVY_PKGS` | `node-js rust` | Packages built first at `HEAVY_JOBS` before the rest |

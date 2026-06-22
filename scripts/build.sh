@@ -157,13 +157,27 @@ info "Using gcc external pinned in spack.yaml ($COMPILER_SPEC)"
 info "Environment package repos:"
 spack -e "$SPACK_ENV_DIR" repo list || die "spack repo list failed (check spack-env/common.yaml repo paths)"
 
-# --- 8. Concretize ---------------------------------------------------------
-# --fresh: this is a pinned, reproducible env (submodule-pinned spack +
-# spack-packages), so a fresh solve is deterministic and avoids reusing stale
-# specs from an earlier (self-built-mpich) install tree. `install` still skips
-# already-built identical hashes, so a fresh solve is not wasteful.
-info "Concretizing $ENV_NAME"
-spack -e "$SPACK_ENV_DIR" concretize -f --fresh || die "concretize failed"
+# --- 8. Concretize (or reuse the committed lock) ---------------------------
+# spack.lock is the COMMITTED, authoritative resolution — the Spack analogue of
+# pixi.lock (tracked in git). By default `build` installs straight from it and
+# does NOT re-solve, so a fresh checkout reproduces byte-identical specs and
+# skips the multi-minute solve. Re-solve only when explicitly asked
+# (LFRIC_RECONCRETIZE=1, which `pixi run concretize` sets) or when no lock has
+# been committed yet. After editing a manifest (spack.yaml / common.yaml) or
+# bumping the vendored spack / spack-packages, run `pixi run concretize` and
+# commit the regenerated lock — same discipline as `pixi install` refreshing
+# pixi.lock. --fresh: the env is fully pinned (submodule spack + spack-packages),
+# so a from-scratch solve is deterministic; `install` still skips already-built
+# identical hashes, so re-solving is never wasteful.
+if [ "${LFRIC_RECONCRETIZE:-0}" = 1 ]; then
+  info "Concretizing $ENV_NAME (LFRIC_RECONCRETIZE=1 — refreshing spack.lock)"
+  spack -e "$SPACK_ENV_DIR" concretize -f --fresh || die "concretize failed"
+elif [ ! -f "$SPACK_ENV_DIR/spack.lock" ]; then
+  info "Concretizing $ENV_NAME (no committed spack.lock yet)"
+  spack -e "$SPACK_ENV_DIR" concretize -f --fresh || die "concretize failed"
+else
+  info "Using committed spack.lock for $ENV_NAME (set LFRIC_RECONCRETIZE=1 to re-solve)"
+fi
 
 # Assert the solve matches the requested variant, so a silently mis-resolved
 # external (or a leaking PrgEnv) can never produce the wrong stack.
