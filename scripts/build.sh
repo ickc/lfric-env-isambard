@@ -15,11 +15,14 @@ _here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
 . "$_here/common.sh"
 
 SPACK_JOBS="${SPACK_JOBS:-8}"
-# A few packages bundle LLVM/V8, whose largest translation units use several GB
-# each; at high -j on a swapless/shared node they OOM (cc1plus gets SIGKILLed).
-# Build those at a capped -j (HEAVY_JOBS) before the rest. HEAVY_PKGS lists them.
+# A few packages have translation units that use several GB each: node-js/rust
+# bundle LLVM/V8, and xios' group_template_decl.cpp is a heavy C++ template unit.
+# At high -j on a memory-capped job they OOM (cc1plus gets SIGKILLed — "Killed
+# signal terminated program cc1plus"). Build those at a capped -j (HEAVY_JOBS)
+# before the rest. HEAVY_PKGS lists them. (The sbatch scripts also request enough
+# memory via --mem; this cap is the in-build belt-and-suspenders for either path.)
 HEAVY_JOBS="${HEAVY_JOBS:-${NODE_JS_JOBS:-6}}"
-HEAVY_PKGS=(${HEAVY_PKGS:-node-js rust})
+HEAVY_PKGS=(${HEAVY_PKGS:-node-js rust xios})
 COMPILER_SPEC="${COMPILER_SPEC:-gcc@14.3.0}"
 COMPILER_SPEC="${COMPILER_SPEC#%}"
 # Cray PrgEnv-gnu provides the compiler (gcc-native/14 == /usr/bin/gcc-14 ==
@@ -133,14 +136,62 @@ fi
 . "$SPACK_ROOT/share/spack/setup-env.sh"
 spack --version || die "spack unavailable after sourcing setup-env.sh"
 
-# --- 5. Repo-local install tree + caches -----------------------------------
-# Without this, Spack would install into vendor/spack/opt (inside the submodule).
+# --- 5. Install tree + caches ----------------------------------------------
+# Without install_tree, Spack would install into vendor/spack/opt (inside the
+# submodule). The install tree + source cache go under $WORKING_DIR (persistent,
+# so completed packages + downloaded tarballs survive a re-run).
+#
+# The BUILD STAGE (the transient compile area) is different: autotools/libtool
+# builds do thousands of small-file metadata ops, and on Isambard $WORKING_DIR is
+# a shared Lustre that can be badly contended — which makes the install phase
+# pathologically slow (observed: ncurses install 33 min, gettext 1h+, a build
+# that should finish in <70 min timing out at 3.5 h). Stage on the node-local
+# NVMe instead ($TMPDIR -> /local), which is fast and immune to Lustre load. It
+# is per-node + transient, so a re-run on another node just re-stages. Override
+# with LFRIC_BUILD_STAGE; it falls back to $WORKING_DIR/stage if /local is
+# unavailable/unwritable.
+if [ -n "${LFRIC_BUILD_STAGE:-}" ]; then
+  BUILD_STAGE="$LFRIC_BUILD_STAGE"; mkdir -p "$BUILD_STAGE" \
+    || die "LFRIC_BUILD_STAGE=$BUILD_STAGE not writable"
+else
+  # Probe candidates in preference order for a writable, node-local stage with
+  # enough room (rust/node-js stage dirs reach ~10-15 GiB). Two filesystems to
+  # avoid: (1) shared lustre/nfs — the slow, contended case we are escaping;
+  # (2) a SMALL tmpfs/ramfs — on these nodes $LOCALDIR can be a RAM disk, and
+  # staging a multi-GiB build there competes with the compilers' own RAM and can
+  # OOM the node, so only use a RAM disk if it is comfortably large. (A big
+  # disk-backed NVMe like this system's /local is ideal.) Thresholds overridable.
+  _disk_min="${LFRIC_STAGE_MIN_GIB:-20}"
+  _tmpfs_min="${LFRIC_TMPFS_MIN_GIB:-60}"
+  BUILD_STAGE=""
+  for _c in "${TMPDIR:-}" "${LOCALDIR:-}" "/local/$USER" "/local/user/$(id -u)" "/tmp/$USER"; do
+    [ -n "$_c" ] || continue
+    _d="$_c/lfric-spack-stage-$LFRIC_STACK"
+    mkdir -p "$_d" 2>/dev/null || continue
+    _fs="$(stat -f -c %T "$_d" 2>/dev/null || echo unknown)"
+    _gib="$(df -Pk "$_d" 2>/dev/null | awk 'NR==2{print int($4/1024/1024)}')"; : "${_gib:=0}"
+    case "$_fs" in
+      lustre|nfs|nfs4|smb2|cifs|gpfs|beegfs)
+        continue ;;                                    # shared FS — keep looking
+      tmpfs|ramfs)
+        [ "$_gib" -lt "$_tmpfs_min" ] && { warn "skip RAM-disk stage $_d ($_fs, ${_gib} GiB < ${_tmpfs_min}) — OOM risk"; continue; } ;;
+      *)
+        [ "$_gib" -lt "$_disk_min" ] && { warn "skip stage $_d ($_fs, ${_gib} GiB < ${_disk_min})"; continue; } ;;
+    esac
+    BUILD_STAGE="$_d"; break
+  done
+  if [ -z "$BUILD_STAGE" ]; then
+    warn "no suitable fast node-local build stage found; using $WORKING_DIR/stage (shared Lustre — slower but safe)"
+    BUILD_STAGE="$WORKING_DIR/stage"; mkdir -p "$BUILD_STAGE"
+  fi
+fi
+info "Spack build stage: $BUILD_STAGE ($(stat -f -c %T "$BUILD_STAGE" 2>/dev/null || echo '?'), $(df -Pk "$BUILD_STAGE" 2>/dev/null | awk 'NR==2{print int($4/1024/1024)}') GiB free)"
 cat > "$SPACK_USER_CONFIG_PATH/config.yaml" <<EOF
 config:
   install_tree:
     root: $WORKING_DIR/opt
   build_stage:
-  - $WORKING_DIR/stage
+  - $BUILD_STAGE
   source_cache: $WORKING_DIR/source-cache
   misc_cache: $WORKING_DIR/misc-cache
   build_jobs: $SPACK_JOBS
@@ -152,6 +203,22 @@ EOF
 # run `spack compiler find`: with the env active (pixi activates it) that would
 # rewrite the tracked manifest, and a stray gcc on PATH could derail the solve.
 info "Using gcc external pinned in spack.yaml ($COMPILER_SPEC)"
+
+# --- 6b. Instantiate the directory environment under WORKING_DIR -----------
+# The Spack environment is built OUTSIDE the repo so its view + lockfile land
+# under PREFIX, making Stage 2 (module load) independent of the repo's location.
+# We generate $SPACK_ENV_DIR/spack.yaml from the tracked template, rewriting its
+# relative `include: ../common.yaml` to an absolute path back into the repo: the
+# shared config (concretizer, repos, gcc external, python) stays version-
+# controlled in spack-env/common.yaml, and its own relative `repos:` keep
+# resolving against repo/spack-env/ (where common.yaml lives). Regenerated every
+# build so a template edit always takes effect.
+[ -f "$SPACK_ENV_TEMPLATE" ] || die "missing env template: $SPACK_ENV_TEMPLATE"
+mkdir -p "$SPACK_ENV_DIR"
+sed "s|../common.yaml|$REPO_ROOT/spack-env/common.yaml|" \
+  "$SPACK_ENV_TEMPLATE" > "$SPACK_ENV_DIR/spack.yaml" \
+  || die "failed to generate $SPACK_ENV_DIR/spack.yaml from template"
+info "Spack env instantiated at $SPACK_ENV_DIR (from $SPACK_ENV_TEMPLATE)"
 
 # --- 7. Sanity: environment repos resolve (incl. vendored builtin) ---------
 info "Environment package repos:"

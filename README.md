@@ -16,7 +16,9 @@ This is a refactor of a single large `install.sh` driver into:
   and the Met Office repos), pinned to known-good commits,
 - **standalone patch scripts** (`patches/*-patch.sh`) replacing the inline
   `sed`/`awk`/`perl`/heredoc patching that the driver used to do,
-- a repo-local, git-ignored `working_dir/` for all heavy build output.
+- an install **`PREFIX`** outside the repo (default
+  `$PROJECTDIR/$USER/opt/<arch>`) for all heavy build output, so the built
+  environment outlives the repo's location.
 
 ## Architecture
 
@@ -30,7 +32,7 @@ Stage 1 — BUILD the environment        (Python 3.7–3.11: pixi, or cray-pytho
   pinned submodules ─▶ Spack: concretize ─▶ install ─▶ view ─▶ generate modulefile
                                                                        │
                                                                        ▼
-            product:  working_dir/modulefiles/lfric-env/<variant>.lua  (self-contained)
+            product:  $PREFIX/modulefiles/lfric-env/<variant>.lua  (self-contained)
                                                                        │
 Stage 2 — USE the environment          (just `module load`; no pixi, no Spack)
   module load lfric-env/<variant> ─▶ rose / cylc / psyclone / spack ...
@@ -39,7 +41,7 @@ Stage 2 — USE the environment          (just `module load`; no pixi, no Spack)
 
 **Stage 1 — build (needs Python 3.7–3.11 + the submodules).** Spack concretizes and
 installs the whole stack (rose, cylc, psyclone, xios, mpi, ...) into
-`working_dir/`, regenerates the env view, and — as its final step — writes a
+`$PREFIX/`, regenerates the env view, and — as its final step — writes a
 self-contained **Lmod modulefile**. The only thing pixi contributes is the Python
 that *runs* Spack (Spack 1.0 needs CPython <3.12); supply that yourself and pixi
 is out of the picture (`build.sh` checks it up front).
@@ -100,10 +102,13 @@ Once Stage 1 has written the modulefile, load it for a working environment — n
 pixi, no Spack:
 
 ```bash
-module use working_dir/modulefiles    # absolute path also fine
+module use "$PREFIX/modulefiles"      # $PROJECTDIR/$USER/opt/<arch>/modulefiles; build prints it
 module load lfric-env/cray            # or lfric-env/spack
 rose --version; cylc --version; psyclone --version
 ```
+
+`$PREFIX` is outside the repo, so this works even if the repo has since moved or
+been deleted — the modulefile carries absolute paths to the install tree + view.
 
 Optionally compile the `lfric_atm` science suite against it (uses the pinned
 `vendor/physics/` submodules; no build-time SSH):
@@ -145,13 +150,16 @@ PSyclone version: 3.2.2
 | `activate` | Activate + print rose/cylc/psyclone versions (cray variant). |
 | `activate-spack` | Same for the spack variant (`LFRIC_STACK=spack`). |
 | `verify-xios` | Check the migrated XIOS source matches the pinned commit. |
-| `clean` | Remove `working_dir/` (keeps submodules and patches). |
+| `clean` | Remove the build output under `$WORKING_DIR` (= `PREFIX`; keeps submodules and patches). |
 
 `pixi run spack ...` works because activation puts the vendored Spack on `PATH`
-(`vendor/spack`). The Spack environments live in `spack-env/<variant>/` (the
-`spack.yaml` manifests and shared `common.yaml` are tracked; the generated
-`.spack-env/` view + lockfile are git-ignored). `LFRIC_STACK` (default `cray`)
-selects which variant every task operates on.
+(`vendor/spack`). The tracked `spack-env/<variant>/spack.yaml` are **templates**:
+`build` instantiates the real directory environment under `PREFIX`
+(`$PREFIX/spack-env/<variant>/`, rewriting the template's relative
+`include: ../common.yaml` to an absolute path back into the repo), so the env's
+generated `.spack-env/` view + lockfile land outside the repo. The shared
+`common.yaml` (and its relative `repos:`) stays tracked in the repo.
+`LFRIC_STACK` (default `cray`) selects which variant every task operates on.
 
 Each task is a thin wrapper around a script in `scripts/`; without pixi, run that
 script directly for the same effect (e.g. `bash scripts/build.sh`, or
@@ -169,23 +177,24 @@ To stay auditable, the modulefile is split in two:
 
 - **Logic** — [`scripts/lfric-env.lua`](scripts/lfric-env.lua): version-controlled,
   syntax-highlighted Lua holding all the `setenv`/`prepend_path`/`pushenv` rules.
-  Audit it once.
-- **Data** — `working_dir/modulefiles/lfric-env/<variant>.lua` (generated per
+  Audit it once. `build` snapshots a byte-identical copy to
+  `$PREFIX/modulefiles/lfric-env.lua` so loading is repo-independent.
+- **Data** — `$PREFIX/modulefiles/lfric-env/<variant>.lua` (generated per
   build by `scripts/gen-modulefile.sh`): a flat table of the per-build paths,
-  ending in `assert(loadfile(".../scripts/lfric-env.lua"))(data)`. Trivial to
-  eyeball/diff.
+  ending in `assert(loadfile("$PREFIX/modulefiles/lfric-env.lua"))(data)`. Trivial
+  to eyeball/diff.
 
 (Lmod's Lua sandbox forbids `dofile()` but allows `loadfile()` + passing the
 table as an argument, which is how the two halves connect.)
 
 - **Inside pixi** (the usual path): nothing to do — every `pixi run ...` /
   `pixi shell` auto-activates the `LFRIC_STACK` variant. `common.sh` puts
-  `working_dir/modulefiles` on `MODULEPATH` and `activate.sh` `module load`s
+  `$PREFIX/modulefiles` on `MODULEPATH` and `activate.sh` `module load`s
   `lfric-env/$LFRIC_STACK`.
 - **Outside pixi** (a Slurm job, a plain login shell — no pixi required):
 
   ```bash
-  module use working_dir/modulefiles   # absolute path also fine
+  module use "$PREFIX/modulefiles"     # $PROJECTDIR/$USER/opt/<arch>/modulefiles
   module avail lfric-env               # -> lfric-env/cray, lfric-env/spack
   module load lfric-env/cray           # or lfric-env/spack
   ```
@@ -193,9 +202,9 @@ table as an argument, which is how the two halves connect.)
   The two share the module name `lfric-env`, so loading one **swaps out** the
   other; bare `module load lfric-env` resolves to the default (`cray`).
 
-The modulefiles live under the git-ignored `working_dir/`, so they are not
+The modulefiles live under `$PREFIX` (outside the repo), so they are not
 tracked (their paths contain per-build content hashes). Regenerate one without a
-full rebuild — e.g. after moving `working_dir` — with:
+full rebuild — e.g. after moving `$PREFIX` — with:
 
 ```bash
 bash scripts/gen-modulefile.sh                 # cray (default)
@@ -206,7 +215,7 @@ LFRIC_STACK=spack bash scripts/gen-modulefile.sh
 
 ```
 pixi.toml                 # pixi project: deps, activation hook, tasks
-spack-env/                # Spack environments (manifests tracked; .spack-env/ ignored)
+spack-env/                # Spack env TEMPLATES (tracked); `build` instantiates under PREFIX
   common.yaml             #   shared config included by both variants (repos, gcc, python)
   cray/spack.yaml         #   variant: system cray-mpich + Cray HDF5/netCDF (default)
   spack/spack.yaml        #   variant: mpich + HDF5/netCDF built from source
@@ -221,7 +230,10 @@ vendor/                   # submodules (pinned)
 patches/                  # one *-patch.sh per upstream patch (sorted by prefix)
 scripts/                  # common.sh, activate.sh, build.sh, gen-modulefile.sh, ...
   lfric-env.lua           #   Lmod modulefile logic (data table generated per build)
-working_dir/              # git-ignored: Spack install tree, caches, env view, logs
+logs/                     # sbatch stdout (#SBATCH --output=logs/...); .gitkeep tracked
+$PREFIX/                  # outside the repo (default $PROJECTDIR/$USER/opt/<arch>):
+  opt/ stage/ *-cache/    #   Spack install tree + build/source/misc caches
+  spack-env/<variant>/    #   instantiated directory env + .spack-env/ view + lockfile
   modulefiles/lfric-env/  #   generated Lmod modulefiles (cray.lua, spack.lua)
 ```
 
@@ -272,11 +284,20 @@ re-applies patches automatically, so it is always self-contained.
 
 ## Notes / caveats
 
-- **Build output location.** Everything heavy (~7.5 GB) goes under
-  `working_dir/` next to the repo. The build redirects Spack's user config and
-  cache there too (`SPACK_USER_CONFIG_PATH`, `SPACK_USER_CACHE_PATH`), so it
-  neither reads nor writes your global `~/.spack`. Put the repo on a filesystem
-  with space (e.g. `$SCRATCH`), or set `LFRIC_WORKING_DIR` to relocate output.
+- **Build output location (`PREFIX`).** Everything heavy (~7.5 GB) — the Spack
+  install tree, the per-variant environment *and its view*, the generated
+  modulefiles and the caches — goes under **`PREFIX`**, which defaults **outside
+  the repo**: `$PROJECTDIR/$USER/opt/<sysname>-<machine>` (e.g.
+  `/projects/u35v/$USER/opt/Linux-aarch64`; falls back to `$SCRATCH`/`$HOME` when
+  `$PROJECTDIR` is unset). This is deliberate: the Spack *view* (the symlink farm
+  that lands on `PATH`) used to live inside the repo, which tied Stage 2 to the
+  repo's path — now it is under `PREFIX`, so once Stage 1 is built the repo can
+  move or be deleted and `module load lfric-env/<variant>` still works (see
+  [Architecture](#architecture)). The build also redirects Spack's user config
+  and cache under `PREFIX` (`SPACK_USER_CONFIG_PATH`, `SPACK_USER_CACHE_PATH`), so
+  it neither reads nor writes your global `~/.spack`. Override with `LFRIC_PREFIX`
+  (whole tree) or `LFRIC_WORKING_DIR` (just the output dir). Stage 1, the *build*,
+  still needs the repo: the vendored Spack + pinned package repos live here.
 - **GCC 14.3.** The compiler is declared as an explicit external in
   `spack-env/common.yaml` (`gcc@14.3.0` → `/usr/bin/{gcc,g++,gfortran}-14`) and
   pinned via per-language `require`s, so the solve is deterministic and `build`
@@ -289,7 +310,7 @@ re-applies patches automatically, so it is always self-contained.
   selectable via **`LFRIC_STACK`** (default `cray`). Each variant is its own Spack
   directory environment under `spack-env/<variant>/`, both `include:`-ing the
   shared `spack-env/common.yaml` (repos, the `gcc@14.3.0` external, python). They
-  **share one install tree** (`working_dir/opt`): Spack's content-addressed store
+  **share one install tree** (`$PREFIX/opt`): Spack's content-addressed store
   builds the large MPI-independent subtree (python/rose/cylc/psyclone/…) once and
   links both views to it; only the MPI-dependent subtree (mpi, hdf5, netcdf, yaxt,
   xios, shumlib, lfric) is built per variant. So both environments coexist and
@@ -337,18 +358,32 @@ re-applies patches automatically, so it is always self-contained.
 
   The `grace` partition is usually full, so request a **small, short,
   non-exclusive** job: it backfills into the schedule far sooner than a
-  whole-node (`--exclusive`) reservation, and the build is not CPU-bound past
-  ~16 cores (past builds finished in ~50–70 min on 16–32 cores). This project
-  standardises on **12 cores** (so `SPACK_JOBS`/`MAKE_JOBS=12`) — a good
-  backfill/throughput balance. The directives `build.sbatch` uses — copy these if
-  rolling your own job:
+  whole-node (`--exclusive`) reservation. The build is not CPU-bound past ~16–24
+  cores (past builds finished in ~50–70 min on 16–32 cores). This project uses
+  **24 cores** (so `SPACK_JOBS`/`MAKE_JOBS=24`). The directives `build.sbatch`
+  uses — copy these if rolling your own job:
 
   ```bash
   #SBATCH --partition=grace
   #SBATCH --ntasks=1
-  #SBATCH --cpus-per-task=12     # project default; raise only if the queue is empty
+  #SBATCH --cpus-per-task=24     # 24 gives compiles memory headroom (see below) + speed
+  #SBATCH --mem-per-cpu=1600M    # pro-rata share: 230400 MB / 144 cores = 1600 MB/core
   #SBATCH --time=03:30:00        # builds take <70 min; a short limit backfills sooner
   ```
+
+  **Memory is pro-rata, and the default is too small.** On grace, memory is a
+  consumable resource (`CR_CORE_MEMORY`): a node has `RealMemory=230400 MB` across
+  144 cores = **1600 MB/core** (probe with `scontrol show node <grace-node>`).
+  Slurm's *default* allocation (~1 GiB/core, e.g. 12 GiB for a 12-core job) is too
+  little — heavy C++ translation units (xios' `group_template_decl`, node-js/rust's
+  LLVM/V8) **OOM-kill `cc1plus`** ("Killed signal terminated program cc1plus")
+  under it. Always set **`--mem-per-cpu=1600M`** (a node's full per-core share) so
+  memory scales with `--cpus-per-task`; do *not* use a flat `--mem` far above the
+  core-share, as that inflates the job's footprint and delays scheduling. 24 cores
+  ⇒ 24 × 1600 MB = **37.5 GiB**, ample headroom. (`build.sh` also caps the known
+  memory-hog packages at `HEAVY_JOBS` as a second line of defence — see the
+  memory/OOM note at the end.) If a future build still OOMs, raise
+  `--cpus-per-task` further: memory rises with it automatically.
 
   Build the **spack** variant on a node by passing the selector through Slurm:
 
@@ -371,6 +406,19 @@ re-applies patches automatically, so it is always self-contained.
   push the job behind the partition's reservations. `SPACK_JOBS` defaults to
   `$SLURM_CPUS_PER_TASK`. Concretization alone is single-process and fine on the
   login node.
+- **Build stage on node-local disk (avoid Lustre contention).** Spack's compile
+  stage is metadata-heavy (autotools/libtool touch thousands of small files). On
+  a busy `grace` node the shared Lustre (`$PREFIX`/`$SCRATCH`) can be so contended
+  that the *install* phase crawls — a build that normally finishes in <70 min can
+  blow past a 3.5 h limit (e.g. a single `ncurses`/`gettext` install taking tens
+  of minutes to an hour). `build` therefore stages on the **node-local NVMe**
+  (`$LOCALDIR`/`/local` — a real 3.5 TB SSD on Isambard grace nodes, *not* the
+  install tree, which stays on `$PREFIX` for persistence + correct RPATHs). It
+  auto-probes for a writable local disk and **skips a small `tmpfs` RAM disk**
+  (where `$LOCALDIR` is a RAM disk, staging would eat node memory and risk OOM) —
+  see `LFRIC_BUILD_STAGE` / `LFRIC_TMPFS_MIN_GIB` in [Useful overrides](#useful-overrides).
+  The stage is per-node and transient, so a re-run on another node just re-stages;
+  the install tree on `$PREFIX` persists, so completed packages are still skipped.
 - **lfric_atm** is intentionally not part of `build`: it needs the private
   physics repos (casim/jules/socrates/ukca), vendored as pinned submodules under
   `vendor/physics/` and consumed via `PHYSICS_ROOT`, so the compile itself does
@@ -392,18 +440,24 @@ re-applies patches automatically, so it is always self-contained.
 | `LFRIC_STACK` | `cray` | Dependency variant: `cray` (system cray-mpich + Cray HDF5/netCDF) or `spack` (mpich + HDF5/netCDF from source). Selects the `spack-env/<variant>/` environment for every task |
 | `SPACK_JOBS` | `8` | Parallel Spack make jobs (raise on a dedicated compute node; keep modest on a shared login node) |
 | `HEAVY_JOBS` | `6` | Make jobs for LLVM/V8-bundling packages (`node-js`, `rust`); capped to avoid OOM (see below) |
-| `HEAVY_PKGS` | `node-js rust` | Packages built first at `HEAVY_JOBS` before the rest |
+| `HEAVY_PKGS` | `node-js rust xios` | Memory-hungry packages built first at `HEAVY_JOBS` before the rest (`xios`' `group_template_decl.cpp` is a heavy template unit) |
 | `MAKE_JOBS` | `8` | Parallel make jobs for `lfric_atm` |
-| `LFRIC_WORKING_DIR` | `<repo>/working_dir` | Where build output lands |
+| `LFRIC_PREFIX` | `$PROJECTDIR/$USER/opt/$(uname -sm \| tr ' ' -)` | Install prefix: where **all** Stage-1 output lands (install tree, env + view, modulefiles, caches). Defaults **outside the repo** so Stage 2 is repo-independent. Falls back to `$SCRATCH`/`$HOME` for `$PROJECTDIR` |
+| `LFRIC_WORKING_DIR` | `$LFRIC_PREFIX` | Build-output directory; defaults to `PREFIX`. Set this for finer control, or `LFRIC_PREFIX` to relocate the whole tree |
+| `LFRIC_BUILD_STAGE` | node-local NVMe (`$TMPDIR`/`$LOCALDIR`/`/local`), else `$WORKING_DIR/stage` | Spack's transient compile area. `build` auto-picks a fast node-local disk to keep the metadata-heavy install phase off the shared Lustre (which can be badly contended); set this to force a location. See the compute-node note below |
+| `LFRIC_STAGE_MIN_GIB` / `LFRIC_TMPFS_MIN_GIB` | `20` / `60` | Min free space `build` requires of a node-local stage before using it — higher for a RAM-disk (`tmpfs`) candidate, since staging there consumes node memory |
 | `PRGENV_MODULE` | `PrgEnv-gnu` | _cray variant only_: Cray PE module loaded by `build`; puts the `cray-mpich`/`libfabric`/`cray-pmi` externals on the module path + sets the `CRAY_*` lib paths (required) |
 | `CRAYPE_TARGET` | `craype-arm-grace` | _cray variant only_: Cray CPU-target module (Grace / Neoverse-V2) |
 | `HDF5_MODULE` / `NETCDF_MODULE` | `cray-hdf5-parallel/1.14.3.9` / `cray-netcdf-hdf5parallel/4.9.2.3` | _cray variant only_: parallel Cray HDF5/netCDF modules backing the `hdf5`/`netcdf` externals |
 | `RUN_XIOS_VERIFICATION` | `1` | Set `0` to skip the XIOS network check in `build` |
 | `CYLC_RUN_BASE` | `$PROJECTDIR/$USER/cylc-run` | Cylc run directory |
 
-**Memory / OOM.** `node-js` (V8) and `rust` (LLVM) have translation units that use
-several GB each; at high `-j` on a swapless or shared node they get OOM-killed
-(`cc1plus: Killed signal`). `build` therefore installs the `HEAVY_PKGS` first at
-`HEAVY_JOBS` (default 6) and the rest at `SPACK_JOBS`. On a busy login node use a
-modest `SPACK_JOBS` (≤16); on a dedicated compute node with plenty of RAM you can
-raise both.
+**Memory / OOM.** `node-js` (V8), `rust` (LLVM) and `xios` (`group_template_decl.cpp`)
+have translation units that use several GB each; at high `-j` under a tight memory
+allocation they get OOM-killed (`cc1plus: Killed signal`). Two defences: (1) on a
+compute node, request enough memory — grace allocates memory **pro-rata** at
+1600 MB/core, and the Slurm default (~1 GiB/core) is too little, so the batch
+scripts set `--mem-per-cpu=1600M` with 24 cores (⇒ 37.5 GiB); see the compute-node
+note under [Notes](#notes--caveats). (2) `build` installs the `HEAVY_PKGS` first at
+`HEAVY_JOBS` (default 6) and the rest at `SPACK_JOBS`, so the hogs never compile at
+full width. On a busy login node also use a modest `SPACK_JOBS` (≤16).

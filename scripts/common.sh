@@ -24,9 +24,22 @@ export REPO_ROOT
 # --- Vendored Spack (vendor/spack submodule) -------------------------------
 export SPACK_ROOT="$REPO_ROOT/vendor/spack"
 
-# --- Repo-local build output (git-ignored via /working_dir/) ---------------
-# Override with LFRIC_WORKING_DIR to put the heavy install tree elsewhere.
-export WORKING_DIR="${LFRIC_WORKING_DIR:-$REPO_ROOT/working_dir}"
+# --- Install prefix + build output -----------------------------------------
+# PREFIX is where ALL Stage-1 build products live: the Spack install tree, the
+# per-variant environment + its view, the generated modulefiles and the caches.
+# It defaults OUTSIDE the repo — under the project space, namespaced by user and
+# OS/arch — so that Stage 2 (just `module load lfric-env/<variant>`) never
+# depends on the repo's location: once built, the repo can move or be deleted and
+# the environment still loads. (Stage 1, the build itself, still needs the repo:
+# the vendored Spack + pinned package repos live here.) Override with LFRIC_PREFIX.
+#   PREFIX default: $PROJECTDIR/$USER/opt/<sysname>-<machine>  (e.g. Linux-aarch64)
+_arch_tag="$(uname -sm | tr ' ' -)"
+export PREFIX="${LFRIC_PREFIX:-${PROJECTDIR:-${SCRATCH:-$HOME}}/$USER/opt/$_arch_tag}"
+unset _arch_tag
+# WORKING_DIR is the directory all build output lands in; it defaults to PREFIX.
+# LFRIC_WORKING_DIR still overrides it directly (kept for back-compat); set
+# LFRIC_PREFIX to relocate the whole tree, LFRIC_WORKING_DIR for finer control.
+export WORKING_DIR="${LFRIC_WORKING_DIR:-$PREFIX}"
 
 # Redirect Spack's user config + cache into the repo-local working dir so the
 # build is hermetic: it neither reads nor writes the user's global ~/.spack.
@@ -47,7 +60,13 @@ export SPACK_USER_CACHE_PATH="${SPACK_USER_CACHE_PATH:-$WORKING_DIR/spack-cache}
 # (Kept default-only here so this stays side-effect-light; build.sh validates the
 # value.) The variant manifests are tracked; the generated state is not.
 export LFRIC_STACK="${LFRIC_STACK:-cray}"
-export SPACK_ENV_DIR="$REPO_ROOT/spack-env/$LFRIC_STACK"
+# The Spack directory environment is GENERATED under WORKING_DIR (so its view +
+# lockfile land outside the repo, making Stage 2 repo-independent). The tracked
+# manifest in the repo is the TEMPLATE build.sh instantiates from (rewriting its
+# relative `include: ../common.yaml` to an absolute path back into the repo so
+# the shared, version-controlled config + pinned repos are still used).
+export SPACK_ENV_TEMPLATE="$REPO_ROOT/spack-env/$LFRIC_STACK/spack.yaml"
+export SPACK_ENV_DIR="$WORKING_DIR/spack-env/$LFRIC_STACK"
 export ENV_NAME="lfric-apps-isambard-$LFRIC_STACK"
 # Lmod activation. MODULE_NAME is what you `module load`; MODULEFILE is the file
 # that backs it and doubles as the "is this variant built?" sentinel (replaces
