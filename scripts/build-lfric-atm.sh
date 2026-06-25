@@ -11,18 +11,26 @@ set -uo pipefail
 
 _here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
 
-# No-pixi Stage-2 flow: if a lfric-env module is already loaded
-# (`module load lfric-env/<variant>; bash scripts/build-lfric-atm.sh`) but
-# LFRIC_STACK was not set explicitly, adopt the loaded variant — otherwise
-# common.sh would default it to cray and we'd compile the wrong stack (or fail
-# with "Environment 'cray' not built"). The loaded module exports
-# SPACK_ENV=<repo>/spack-env/<variant>, so read the variant from there. No-op
-# under pixi or when LFRIC_STACK is set explicitly (e.g. LFRIC_STACK=spack ...).
-if [ -z "${LFRIC_STACK:-}" ] && [ -n "${SPACK_ENV:-}" ]; then
-  case "${SPACK_ENV%/}" in
-    */spack-env/spack) export LFRIC_STACK=spack ;;
-    */spack-env/cray)  export LFRIC_STACK=cray  ;;
+# No-pixi Stage-2 flow: when a lfric-env module is already loaded
+# (`module load lfric-env/<variant>; bash scripts/build-lfric-atm.sh`) it exports
+# SPACK_ENV=<working_dir>/spack-env/<variant>, which encodes BOTH the variant and
+# the prefix the env was built under. common.sh (sourced below) would otherwise
+# recompute these from its own defaults: LFRIC_STACK -> cray (wrong stack, or
+# "Environment 'cray' not built") and WORKING_DIR -> the DEFAULT prefix, so
+# MODULEFILE / SPACK_ENV_DIR / the view would point at a different tree than the
+# one just loaded — fatal when the env was built under a custom LFRIC_PREFIX. So
+# unless set explicitly, adopt both from SPACK_ENV. No-op under pixi or when set
+# explicitly (e.g. LFRIC_STACK=spack ... / LFRIC_WORKING_DIR=... ). Only when the
+# tail actually matches, so an unrelated SPACK_ENV cannot redirect us.
+if [ -n "${SPACK_ENV:-}" ]; then
+  _spack_env="${SPACK_ENV%/}"
+  case "$_spack_env" in
+    */spack-env/cray|*/spack-env/spack)
+      [ -z "${LFRIC_STACK:-}" ]       && export LFRIC_STACK="${_spack_env##*/}"
+      [ -z "${LFRIC_WORKING_DIR:-}" ] && export LFRIC_WORKING_DIR="${_spack_env%/spack-env/*}"
+      ;;
   esac
+  unset _spack_env
 fi
 
 # common.sh sets REPO_ROOT/SPACK_ENV_DIR/MODULEFILE/MODULEPATH/...; activate.sh
