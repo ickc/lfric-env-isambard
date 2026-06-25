@@ -41,8 +41,8 @@ unset _arch_tag
 # LFRIC_PREFIX to relocate the whole tree, LFRIC_WORKING_DIR for finer control.
 export WORKING_DIR="${LFRIC_WORKING_DIR:-$PREFIX}"
 
-# Redirect Spack's user config + cache into the repo-local working dir so the
-# build is hermetic: it neither reads nor writes the user's global ~/.spack.
+# Redirect Spack's user config + cache under WORKING_DIR (i.e. PREFIX by default)
+# so the build is hermetic: it neither reads nor writes the user's global ~/.spack.
 export SPACK_USER_CONFIG_PATH="${SPACK_USER_CONFIG_PATH:-$WORKING_DIR/spack-config}"
 export SPACK_USER_CACHE_PATH="${SPACK_USER_CACHE_PATH:-$WORKING_DIR/spack-cache}"
 
