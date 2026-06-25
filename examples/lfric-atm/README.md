@@ -45,6 +45,12 @@ sbatch examples/lfric-atm/build.sbatch
 sbatch --export=ALL,LFRIC_STACK=spack examples/lfric-atm/build.sbatch
 ```
 
+> **Build one variant at a time.** Both variants compile in the *same* lfric_apps
+> working tree (`applications/lfric_atm/working/`), so running the two `lfric-atm`
+> jobs **concurrently** corrupts the build (stale handles / locked dependency DB).
+> Submit the second variant only after the first has finished. (The Stage-1 env
+> builds, by contrast, are independent and may run at the same time.)
+
 Interactively (small targets only — a full compile can exhaust the login node's
 process limit), set the variant + prefix to match what you built, then run:
 

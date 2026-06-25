@@ -166,6 +166,9 @@ if [ "${CLEAN_PHYSICS_SCRATCH:-1}" != "0" ]; then
          "$APPS_ROOT_DIR/applications/lfric_atm/working/physics_scratch"
 fi
 
+# local_build.py compiles in-place in the lfric_apps source tree. This working dir
+# is SHARED across variants (and not per-variant), so build one variant at a time:
+# two concurrent runs corrupt each other (stale handles, a locked dependency DB).
 LOCAL_BUILD_WORKING_DIR="$APPS_ROOT_DIR/applications/lfric_atm/working"
 LOCAL_BUILD_LOG="$PREFIX/lfric_atm-make.log"
 [ "${CLEAN_BUILD_WORKING:-1}" != "0" ] && rm -rf "$LOCAL_BUILD_WORKING_DIR/build_lfric_atm"

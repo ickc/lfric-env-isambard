@@ -132,6 +132,10 @@ sbatch examples/lfric-atm/build.sbatch                                  # cray
 sbatch --export=ALL,LFRIC_STACK=spack examples/lfric-atm/build.sbatch   # spack
 ```
 
+> Build one variant at a time — both compile in the same lfric_apps working tree,
+> so don't run the two `lfric-atm` jobs concurrently. A successful run ends with
+> `LFRIC_ATM_OK`.
+
 A successful run ends with `LFRIC_ATM_OK`. See
 [`examples/lfric-atm/README.md`](examples/lfric-atm/README.md) for how to adapt it
 for your own suite.
