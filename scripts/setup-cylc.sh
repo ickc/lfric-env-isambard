@@ -17,6 +17,7 @@ set -uo pipefail
 
 info() { echo "INFO: $*"; }
 warn() { echo "WARN: $*" >&2; }
+die()  { echo "ERROR: $*" >&2; exit 1; }
 
 run_base_root="${CYLC_RUN_BASE_ROOT:-${PROJECTDIR:-${SCRATCH:-$HOME}}}"
 run_base="${CYLC_RUN_BASE:-$run_base_root/${USER}/cylc-run}"
@@ -25,8 +26,9 @@ conf_dir="$(dirname "$conf")"
 run_start="# BEGIN LFRIC_CYLC_RUN_DIR";   run_end="# END LFRIC_CYLC_RUN_DIR"
 plat_start="# BEGIN LFRIC_ISAMBARD3_PLATFORM"; plat_end="# END LFRIC_ISAMBARD3_PLATFORM"
 
-mkdir -p "$conf_dir" "$run_base" 2>/dev/null || true
-[ -f "$conf" ] || : > "$conf"
+mkdir -p "$conf_dir" "$run_base" \
+  || die "could not create $conf_dir / $run_base (permissions? full filesystem?)"
+[ -f "$conf" ] || : > "$conf" || die "could not write $conf"
 
 # Run directory: replace our managed block if present, else append it.
 if grep -q "$run_start" "$conf" 2>/dev/null; then
@@ -50,7 +52,7 @@ info "cylc run dir -> $run_base  (in $conf)"
 # isambard3 Slurm platform (written once; edit by hand thereafter).
 plat_dir="$conf_dir/platforms.d"
 plat_file="$plat_dir/isambard3.cylc"
-mkdir -p "$plat_dir" 2>/dev/null || true
+mkdir -p "$plat_dir" || die "could not create $plat_dir (permissions? full filesystem?)"
 if [ ! -f "$plat_file" ]; then
   cat > "$plat_file" <<EOF
 $plat_start
