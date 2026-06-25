@@ -47,6 +47,12 @@ GCC_FC="${GCC_FC:-/usr/bin/gfortran-14}"
 # The Stage-1 (core) submodules every solve/build needs.
 LFRIC_CORE_SUBMODULES=(spack spack-packages lfric_apps lfric_core mo-spack-packages)
 
+# True if vendor/<name> is an INITIALIZED submodule. An initialized submodule has
+# its own .git (a gitlink file); an uninitialized one is an empty directory, for
+# which `git -C ... rev-parse --git-dir` would misleadingly succeed by walking UP
+# to the superproject's .git — so test the submodule's own .git directly.
+_lfric_submodule_present() { [ -e "$REPO_ROOT/vendor/$1/.git" ]; }
+
 # --- Preflight -------------------------------------------------------------
 lfric_validate_variant() {
   case "$LFRIC_STACK" in
@@ -79,8 +85,8 @@ lfric_ensure_dirs() {
 lfric_check_submodules() {
   local sub
   for sub in "${LFRIC_CORE_SUBMODULES[@]}"; do
-    git -C "$REPO_ROOT/vendor/$sub" rev-parse --git-dir >/dev/null 2>&1 \
-      || die "Submodule vendor/$sub is missing. Run: pixi run submodule-init  (or: git submodule update --init --recursive --jobs 4 -- ${LFRIC_CORE_SUBMODULES[*]/#/vendor/})"
+    _lfric_submodule_present "$sub" \
+      || die "Submodule vendor/$sub is missing/uninitialized. Run: pixi run submodule-init  (or: git submodule update --init --recursive --jobs 4 -- ${LFRIC_CORE_SUBMODULES[*]/#/vendor/})"
   done
 }
 
@@ -91,8 +97,7 @@ lfric_check_submodules() {
 lfric_clone_missing_submodules() {
   local jobs="${1:-4}" sub missing=()
   for sub in "${LFRIC_CORE_SUBMODULES[@]}"; do
-    git -C "$REPO_ROOT/vendor/$sub" rev-parse --git-dir >/dev/null 2>&1 \
-      || missing+=("vendor/$sub")
+    _lfric_submodule_present "$sub" || missing+=("vendor/$sub")
   done
   if [ "${#missing[@]}" -gt 0 ]; then
     info "Cloning missing Stage-1 submodules (--jobs $jobs): ${missing[*]}"
@@ -156,7 +161,11 @@ lfric_bootstrap_spack() {
 # metadata-heavy compile area (node-local NVMe on a compute node). See MAINTAINER.md.
 lfric_write_config() {
   local build_stage="$WORKING_DIR"
-  mkdir -p "$build_stage" || die "build stage not writable: $build_stage (set LFRIC_WORKING_DIR)"
+  # mkdir -p returns 0 for an already-existing dir even when it is not writable,
+  # so test writability explicitly rather than trust mkdir's exit status.
+  mkdir -p "$build_stage" 2>/dev/null
+  { [ -d "$build_stage" ] && [ -w "$build_stage" ]; } \
+    || die "build stage not writable: $build_stage (set LFRIC_WORKING_DIR)"
   info "Install prefix (persistent):   $PREFIX"
   info "Build stage    (transient):    $build_stage"
   cat > "$SPACK_USER_CONFIG_PATH/config.yaml" <<EOF
