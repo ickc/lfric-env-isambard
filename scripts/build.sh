@@ -215,9 +215,20 @@ info "Using gcc external pinned in spack.yaml ($COMPILER_SPEC)"
 # build so a template edit always takes effect.
 [ -f "$SPACK_ENV_TEMPLATE" ] || die "missing env template: $SPACK_ENV_TEMPLATE"
 mkdir -p "$SPACK_ENV_DIR"
-sed "s|../common.yaml|$REPO_ROOT/spack-env/common.yaml|" \
-  "$SPACK_ENV_TEMPLATE" > "$SPACK_ENV_DIR/spack.yaml" \
+# Literal (non-regex) replacement of the relative include with the absolute path,
+# done in awk via index()/substr so nothing in $REPO_ROOT is interpreted — sed's
+# replacement would mangle a '&', backslash or the delimiter if a path ever
+# contained one. The path is passed through the environment (ENVIRON), which awk
+# does not run C-escape processing on (unlike -v), so even a backslash is safe.
+LFRIC_COMMON_YAML="$REPO_ROOT/spack-env/common.yaml" \
+  awk '
+    { i = index($0, "../common.yaml")
+      if (i > 0) $0 = substr($0, 1, i-1) ENVIRON["LFRIC_COMMON_YAML"] substr($0, i + length("../common.yaml"))
+      print }
+  ' "$SPACK_ENV_TEMPLATE" > "$SPACK_ENV_DIR/spack.yaml" \
   || die "failed to generate $SPACK_ENV_DIR/spack.yaml from template"
+grep -q "$REPO_ROOT/spack-env/common.yaml" "$SPACK_ENV_DIR/spack.yaml" \
+  || die "include rewrite produced no absolute common.yaml path in $SPACK_ENV_DIR/spack.yaml"
 info "Spack env instantiated at $SPACK_ENV_DIR (from $SPACK_ENV_TEMPLATE)"
 
 # --- 7. Sanity: environment repos resolve (incl. vendored builtin) ---------
