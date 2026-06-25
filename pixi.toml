@@ -16,7 +16,7 @@ python = "3.11.*"
 #   common.sh    puts the vendored `spack` on PATH + the generated modulefiles on
 #                MODULEPATH (so `pixi run spack ...` and `module load` both work).
 #   activate.sh  `module load`s lfric-env/<LFRIC_STACK> (the generated modulefile
-#                working_dir/modulefiles/lfric-env/<variant>.lua).
+#                $PREFIX/modulefiles/lfric-env/<variant>.lua).
 # Both are a NO-OP until `pixi run build` has produced the modulefile, so this is
 # safe before the first build. Order matters: common.sh sets the MODULEPATH that
 # activate.sh relies on.
@@ -30,10 +30,16 @@ python = "3.11.*"
 scripts = ["scripts/common.sh", "scripts/activate.sh"]
 
 [tasks]
-# One-time: clone the pinned submodules. You are responsible for clone access
-# (an SSH key authorized for the private Met Office repos, or an HTTPS
-# credential helper). See README for the MetOffice SSO note.
-submodule-init = "git submodule update --init --recursive --jobs 4"
+# One-time: clone the pinned Stage-1 (core) submodules — Spack, the package repos
+# and the LFRic sources. You are responsible for clone access (an SSH key
+# authorized for the private Met Office repos, or an HTTPS credential helper); see
+# the README MetOffice SSO note. The Stage-2 physics submodules are SEPARATE — see
+# `init-physics` — to keep the two-stage split clear.
+submodule-init = "git submodule update --init --recursive --jobs 4 -- vendor/spack vendor/spack-packages vendor/lfric_apps vendor/lfric_core vendor/mo-spack-packages"
+
+# Stage-2 only: clone the pinned physics submodules (casim/jules/socrates/ukca),
+# needed to compile the lfric_atm example (examples/lfric-atm/). Same SSH access.
+init-physics = "git submodule update --init --jobs 4 -- vendor/physics/casim vendor/physics/jules vendor/physics/socrates vendor/physics/ukca"
 
 # Stage/update the pinned physics + lfric_core submodules to the refs in
 # vendor/lfric_apps/dependencies.yaml, then commit the gitlinks. This is the
@@ -49,11 +55,11 @@ patch = "bash scripts/patch-all.sh"
 # Revert all patches by resetting the patched submodules to their pinned commit.
 unpatch = "bash scripts/unpatch.sh"
 
-# Build the Spack environment — the bulk of the work (~2-4 h from scratch on a
-# login node; re-runs are incremental). Applies patches first, then concretizes
-# and installs into working_dir/.
+# Build the Spack environment — the bulk of the work (~2-4 h from scratch;
+# re-runs are incremental). Run it on a compute node (see scripts/build.sbatch).
+# Applies patches first, then concretizes and installs into PREFIX.
 #
-# Two dependency variants share one install tree (working_dir/opt), selected by
+# Two dependency variants share one install tree ($PREFIX/opt), selected by
 # LFRIC_STACK (default "cray"; see scripts/common.sh):
 #   pixi run build                     # cray: system cray-mpich + Cray HDF5/netCDF
 #   pixi run build-spack               # spack: mpich + HDF5/netCDF from source
@@ -62,11 +68,33 @@ unpatch = "bash scripts/unpatch.sh"
 build = "bash scripts/build.sh"
 build-spack = "LFRIC_STACK=spack bash scripts/build.sh"
 
-# Optional: compile lfric_atm and run its example. Separate from `build` because
-# it needs the private physics repos (casim/jules/socrates/ukca) — now vendored
-# as pinned submodules under vendor/physics/ and consumed via PHYSICS_ROOT, so
-# the compile itself does no network/SSH (run `submodule-init` once beforehand).
-build-lfric-atm = "bash scripts/build-lfric-atm.sh"
+# Concretize ONLY — the dependency solve + variant assertions, then stop. This is
+# the cheap, login-node-safe check that a manifest/variant change still solves
+# (no multi-hour install). Idempotent: a no-op when the lock already matches the
+# manifest; set FORCE_CONCRETIZE=1 to force a fresh re-solve. `build` and `fetch`
+# both run this same phase first (scripts/lib.sh).
+concretize = "bash scripts/concretize.sh"
+concretize-spack = "LFRIC_STACK=spack bash scripts/concretize.sh"
+
+# Login-node pre-fetch: clone the pinned Stage-1 submodules (if missing), then
+# download every from-source Spack package (xios, mpich, hdf5, ...) into
+# $PREFIX/source-cache, so the compute-node `build` runs offline and survives an
+# intermittent source-host blip (e.g. the gitlab.in2p3.fr XIOS clone). Run this on
+# a LOGIN NODE before `build`. Concurrency is capped (FETCH_JOBS, default 4) for
+# the login node's small `ulimit -u`. As with `build`, repeat for the spack variant:
+#   pixi run fetch                     # cray variant's sources
+#   pixi run fetch-spack               # spack variant's sources
+fetch = "bash scripts/fetch.sh"
+fetch-spack = "LFRIC_STACK=spack bash scripts/fetch.sh"
+
+# Stage-2 EXAMPLE: compile lfric_atm and run its example on the built environment.
+# One worked example of building a science target (copy/adapt it for your own
+# suite — see examples/lfric-atm/). Needs the physics submodules (`init-physics`).
+build-lfric-atm = "bash examples/lfric-atm/build.sh"
+
+# Optional, opt-in: configure cylc (a run dir + an isambard3 Slurm platform) for
+# running rose/cylc suites. NOT part of `build` — building must not touch ~/.cylc.
+setup-cylc = "bash scripts/setup-cylc.sh"
 
 # Activate the environment and report tool versions (rose / cylc / psyclone).
 # activate-spack reports the from-source variant; either is a no-op until built.
