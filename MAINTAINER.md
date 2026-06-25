@@ -19,6 +19,8 @@ scripts/                # Stage 1 + shared helpers
                         #   puts vendored spack on PATH + modulefiles on MODULEPATH
   build.sh              #   Stage 1: concretize + install the environment
   build.sbatch          #   submit build.sh to a Grace compute node (config block on top)
+  fetch.sh              #   optional login-node pre-fetch: clone submodules + `spack fetch`
+                        #     all sources into $PREFIX/source-cache (build then runs offline)
   activate.sh           #   `module load lfric-env/<variant>` (pixi auto-activation)
   print-versions.sh     #   `pixi run activate`: report rose/cylc/psyclone
   gen-modulefile.sh     #   resolve per-build paths -> Lua data table modulefile
@@ -244,6 +246,7 @@ Beyond the user-facing vars in the README:
 | `HEAVY_PKGS` | `node-js rust xios` | Memory-hungry packages pre-built first at `HEAVY_JOBS`. |
 | `STOP_AFTER_CONCRETIZE` | `0` | Set `1` to concretize + run the variant assertions, then stop before install (cheap check; prints `CONCRETIZE_OK`). |
 | `RUN_XIOS_VERIFICATION` | `1` | Set `0` to skip the XIOS network check in `build`. |
+| `FETCH_JOBS` | `4` | `scripts/fetch.sh`: concurrency cap (submodule `--jobs` + `submodule.fetchJobs`) for the login node's `ulimit -u`. |
 | `PRGENV_MODULE` / `CRAYPE_TARGET` | `PrgEnv-gnu` / `craype-arm-grace` | _cray only_: Cray PE + CPU-target modules. |
 | `HDF5_MODULE` / `NETCDF_MODULE` | `cray-hdf5-parallel/1.14.3.9` / `cray-netcdf-hdf5parallel/4.9.2.3` | _cray only_: must match the external prefixes in `cray/spack.yaml`. |
 | `PSYCLONE_TRANSFORMATION` | `minimum` | Stage-2 example: PSyclone optimisation set. |

@@ -83,6 +83,24 @@ Everything installs under **`$LFRIC_PREFIX`** (default
 > a full parallel build fails there with `fork: Resource temporarily unavailable`.
 > `sbatch` runs it on a Grace compute node with enough cores and memory.
 
+### Optional: pre-fetch the sources on the login node
+
+Spack downloads each package's source the first time it builds it — including a
+git clone of **XIOS** from `gitlab.in2p3.fr`. To do all the network + disk I/O up
+front (and make the compute-node build robust to an intermittent source-host
+outage), pre-fetch everything on the **login node** first:
+
+```bash
+bash scripts/fetch.sh                          # cray variant (default)
+LFRIC_STACK=spack bash scripts/fetch.sh        # spack variant
+```
+
+This clones any missing Stage-1 submodules, concretizes the variant, then
+downloads every source into the cache under `$LFRIC_PREFIX`. The subsequent
+`sbatch` build reuses that cache and fetches nothing. Like the build, it needs a
+Python in [3.7, 3.12) (`module load cray-python/3.11.7`, or use `pixi run fetch`).
+Concurrency is capped for the login node's process limit (`FETCH_JOBS`, default 4).
+
 ---
 
 ## Stage 2 — use the environment (without pixi)
@@ -151,6 +169,8 @@ script the no-pixi sections above already use.
 
 ```bash
 pixi run submodule-init     # = the Stage-1 `git submodule update` above
+pixi run fetch              # = scripts/fetch.sh (cray)   — pre-fetch sources on a login node
+pixi run fetch-spack        # = scripts/fetch.sh (spack)
 pixi run build              # = scripts/build.sh (cray)   — run on a compute node
 pixi run build-spack        # = scripts/build.sh (spack)
 pixi run activate           # report rose / cylc / psyclone versions
@@ -184,6 +204,7 @@ to see/change exactly where things go.
 | `LFRIC_WORKING_DIR` | `$LFRIC_PREFIX/stage` | **Transient** Spack build/compile scratch. On a compute node the sbatch points this at node‑local NVMe (`$LOCALDIR/…`) so the build stays off the shared Lustre. Safe to delete anytime. |
 | `SPACK_JOBS` | `$SLURM_CPUS_PER_TASK` | Parallel build jobs (Stage 1). |
 | `MAKE_JOBS` | `$SLURM_CPUS_PER_TASK` | Parallel make jobs (Stage 2 example). |
+| `FETCH_JOBS` | `4` | Concurrency cap for the optional login-node pre-fetch (`scripts/fetch.sh`); kept small for the login node's process limit. |
 
 `LFRIC_PREFIX` is what makes Stage 2 repo-independent: the build records absolute
 paths into it, so once built you can move or delete the repo and `module load`
@@ -210,6 +231,10 @@ generally cleared with the node; delete it directly if you want it gone sooner.
 - **`Killed signal terminated program cc1plus` (out of memory).** Give the job
   more memory; the sbatch scripts already request a node's full per-core share. See
   the memory note in [`MAINTAINER.md`](MAINTAINER.md).
+- **`Unable to clone XIOS …` / a source download fails mid-build.** Usually a
+  transient source-host blip. Re-running resumes from the cache; to avoid it
+  entirely, pre-fetch on the login node first (see
+  [Optional: pre-fetch the sources](#optional-pre-fetch-the-sources-on-the-login-node)).
 
 ## More documentation
 
