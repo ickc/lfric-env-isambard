@@ -171,6 +171,8 @@ script the no-pixi sections above already use.
 pixi run submodule-init     # = the Stage-1 `git submodule update` above
 pixi run fetch              # = scripts/fetch.sh (cray)   — pre-fetch sources on a login node
 pixi run fetch-spack        # = scripts/fetch.sh (spack)
+pixi run concretize         # = scripts/concretize.sh (cray)  — solve only (cheap login-node check)
+pixi run concretize-spack   # = scripts/concretize.sh (spack)
 pixi run build              # = scripts/build.sh (cray)   — run on a compute node
 pixi run build-spack        # = scripts/build.sh (spack)
 pixi run activate           # report rose / cylc / psyclone versions
@@ -182,8 +184,8 @@ pixi run setup-cylc         # = scripts/setup-cylc.sh
 ```
 
 The heavy build still needs a compute node: either submit `scripts/build.sbatch`
-(its last line shows how to switch it to `exec pixi run build`), or use `pixi run`
-interactively only for a quick concretise check (`STOP_AFTER_CONCRETIZE=1`).
+(its last line shows how to switch it to `exec pixi run build`), or use `pixi run
+concretize` interactively for a quick solve-only check before submitting.
 
 Inside pixi you can skip the explicit `module load`: after a build, every
 `pixi run …` / `pixi shell` auto-loads the `LFRIC_STACK` variant, so

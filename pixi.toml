@@ -68,6 +68,14 @@ unpatch = "bash scripts/unpatch.sh"
 build = "bash scripts/build.sh"
 build-spack = "LFRIC_STACK=spack bash scripts/build.sh"
 
+# Concretize ONLY — the dependency solve + variant assertions, then stop. This is
+# the cheap, login-node-safe check that a manifest/variant change still solves
+# (no multi-hour install). Idempotent: a no-op when the lock already matches the
+# manifest; set FORCE_CONCRETIZE=1 to force a fresh re-solve. `build` and `fetch`
+# both run this same phase first (scripts/lib.sh).
+concretize = "bash scripts/concretize.sh"
+concretize-spack = "LFRIC_STACK=spack bash scripts/concretize.sh"
+
 # Login-node pre-fetch: clone the pinned Stage-1 submodules (if missing), then
 # download every from-source Spack package (xios, mpich, hdf5, ...) into
 # $PREFIX/source-cache, so the compute-node `build` runs offline and survives an

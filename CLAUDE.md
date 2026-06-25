@@ -20,14 +20,18 @@ a self-contained Lmod modulefile. Two stages, two variants:
 
 **All four cases must still build:** {Stage 1, Stage 2 example} × {`cray`, `spack`}.
 This is the one outcome that must stay green. The `cray`/`spack` solve assertions in
-`scripts/build.sh` (grepping `spack.lock`) guard the variants — keep them.
+`lfric_concretize` (`scripts/lib.sh`, grepping `spack.lock`) guard the variants — keep them.
 
 ## Layout (where to look)
 
 - `scripts/common.sh` — sourced by everything; sets `PREFIX`, `WORKING_DIR`,
   `LFRIC_STACK`, `SPACK_ENV_DIR`, `MODULEFILE`, and puts vendored spack on `PATH`.
   Start here to understand any path.
-- `scripts/build.sh` — Stage 1. `scripts/build.sbatch` — submits it to a compute node.
+- `scripts/lib.sh` — the Stage-1 build PHASES as sourceable `lfric_*` functions
+  (prepare/concretize/install/fetch/…). The drivers below just compose these.
+- `scripts/build.sh` — Stage 1 driver (prepare+concretize+install+modulefile).
+  `scripts/concretize.sh` — solve only (the cheap login-node check). `scripts/fetch.sh`
+  — login-node source pre-fetch. `scripts/build.sbatch` — submits build to a compute node.
 - `examples/lfric-atm/{build.sh,build.sbatch}` — Stage 2 example.
 - `scripts/gen-modulefile.sh` + `scripts/lfric-env.lua` — the two-part modulefile
   (generated per-build data table + version-controlled logic).
@@ -65,10 +69,11 @@ This is the one outcome that must stay green. The `cray`/`spack` solve assertion
 ## How to test a change
 
 - **Static:** `bash -n scripts/*.sh examples/lfric-atm/build.sh`; `shellcheck` if present.
-- **Cheap concretize (login node):** `STOP_AFTER_CONCRETIZE=1 LFRIC_STACK=cray bash
-  scripts/build.sh` → `CONCRETIZE_OK`; repeat with `LFRIC_STACK=spack`. This runs the
-  variant assertions without the multi-hour install. Do this before claiming a
-  build-affecting change works.
+- **Cheap concretize (login node):** `LFRIC_STACK=cray bash scripts/concretize.sh`
+  → `CONCRETIZE_OK`; repeat with `LFRIC_STACK=spack`. This runs the variant
+  assertions without the multi-hour install (idempotent — a no-op when the lock is
+  current; add `FORCE_CONCRETIZE=1` to force a fresh re-solve). Do this before
+  claiming a build-affecting change works.
 - **Full build:** heavy + scheduler-gated; the user runs `sbatch`. Success markers:
   `BUILD_OK` (Stage 1), `LFRIC_ATM_OK` (Stage 2 example).
 
