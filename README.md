@@ -150,7 +150,6 @@ PSyclone version: 3.2.2
 | `activate` | Activate + print rose/cylc/psyclone versions (cray variant). |
 | `activate-spack` | Same for the spack variant (`LFRIC_STACK=spack`). |
 | `verify-xios` | Check the migrated XIOS source matches the pinned commit. |
-| `clean` | Remove the build output under `$WORKING_DIR` (= `PREFIX`; keeps submodules and patches). |
 
 `pixi run spack ...` works because activation puts the vendored Spack on `PATH`
 (`vendor/spack`). The tracked `spack-env/<variant>/spack.yaml` are **templates**:
