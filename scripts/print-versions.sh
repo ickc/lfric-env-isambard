@@ -12,10 +12,11 @@ _here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
 . "$_here/activate.sh"
 
 if [ ! -f "$MODULEFILE" ]; then
-  echo "Environment '$LFRIC_STACK' is not built yet."
-  echo "  pixi run submodule-init                 # one-time: clone submodules"
-  echo "  pixi run build                          # build the cray stack (default)"
-  echo "  LFRIC_STACK=spack pixi run build        # build the from-source stack"
+  echo "Environment '$LFRIC_STACK' is not built yet (no modulefile at $MODULEFILE)."
+  echo "  Build it on a compute node (from the repo root):"
+  echo "    sbatch scripts/build.sbatch                                 # cray (default)"
+  echo "    sbatch --export=ALL,LFRIC_STACK=spack scripts/build.sbatch  # spack"
+  echo "  (with pixi: pixi run build / pixi run build-spack)"
   exit 1
 fi
 

@@ -1,56 +1,45 @@
 #!/usr/bin/env bash
-# build-lfric-atm.sh — compile lfric_atm and run its example.
+# examples/lfric-atm/build.sh — compile the lfric_atm science target on a built
+# LFRic environment, and run its bundled example.
 #
-# Separate from `build` because lfric_atm needs the private Met Office physics
-# repos (casim, jules, socrates, ukca). Those are vendored as pinned submodules
-# under vendor/physics/ and fed to the LFRic extract step via PHYSICS_ROOT, so
-# the compile does NOT clone anything over SSH — it is offline/reproducible once
-# `pixi run submodule-init` has populated them. The Spack environment from
-# `pixi run build` is complete and usable without this step.
+# THIS IS A WORKED EXAMPLE of Stage 2. The reproducible core of this repo is the
+# environment itself (Stage 1, scripts/build.sh). Compiling a science target is
+# one thing you do *with* that environment — copy and adapt this script for your
+# own suite. See examples/lfric-atm/README.md.
+#
+# It needs the private Met Office physics repos (casim, jules, socrates, ukca),
+# vendored as pinned submodules under vendor/physics/ and fed to the LFRic extract
+# step via PHYSICS_ROOT, so the compile clones nothing over SSH once those are
+# initialised (README "Stage 2"). It uses an already-built environment for the
+# variant you select; it does NOT build one.
+#
+# Set the variant + prefix EXPLICITLY to match the environment you built:
+#   LFRIC_STACK=cray|spack   LFRIC_PREFIX=<the prefix you built into>
+# (defaults: cray, and the same $PROJECTDIR/$USER/opt/<arch> default as Stage 1.)
 set -uo pipefail
 
+# This script lives in examples/lfric-atm/; the shared scripts are in scripts/.
 _here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
+REPO_ROOT="${PIXI_PROJECT_ROOT:-$(cd -- "$_here/../.." && pwd)}"
+SCRIPTS="$REPO_ROOT/scripts"
 
-# No-pixi Stage-2 flow: when a lfric-env module is already loaded
-# (`module load lfric-env/<variant>; bash scripts/build-lfric-atm.sh`) it exports
-# SPACK_ENV=<working_dir>/spack-env/<variant>, which encodes BOTH the variant and
-# the prefix the env was built under. common.sh (sourced below) would otherwise
-# recompute these from its own defaults: LFRIC_STACK -> cray (wrong stack, or
-# "Environment 'cray' not built") and WORKING_DIR -> the DEFAULT prefix, so
-# MODULEFILE / SPACK_ENV_DIR / the view would point at a different tree than the
-# one just loaded — fatal when the env was built under a custom LFRIC_PREFIX. So
-# unless set explicitly, adopt both from SPACK_ENV. No-op under pixi or when set
-# explicitly (e.g. LFRIC_STACK=spack ... / LFRIC_WORKING_DIR=... ). Only when the
-# tail actually matches, so an unrelated SPACK_ENV cannot redirect us.
-if [ -n "${SPACK_ENV:-}" ]; then
-  _spack_env="${SPACK_ENV%/}"
-  case "$_spack_env" in
-    */spack-env/cray|*/spack-env/spack)
-      [ -z "${LFRIC_STACK:-}" ]       && export LFRIC_STACK="${_spack_env##*/}"
-      [ -z "${LFRIC_WORKING_DIR:-}" ] && export LFRIC_WORKING_DIR="${_spack_env%/spack-env/*}"
-      ;;
-  esac
-  unset _spack_env
-fi
-
-# common.sh sets REPO_ROOT/SPACK_ENV_DIR/MODULEFILE/MODULEPATH/...; activate.sh
-# then module-loads the env. (Runnable standalone, not only via pixi activation.)
+# common.sh sets REPO_ROOT/PREFIX/SPACK_ENV_DIR/MODULEFILE/MODULEPATH/...;
+# activate.sh then module-loads the selected variant. (Runnable standalone.)
 # shellcheck source=scripts/common.sh
-. "$_here/common.sh"
+. "$SCRIPTS/common.sh"
 # shellcheck source=scripts/activate.sh
-. "$_here/activate.sh"
+. "$SCRIPTS/activate.sh"
 
 info() { echo "INFO: $*"; }
 warn() { echo "WARN: $*" >&2; }
 die()  { echo "ERROR: $*" >&2; exit 1; }
 
-[ -f "$MODULEFILE" ] || die "Environment '$LFRIC_STACK' not built. Run: ${LFRIC_STACK:+LFRIC_STACK=$LFRIC_STACK }pixi run build"
+[ -f "$MODULEFILE" ] || die "Environment '$LFRIC_STACK' not built under PREFIX=$PREFIX. Build it first (Stage 1): ${LFRIC_STACK:+LFRIC_STACK=$LFRIC_STACK }sbatch scripts/build.sbatch  (set LFRIC_PREFIX to match if you customised it)"
 
-# Ensure patches are applied (idempotent). In particular this applies the
-# lfric_apps local-sources patch so local_build.py uses the staged submodules in
-# place (no clone/rsync/git-fetch). `pixi run build` also applies these, but
-# build-lfric-atm.sh can be re-run on its own, so make it self-contained.
-bash "$_here/patch-all.sh" || die "patch-all failed"
+# Ensure patches are applied (idempotent) — in particular the lfric_apps
+# local-sources patch, so local_build.py uses the staged submodules in place (no
+# clone/rsync/git-fetch). Stage 1 applies these too; re-assert for a standalone run.
+bash "$SCRIPTS/patch-all.sh" || die "patch-all failed"
 
 # Use the staged submodule source trees in place (the local-sources patch
 # symlinks them); keep them pristine by not dropping __pycache__ into the tree.
@@ -132,7 +121,7 @@ info "MPI compiler: $("$FC" --version 2>/dev/null | head -1) (FC=$FC LDMPI=$LDMP
 # by activate.sh) already put shumlib on LDFLAGS/LIBRARY_PATH/LD_LIBRARY_PATH;
 # prepend the view's dirs here.
 _view="$SPACK_ENV_DIR/.spack-env/view"
-[ -d "$_view/include" ] || die "Spack env view missing at $_view — run: pixi run build"
+[ -d "$_view/include" ] || die "Spack env view missing at $_view — build Stage 1 first: ${LFRIC_STACK:+LFRIC_STACK=$LFRIC_STACK }sbatch scripts/build.sbatch"
 export FFLAGS="-I$_view/include${FFLAGS:+ $FFLAGS}"
 export LDFLAGS="-L$_view/lib -L$_view/lib64 -Wl,-rpath=$_view/lib -Wl,-rpath=$_view/lib64${LDFLAGS:+ $LDFLAGS}"
 export LD_LIBRARY_PATH="$_view/lib:$_view/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
@@ -156,7 +145,7 @@ PROJECT="${PROJECT:-lfric_atm}"
 export PHYSICS_ROOT="${PHYSICS_ROOT:-$REPO_ROOT/vendor/physics}"
 for _dep in casim jules socrates ukca; do
   [ -e "$PHYSICS_ROOT/$_dep/.git" ] \
-    || die "physics submodule '$_dep' not initialized under $PHYSICS_ROOT — run: pixi run submodule-init"
+    || die "physics submodule '$_dep' not initialised under $PHYSICS_ROOT. Init the Stage-2 physics submodules: git submodule update --init --jobs 4 -- vendor/physics/{casim,jules,socrates,ukca}  (or: pixi run init-physics)"
 done
 info "Physics sources (PHYSICS_ROOT): $PHYSICS_ROOT (casim/jules/socrates/ukca, pinned submodules)"
 
@@ -178,7 +167,7 @@ if [ "${CLEAN_PHYSICS_SCRATCH:-1}" != "0" ]; then
 fi
 
 LOCAL_BUILD_WORKING_DIR="$APPS_ROOT_DIR/applications/lfric_atm/working"
-LOCAL_BUILD_LOG="$WORKING_DIR/lfric_atm-make.log"
+LOCAL_BUILD_LOG="$PREFIX/lfric_atm-make.log"
 [ "${CLEAN_BUILD_WORKING:-1}" != "0" ] && rm -rf "$LOCAL_BUILD_WORKING_DIR/build_lfric_atm"
 
 build_lfric_atm() {

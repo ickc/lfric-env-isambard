@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # gen-modulefile.sh — write the per-variant Lmod modulefile for LFRIC_STACK.
 #
-# This replaces the old `working_dir/env-runtime-<variant>.sh` shell snippet. The
+# This replaces the old env-runtime-<variant>.sh shell snippet. The
 # environment is loaded with `module load lfric-env/<cray|spack>` (and pixi auto-
 # activation does the same via scripts/activate.sh).
 #
@@ -43,7 +43,7 @@ view="$SPACK_ENV_DIR/.spack-env/view"
 # (it may have moved/been deleted since the build). Byte-identical to the tracked
 # scripts/lfric-env.lua, refreshed every build.
 installed_logic="$MODULEFILES_DIR/lfric-env.lua"
-[ -d "$view/bin" ] || die "Spack env view missing at $view — run: pixi run build"
+[ -d "$view/bin" ] || die "Spack env view missing at $view — build it first: sbatch scripts/build.sbatch (or: pixi run build)"
 command -v spack >/dev/null 2>&1 || die "spack CLI not on PATH (common.sh should add it)"
 
 # --- Lua literal helpers (the only quoting this script does) ----------------

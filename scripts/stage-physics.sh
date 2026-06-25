@@ -23,7 +23,7 @@ warn() { echo "WARN: $*" >&2; }
 die()  { echo "ERROR: $*" >&2; exit 1; }
 
 DEPS="${DEPS_YAML:-$REPO_ROOT/vendor/lfric_apps/dependencies.yaml}"
-[ -f "$DEPS" ] || die "dependencies.yaml not found at $DEPS — run: pixi run submodule-init"
+[ -f "$DEPS" ] || die "dependencies.yaml not found at $DEPS — init the core submodules first (git submodule update --init -- vendor/lfric_apps, or: pixi run submodule-init)"
 
 # dependency name -> submodule path (lfric_core lives at vendor/, physics grouped)
 declare -A PATHS=(

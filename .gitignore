@@ -1,15 +1,13 @@
 # pixi-managed conda environment (pixi.lock IS tracked)
 /.pixi/
 
-# Legacy repo-local build output. Build output now defaults OUTSIDE the repo
-# under PREFIX ($PROJECTDIR/$USER/opt/<arch> by default; see scripts/common.sh),
-# but keep this ignore for older trees / an explicit LFRIC_WORKING_DIR=working_dir.
+# All build output lands OUTSIDE the repo under PREFIX (LFRIC_PREFIX; default
+# $PROJECTDIR/$USER/opt/<arch>, see scripts/common.sh) and the transient stage
+# under WORKING_DIR (LFRIC_WORKING_DIR; default $PREFIX/stage) — so nothing build-
+# related is tracked. The rules below are a safety net only, in case an older
+# build (or a repo-relative LFRIC_PREFIX) ever wrote state into the repo.
 /working_dir/
-
-# Spack directory-environment state. The whole environment (manifest + view +
-# lockfile) is now GENERATED under PREFIX by `build`; the tracked spack-env/
-# <variant>/spack.yaml are TEMPLATES. These ignores remain as a safety net in
-# case a stale .spack-env/ was ever created in-repo by an older build.
+/stage/
 /spack-env/*/.spack-env/
 /spack-env/*/spack.lock
 

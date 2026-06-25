@@ -3,10 +3,10 @@
 #
 # This is the bulk of the original walkthrough.sh / install.sh: it produces a
 # complete, activatable Spack environment (rose, cylc, psyclone, xios, mpich,
-# ...). It does NOT compile lfric_atm — that needs SSH access to private physics
-# repos (casim/jules/socrates) and lives in build-lfric-atm.sh.
+# ...). It does NOT compile lfric_atm — that needs the private physics repos
+# (casim/jules/socrates/ukca) and is the Stage-2 example in examples/lfric-atm/.
 #
-# All heavy output goes under working_dir/ (git-ignored). Re-runs are cheap:
+# All heavy output goes under PREFIX (outside the repo). Re-runs are cheap:
 # Spack skips already-built, content-addressed packages.
 set -uo pipefail
 
@@ -60,19 +60,19 @@ info "Dependency stack variant: LFRIC_STACK=$LFRIC_STACK (env: $SPACK_ENV_DIR)"
 # Spack traceback later.
 _py="${SPACK_PYTHON:-$(command -v python3 2>/dev/null || true)}"
 [ -n "$_py" ] && [ -x "$_py" ] \
-  || die "no Python found to run Spack. Use pixi ('pixi run build'), or bring your own: 'module load cray-python/3.11.7' (or any python3 in [3.7,3.12)) then re-run."
+  || die "no Python found to run Spack. Load one ('module load cray-python/3.11.7', or any python3 in [3.7,3.12)) and re-run — or use pixi ('pixi run build')."
 _pyver="$("$_py" -c 'import sys; print("%d.%d" % sys.version_info[:2])' 2>/dev/null || true)"
 case "$_pyver" in
   3.7|3.8|3.9|3.10|3.11) info "Spack Python: $_py ($_pyver)" ;;
-  *) die "Spack needs Python >=3.7 and <3.12 (found '${_pyver:-unknown}' at $_py). Use pixi ('pixi run build'), or 'module load cray-python/3.11.7', then re-run." ;;
+  *) die "Spack needs Python >=3.7 and <3.12 (found '${_pyver:-unknown}' at $_py). Load a suitable one ('module load cray-python/3.11.7') and re-run — or use pixi ('pixi run build')." ;;
 esac
 
-mkdir -p "$WORKING_DIR" "$SPACK_USER_CONFIG_PATH" "$SPACK_USER_CACHE_PATH"
+mkdir -p "$PREFIX" "$SPACK_USER_CONFIG_PATH" "$SPACK_USER_CACHE_PATH"
 
 # --- 0. Submodules present? ------------------------------------------------
 for sub in spack spack-packages lfric_apps lfric_core mo-spack-packages; do
   git -C "$REPO_ROOT/vendor/$sub" rev-parse --git-dir >/dev/null 2>&1 \
-    || die "Submodule vendor/$sub is missing. Run: pixi run submodule-init"
+    || die "Submodule vendor/$sub is missing. Run: git submodule update --init --recursive --jobs 4 -- vendor/spack vendor/spack-packages vendor/lfric_apps vendor/lfric_core vendor/mo-spack-packages  (or: pixi run submodule-init)"
 done
 
 # --- 1. Apply patches (idempotent; build is self-contained) ----------------
@@ -126,7 +126,7 @@ fi
 # --- 3. XIOS source verification (non-fatal) -------------------------------
 if [ "${RUN_XIOS_VERIFICATION:-1}" = "1" ]; then
   info "Verifying XIOS source (set RUN_XIOS_VERIFICATION=0 to skip)"
-  XIOS_WORKDIR="$WORKING_DIR/xios-verification" bash "$_here/xios-verification.sh" \
+  XIOS_WORKDIR="$PREFIX/xios-verification" bash "$_here/xios-verification.sh" \
     || warn "XIOS verification failed; continuing (the xios Spack package pins the same commit)"
 fi
 
@@ -138,62 +138,26 @@ spack --version || die "spack unavailable after sourcing setup-env.sh"
 
 # --- 5. Install tree + caches ----------------------------------------------
 # Without install_tree, Spack would install into vendor/spack/opt (inside the
-# submodule). The install tree + source cache go under $WORKING_DIR (persistent,
-# so completed packages + downloaded tarballs survive a re-run).
+# submodule). The install tree + caches go under PREFIX (persistent, so built
+# packages + downloaded tarballs survive a re-run).
 #
-# The BUILD STAGE (the transient compile area) is different: autotools/libtool
-# builds do thousands of small-file metadata ops, and on Isambard $WORKING_DIR is
-# a shared Lustre that can be badly contended — which makes the install phase
-# pathologically slow (observed: ncurses install 33 min, gettext 1h+, a build
-# that should finish in <70 min timing out at 3.5 h). Stage on the node-local
-# NVMe instead ($TMPDIR -> /local), which is fast and immune to Lustre load. It
-# is per-node + transient, so a re-run on another node just re-stages. Override
-# with LFRIC_BUILD_STAGE; it falls back to $WORKING_DIR/stage if /local is
-# unavailable/unwritable.
-if [ -n "${LFRIC_BUILD_STAGE:-}" ]; then
-  BUILD_STAGE="$LFRIC_BUILD_STAGE"; mkdir -p "$BUILD_STAGE" \
-    || die "LFRIC_BUILD_STAGE=$BUILD_STAGE not writable"
-else
-  # Probe candidates in preference order for a writable, node-local stage with
-  # enough room (rust/node-js stage dirs reach ~10-15 GiB). Two filesystems to
-  # avoid: (1) shared lustre/nfs — the slow, contended case we are escaping;
-  # (2) a SMALL tmpfs/ramfs — on these nodes $LOCALDIR can be a RAM disk, and
-  # staging a multi-GiB build there competes with the compilers' own RAM and can
-  # OOM the node, so only use a RAM disk if it is comfortably large. (A big
-  # disk-backed NVMe like this system's /local is ideal.) Thresholds overridable.
-  _disk_min="${LFRIC_STAGE_MIN_GIB:-20}"
-  _tmpfs_min="${LFRIC_TMPFS_MIN_GIB:-60}"
-  BUILD_STAGE=""
-  for _c in "${TMPDIR:-}" "${LOCALDIR:-}" "/local/$USER" "/local/user/$(id -u)" "/tmp/$USER"; do
-    [ -n "$_c" ] || continue
-    _d="$_c/lfric-spack-stage-$LFRIC_STACK"
-    mkdir -p "$_d" 2>/dev/null || continue
-    _fs="$(stat -f -c %T "$_d" 2>/dev/null || echo unknown)"
-    _gib="$(df -Pk "$_d" 2>/dev/null | awk 'NR==2{print int($4/1024/1024)}')"; : "${_gib:=0}"
-    case "$_fs" in
-      lustre|nfs|nfs4|smb2|cifs|gpfs|beegfs)
-        continue ;;                                    # shared FS — keep looking
-      tmpfs|ramfs)
-        [ "$_gib" -lt "$_tmpfs_min" ] && { warn "skip RAM-disk stage $_d ($_fs, ${_gib} GiB < ${_tmpfs_min}) — OOM risk"; continue; } ;;
-      *)
-        [ "$_gib" -lt "$_disk_min" ] && { warn "skip stage $_d ($_fs, ${_gib} GiB < ${_disk_min})"; continue; } ;;
-    esac
-    BUILD_STAGE="$_d"; break
-  done
-  if [ -z "$BUILD_STAGE" ]; then
-    warn "no suitable fast node-local build stage found; using $WORKING_DIR/stage (shared Lustre — slower but safe)"
-    BUILD_STAGE="$WORKING_DIR/stage"; mkdir -p "$BUILD_STAGE"
-  fi
-fi
-info "Spack build stage: $BUILD_STAGE ($(stat -f -c %T "$BUILD_STAGE" 2>/dev/null || echo '?'), $(df -Pk "$BUILD_STAGE" 2>/dev/null | awk 'NR==2{print int($4/1024/1024)}') GiB free)"
+# WORKING_DIR is Spack's transient build/compile stage. It is metadata-heavy
+# (autotools/libtool touch thousands of small files), so on a compute node it
+# should be node-local NVMe: the sbatch sets LFRIC_WORKING_DIR=$LOCALDIR/... to
+# keep the install phase off the shared (often contended) Lustre. It defaults to
+# $PREFIX/stage (on Lustre: correct, just slower). See MAINTAINER.md.
+BUILD_STAGE="$WORKING_DIR"
+mkdir -p "$BUILD_STAGE" || die "build stage not writable: $BUILD_STAGE (set LFRIC_WORKING_DIR)"
+info "Install prefix (persistent):   $PREFIX"
+info "Build stage    (transient):    $BUILD_STAGE"
 cat > "$SPACK_USER_CONFIG_PATH/config.yaml" <<EOF
 config:
   install_tree:
-    root: $WORKING_DIR/opt
+    root: $PREFIX/opt
   build_stage:
   - $BUILD_STAGE
-  source_cache: $WORKING_DIR/source-cache
-  misc_cache: $WORKING_DIR/misc-cache
+  source_cache: $PREFIX/source-cache
+  misc_cache: $PREFIX/misc-cache
   build_jobs: $SPACK_JOBS
 EOF
 
@@ -204,15 +168,12 @@ EOF
 # rewrite the tracked manifest, and a stray gcc on PATH could derail the solve.
 info "Using gcc external pinned in spack.yaml ($COMPILER_SPEC)"
 
-# --- 6b. Instantiate the directory environment under WORKING_DIR -----------
+# --- 6b. Instantiate the directory environment under PREFIX ----------------
 # The Spack environment is built OUTSIDE the repo so its view + lockfile land
 # under PREFIX, making Stage 2 (module load) independent of the repo's location.
 # We generate $SPACK_ENV_DIR/spack.yaml from the tracked template, rewriting its
-# relative `include: ../common.yaml` to an absolute path back into the repo: the
-# shared config (concretizer, repos, gcc external, python) stays version-
-# controlled in spack-env/common.yaml, and its own relative `repos:` keep
-# resolving against repo/spack-env/ (where common.yaml lives). Regenerated every
-# build so a template edit always takes effect.
+# relative `include: ../common.yaml` to an absolute path back into the repo (so
+# the shared, version-controlled config is still used). See MAINTAINER.md.
 [ -f "$SPACK_ENV_TEMPLATE" ] || die "missing env template: $SPACK_ENV_TEMPLATE"
 mkdir -p "$SPACK_ENV_DIR"
 # Literal (non-regex) replacement of the relative include with the absolute path,
@@ -324,64 +285,14 @@ fi
 
 # --- 11. Resolve runtime env once -> Lmod modulefile (per variant) ---------
 # gen-modulefile.sh resolves the per-build view + package prefixes into a flat
-# Lua data table (working_dir/modulefiles/lfric-env/<variant>.lua) that `module
+# Lua data table ($PREFIX/modulefiles/lfric-env/<variant>.lua) that `module
 # load` runs through the version-controlled logic in scripts/lfric-env.lua. It
 # runs here (after the view exists) but is standalone, so the modulefile can be
 # regenerated without a full rebuild. The CRAY_* lib paths it bakes in come from
 # the Cray PE modules loaded in step 2.
 bash "$_here/gen-modulefile.sh" || die "gen-modulefile.sh failed"
 
-# --- 12. Cylc user config (idempotent; mirrors the old activate.sh) --------
-setup_cylc_config() {
-  local run_base_root run_base conf conf_dir run_start run_end plat_start plat_end
-  run_base_root="${CYLC_RUN_BASE_ROOT:-${PROJECTDIR:-${SCRATCH:-$HOME}}}"
-  run_base="${CYLC_RUN_BASE:-$run_base_root/${USER}/cylc-run}"
-  conf="${CYLC_USER_CONF:-$HOME/.cylc/flow/global.cylc}"
-  conf_dir="$(dirname "$conf")"
-  run_start="# BEGIN LFRIC_CYLC_RUN_DIR";   run_end="# END LFRIC_CYLC_RUN_DIR"
-  plat_start="# BEGIN LFRIC_ISAMBARD3_PLATFORM"; plat_end="# END LFRIC_ISAMBARD3_PLATFORM"
-
-  mkdir -p "$conf_dir" "$run_base" 2>/dev/null || true
-  [ -f "$conf" ] || : > "$conf"
-
-  if grep -q "$run_start" "$conf" 2>/dev/null; then
-    awk -v s="$run_start" -v e="$run_end" -v run="$run_base" '
-      $0==s {inb=1; print; print "[install]"; print "    [[symlink dirs]]";
-             print "        [[[localhost]]]"; print "            run = " run; next}
-      $0==e {inb=0; print; next} !inb{print}' "$conf" > "$conf.tmp" && mv "$conf.tmp" "$conf"
-  else
-    cat >> "$conf" <<EOF
-
-$run_start
-[install]
-    [[symlink dirs]]
-        [[[localhost]]]
-            run = $run_base
-$run_end
-EOF
-  fi
-
-  local plat_dir="$conf_dir/platforms.d" plat_file
-  plat_file="$plat_dir/isambard3.cylc"
-  mkdir -p "$plat_dir" 2>/dev/null || true
-  if [ ! -f "$plat_file" ]; then
-    cat > "$plat_file" <<EOF
-$plat_start
-[platforms]
-    [[isambard3]]
-        hosts = localhost
-        job runner = slurm
-        install target = localhost
-$plat_end
-EOF
-  fi
-}
-if [ "${SETUP_CYLC_CONFIG:-1}" = "1" ]; then
-  info "Configuring ~/.cylc (run dir + isambard3 platform)"
-  setup_cylc_config || warn "cylc config setup failed (environment still usable)"
-fi
-
-# --- 13. Smoke test --------------------------------------------------------
+# --- 12. Smoke test --------------------------------------------------------
 # shellcheck source=/dev/null
 . "$_here/activate.sh"
 info "rose:     $(rose --version 2>&1 || echo MISSING)"
@@ -389,5 +300,6 @@ info "cylc:     $(cylc --version 2>&1 || echo MISSING)"
 info "psyclone: $(psyclone --version 2>&1 || echo MISSING)"
 
 echo ""
-echo "BUILD_OK — environment built. Activate with: pixi run activate (or any 'pixi run ...'),"
-echo "or outside pixi: module use $MODULEFILES_DIR && module load $MODULE_NAME"
+echo "BUILD_OK — environment built ($LFRIC_STACK variant)."
+echo "Use it (Stage 2):  module use $MODULEFILES_DIR && module load $MODULE_NAME"
+echo "                   (inside pixi: any 'pixi run ...' auto-loads it)"

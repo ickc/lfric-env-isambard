@@ -8,7 +8,7 @@
 # Deliberately a NO-OP until the environment is built: `module load` of a
 # not-yet-generated modulefile just fails quietly. End users without pixi do not
 # need this script at all — they activate the same environment directly with:
-#   module use <repo>/working_dir/modulefiles && module load lfric-env/<variant>
+#   module use "$PREFIX/modulefiles" && module load lfric-env/<variant>
 #
 # We do NOT source spack's setup-env.sh (its exported shell functions error
 # noisily when pixi runs a command under /bin/sh); Lmod's `module` function is
