@@ -15,13 +15,14 @@
 
 local d = ...   -- per-build data table passed by the generated modulefile
 
--- Paths that follow the fixed repo layout are derived here (rather than carried
--- in the data) so the generated table stays minimal and focused on the per-build
--- specifics (the hash-addressed prefixes and the Cray lib dirs).
+-- The Spack env + view are built under PREFIX (outside the repo), so their
+-- absolute paths are carried in the data; loading the module therefore needs
+-- nothing from the repo. (Older generated tables lack these keys — fall back to
+-- the historical in-repo layout so a stale modulefile keeps working.)
 local repo    = d.repo_root
 local name    = "lfric-apps-isambard-" .. d.variant
-local spk_env = repo .. "/spack-env/" .. d.variant
-local view    = spk_env .. "/.spack-env/view"
+local spk_env = d.spack_env or (repo .. "/spack-env/" .. d.variant)
+local view    = d.view or (spk_env .. "/.spack-env/view")
 
 whatis("Name: " .. name)
 whatis("LFRic Apps Spack environment (rose/cylc/psyclone/xios/...), " .. d.variant .. " stack")

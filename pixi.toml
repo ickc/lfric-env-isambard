@@ -75,6 +75,3 @@ activate-spack = "LFRIC_STACK=spack bash scripts/print-versions.sh"
 
 # Verify the migrated XIOS source matches the pinned commit (network check).
 verify-xios = "bash scripts/xios-verification.sh"
-
-# Remove repo-local build output (keeps submodules and applied patches).
-clean = "rm -rf working_dir"

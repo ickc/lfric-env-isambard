@@ -2,9 +2,19 @@
 #SBATCH --job-name=lfric-build
 #SBATCH --partition=grace
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=12
+#SBATCH --cpus-per-task=24
+#SBATCH --mem-per-cpu=1600M
 #SBATCH --time=03:30:00
-#SBATCH --output=working_dir/build-%j.out
+#SBATCH --output=logs/build-%j.out
+# Memory on grace is PRO-RATA to cores: RealMemory 230400 MB / 144 cores =
+# 1600 MB/core (probe with `scontrol show node <grace-node>`). --mem-per-cpu=1600M
+# therefore claims a node's full per-core share and scales automatically with
+# --cpus-per-task — no over-request (a flat --mem far above core-share inflates the
+# job's footprint and delays scheduling under CR_CORE_MEMORY). Slurm's DEFAULT
+# (~1 GiB/core) is too little: heavy C++ TUs (xios' group_template_decl, node-js/
+# rust LLVM/V8) OOM-kill cc1plus ("Killed signal terminated program cc1plus") under
+# it. We use 24 cores => 37.5 GiB total — ample headroom over the 12-core/12 GiB
+# job that OOM'd, and faster. Bumping --cpus-per-task raises memory in lockstep.
 # Build the LFRic Apps Spack environment on a Grace compute node.
 #
 #   sbatch scripts/build.sbatch        # from the repo root (cray variant, default)
@@ -16,11 +26,12 @@
 # on the login node.
 #
 # Keep the job SMALL and SHORT: the `grace` partition is usually full, so a
-# 12-core, non-exclusive, <=3.5 h job backfills into the schedule far sooner
-# than a whole-node `--exclusive` reservation — and the build is not CPU-bound
-# past ~16 cores (past builds finished in ~50-70 min on 16-32 cores). NOTE: this
-# project standardises on --cpus-per-task=12 (so SPACK_JOBS/MAKE_JOBS=12) for its
-# builds; raise --cpus-per-task (and resubmit) only if the queue is empty.
+# 24-core, non-exclusive, <=3.5 h job backfills into the schedule far sooner than
+# a whole-node `--exclusive` reservation — and the build is not CPU-bound past
+# ~16-24 cores (past builds finished in ~50-70 min on 16-32 cores). This project
+# uses --cpus-per-task=24 (so SPACK_JOBS/MAKE_JOBS=24); the memory request scales
+# with it via --mem-per-cpu (see the directives above) — 24 cores gives compiles
+# enough RAM to avoid the cc1plus OOM a 12-core/12 GiB job hit on xios.
 #
 # Overridable: LFRIC_STACK (cray|spack dependency variant; pass it through Slurm
 # with --export=ALL,LFRIC_STACK=spack), SPACK_JOBS (parallel make jobs), PIXI

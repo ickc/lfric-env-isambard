@@ -2,9 +2,14 @@
 #SBATCH --job-name=lfric-atm
 #SBATCH --partition=grace
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=12
+#SBATCH --cpus-per-task=24
+#SBATCH --mem-per-cpu=1600M
 #SBATCH --time=02:00:00
-#SBATCH --output=working_dir/lfric-atm-%j.out
+#SBATCH --output=logs/lfric-atm-%j.out
+# Memory on grace is pro-rata: 230400 MB / 144 cores = 1600 MB/core, so
+# --mem-per-cpu=1600M claims a node's full per-core share and scales with
+# --cpus-per-task (no over-request). Slurm's default ~1 GiB/core is too little for
+# the lfric_atm C++/Fortran compile at -j (cc1plus OOM-killed). 24 cores => 37.5 GiB.
 # Compile lfric_atm (and run its example) on a Grace compute node.
 #
 #   sbatch scripts/build-lfric-atm.sbatch        # from the repo root
