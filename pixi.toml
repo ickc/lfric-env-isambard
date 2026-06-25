@@ -68,6 +68,17 @@ unpatch = "bash scripts/unpatch.sh"
 build = "bash scripts/build.sh"
 build-spack = "LFRIC_STACK=spack bash scripts/build.sh"
 
+# Login-node pre-fetch: clone the pinned Stage-1 submodules (if missing), then
+# download every from-source Spack package (xios, mpich, hdf5, ...) into
+# $PREFIX/source-cache, so the compute-node `build` runs offline and survives an
+# intermittent source-host blip (e.g. the gitlab.in2p3.fr XIOS clone). Run this on
+# a LOGIN NODE before `build`. Concurrency is capped (FETCH_JOBS, default 4) for
+# the login node's small `ulimit -u`. As with `build`, repeat for the spack variant:
+#   pixi run fetch                     # cray variant's sources
+#   pixi run fetch-spack               # spack variant's sources
+fetch = "bash scripts/fetch.sh"
+fetch-spack = "LFRIC_STACK=spack bash scripts/fetch.sh"
+
 # Stage-2 EXAMPLE: compile lfric_atm and run its example on the built environment.
 # One worked example of building a science target (copy/adapt it for your own
 # suite — see examples/lfric-atm/). Needs the physics submodules (`init-physics`).
