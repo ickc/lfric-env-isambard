@@ -288,7 +288,7 @@ re-applies patches automatically, so it is always self-contained.
   install tree, the per-variant environment *and its view*, the generated
   modulefiles and the caches — goes under **`PREFIX`**, which defaults **outside
   the repo**: `$PROJECTDIR/$USER/opt/<sysname>-<machine>` (e.g.
-  `/projects/u35v/$USER/opt/Linux-aarch64`; falls back to `$SCRATCH`/`$HOME` when
+  `$PROJECTDIR/$USER/opt/Linux-aarch64`; falls back to `$SCRATCH`/`$HOME` when
   `$PROJECTDIR` is unset). This is deliberate: the Spack *view* (the symlink farm
   that lands on `PATH`) used to live inside the repo, which tied Stage 2 to the
   repo's path — now it is under `PREFIX`, so once Stage 1 is built the repo can
