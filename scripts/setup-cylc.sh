@@ -49,12 +49,19 @@ EOF
 fi
 info "cylc run dir -> $run_base  (in $conf)"
 
-# isambard3 Slurm platform (written once; edit by hand thereafter).
-plat_dir="$conf_dir/platforms.d"
-plat_file="$plat_dir/isambard3.cylc"
-mkdir -p "$plat_dir" || die "could not create $plat_dir (permissions? full filesystem?)"
-if [ ! -f "$plat_file" ]; then
-  cat > "$plat_file" <<EOF
+# isambard3 Slurm platform. This MUST go in global.cylc itself: the `platforms.d/`
+# drop-in directory is only read by cylc >= 8.5, but the environment ships cylc
+# 8.4.2 — which reads platforms ONLY from global.cylc. Write it as a managed block
+# (replace if present, else append), mirroring the run-dir block above.
+if grep -q "$plat_start" "$conf" 2>/dev/null; then
+  awk -v s="$plat_start" -v e="$plat_end" '
+    $0==s {inb=1; print; print "[platforms]"; print "    [[isambard3]]";
+           print "        hosts = localhost"; print "        job runner = slurm";
+           print "        install target = localhost"; next}
+    $0==e {inb=0; print; next} !inb{print}' "$conf" > "$conf.tmp" && mv "$conf.tmp" "$conf"
+else
+  cat >> "$conf" <<EOF
+
 $plat_start
 [platforms]
     [[isambard3]]
@@ -63,9 +70,16 @@ $plat_start
         install target = localhost
 $plat_end
 EOF
-  info "isambard3 platform -> $plat_file"
-else
-  info "isambard3 platform already exists: $plat_file (left as-is)"
+fi
+info "isambard3 platform -> $conf"
+
+# Remove a stale platforms.d/isambard3.cylc from older setup-cylc.sh runs: cylc
+# 8.4.2 ignores it, and leaving it is confusing once the platform lives in
+# global.cylc. (Only our managed file; harmless if absent.)
+stale_plat="$conf_dir/platforms.d/isambard3.cylc"
+if [ -f "$stale_plat" ] && grep -q "$plat_start" "$stale_plat" 2>/dev/null; then
+  rm -f "$stale_plat"
+  rmdir "$conf_dir/platforms.d" 2>/dev/null || true
 fi
 
 echo "CYLC_SETUP_OK"
