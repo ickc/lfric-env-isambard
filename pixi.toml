@@ -92,6 +92,11 @@ fetch-spack = "LFRIC_STACK=spack bash scripts/fetch.sh"
 # suite — see examples/lfric-atm/). Needs the physics submodules (`init-physics`).
 build-lfric-atm = "bash examples/lfric-atm/build.sh"
 
+# Stage-3 EXAMPLE: run a real Rose/Cylc LFRic science suite on the built env.
+# Pass the suite id, e.g. `LFRIC_STACK=spack pixi run run-suite u-dr932`. Drives
+# cylc on the login node -> Slurm (not sbatch); see examples/science-suites/README.md.
+run-suite = "bash examples/science-suites/run-suite.sh"
+
 # Optional, opt-in: configure cylc (a run dir + an isambard3 Slurm platform) for
 # running rose/cylc suites. NOT part of `build` — building must not touch ~/.cylc.
 setup-cylc = "bash scripts/setup-cylc.sh"

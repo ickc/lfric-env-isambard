@@ -18,7 +18,10 @@ Stage 1  —  BUILD the environment            (run once; heavy; on a compute no
 
 Stage 2  —  USE the environment              (just `module load`; lightweight)
   module load lfric-env/<variant> ─▶ rose / cylc / psyclone / spack …
-                                   └▶ compile a science suite (examples/lfric-atm/)
+                                   └▶ compile a science target (examples/lfric-atm/)
+
+Stage 3  —  RUN a science suite              (cylc on the login node ─▶ Slurm)
+  cylc vip a Rose/Cylc LFRic suite (examples/science-suites/u-*/) on the built env
 ```
 
 - **Stage 1** is the reproducible core of this repo. It needs the repo + a Python
@@ -26,7 +29,10 @@ Stage 2  —  USE the environment              (just `module load`; lightweight)
 - **Stage 2** is everything you do *with* the built environment. It needs only the
   modulefile — no Spack, no pixi, and the repo can even have moved or been deleted.
   Compiling the `lfric_atm` example (`examples/lfric-atm/`) is one worked example
-  of Stage 2; adapt it for your own science suite.
+  of Stage 2; adapt it for your own science target.
+- **Stage 3** runs real Rose/Cylc science suites on the built env, the way
+  scientists do — `cylc` schedules the suite and submits to Slurm. See
+  `examples/science-suites/` (e.g. `LFRIC_STACK=spack pixi run run-suite u-dr932`).
 
 There are **two dependency variants**, chosen with `LFRIC_STACK`:
 
@@ -244,4 +250,6 @@ generally cleared with the node; delete it directly if you want it gone sooner.
   (variants, patches, bumping pinned versions, the modulefile, tuning).
 - [`examples/lfric-atm/README.md`](examples/lfric-atm/README.md) — the Stage-2
   example and how to adapt it.
+- [`examples/science-suites/README.md`](examples/science-suites/README.md) — the
+  Stage-3 examples: running real Rose/Cylc LFRic suites on the built env.
 - [`CLAUDE.md`](CLAUDE.md) — orientation for AI coding agents working in this repo.

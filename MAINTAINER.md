@@ -34,6 +34,10 @@ scripts/                # Stage 1 + shared helpers
   xios-verification.sh  #   check migrated XIOS source matches the pinned commit
 examples/lfric-atm/     # Stage 2 EXAMPLE: compile lfric_atm + run its example
   build.sh  build.sbatch  README.md
+examples/science-suites/ # Stage 3 EXAMPLES: run real Rose/Cylc LFRic suites
+  run-suite.sh           #   launcher: cylc vip a suite against the built env
+  site/activate-env.sh   #   ACTIVATE_ENV: module-load the env for suite tasks
+  u-dn704/ u-dr932/ u-dt000/  # adapted suites (build from vendored sources) + README
 spack-env/              # Spack env TEMPLATES (tracked); build.sh instantiates under PREFIX
   common.yaml           #   shared config: repos, gcc@14.3.0 external, python
   cray/spack.yaml       #   variant: system cray-mpich + Cray HDF5/netCDF (default)

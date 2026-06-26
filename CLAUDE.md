@@ -8,11 +8,13 @@ proposing non-trivial changes — don't duplicate them here.
 
 A reproducible build of the **LFRic Apps Spack environment** for **Isambard 3**
 (Cray EX, Grace/aarch64, GCC 14.3). Pinned source submodules → a Spack build →
-a self-contained Lmod modulefile. Two stages, two variants:
+a self-contained Lmod modulefile. Three stages, two variants:
 
 - **Stage 1** (`scripts/build.sh`): build the environment. The reproducible core.
 - **Stage 2** (`examples/lfric-atm/`): a *worked example* of compiling a science
   target on the built environment. Adaptable, not core.
+- **Stage 3** (`examples/science-suites/u-*/`): *worked examples* of running real
+  Rose/Cylc science suites on the built environment. Adaptable, not core.
 - **Variants** via `LFRIC_STACK`: `cray` (system cray-mpich + Cray HDF5/netCDF;
   default) and `spack` (mpich + HDF5/netCDF from source).
 
@@ -57,6 +59,15 @@ This is the one outcome that must stay green. The `cray`/`spack` solve assertion
 - **Builds run on a compute node.** Never run a full Stage-1 build on a login node —
   it hits `ulimit -u` (~900 procs) and fails with `fork: Resource temporarily
   unavailable`. Concretization alone is fine on the login node.
+- **Stage 3 uses Rose/Cylc on purpose — don't reinvent it.** Scientists run LFRic
+  suites with `cylc`/`rose`, so Stage 3 runs them *that* way: the environment Stage 1
+  builds already ships `rose`, `cylc`, `rose_picker` in the view (deps of
+  `lfric-apps-isambard`), and Stage 3's job is to make a real suite run on Isambard 3
+  against our env — adapt the suite's site/platform config + point its sources at our
+  vendored trees, don't replace Cylc's scheduler with `sbatch` or hand-roll a
+  `rose-app.conf` parser. (Stage 1/Stage 2 stay `sbatch`-driven; only Stage 3 is
+  Cylc-driven, because that is the user-facing workflow we must support. The `extract`
+  step still honours the offline/reproducible invariant — local clones, no MO clones.)
 - **pixi is optional.** Every `pixi` task in `pixi.toml` is a thin wrapper around a
   `scripts/` (or `examples/`) script; keep that 1:1 mapping and keep docs no-pixi-first.
 - **Reproducible/offline.** The lfric_atm compile must not fetch sources at build
