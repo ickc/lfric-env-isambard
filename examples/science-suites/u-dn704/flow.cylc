@@ -8,6 +8,8 @@
 {% if LFRIC_STACK is not defined %}{% set LFRIC_STACK = 'cray' %}{% endif %}
 {% if LFRIC_PREFIX is not defined %}{% set LFRIC_PREFIX = '' %}{% endif %}
 {% if REPO_ROOT is not defined %}{% set REPO_ROOT = '' %}{% endif %}
+{# NWP ancillaries + start dump + um_aux ctldata, staged on the Isambard project FS. #}
+{% if BIG_DATA_DIR is not defined %}{% set BIG_DATA_DIR = '/projects/u35v/sw/lfricdata' %}{% endif %}
 
 # Machine specific settings
 {% if EX_HOST == 'isambard3' %}
@@ -93,7 +95,7 @@
                         """
         platform = isambard3
         [[[environment]]]
-            BIG_DATA_DIR = $CYLC_WORKFLOW_SHARE_DIR/data
+            BIG_DATA_DIR = {{ BIG_DATA_DIR }}
             BUILD_ROOT = ${TMPDIR}
             HYPERTHREADS    = 1
             CORES_PER_NODE  = 128
@@ -220,6 +222,11 @@
         {% if EX_HOST == 'isambard3' %}
             --nodes=1
             --ntasks=6
+            # Stage-3 (this repo): without an explicit --mem the job inherits Slurm's
+            # DefMemPerCPU (~1G/task = 6G total), and the GAL9 run OOM-kills a rank
+            # while reading the start dump. A Grace node has ~230G; 64G is ample for
+            # this C12 run with margin (build_lfric_atm's 6G is fine, it's not the model).
+            --mem=64G
             --partition={{ RUN_QUEUE }}
         {% else %}
             -l select=1

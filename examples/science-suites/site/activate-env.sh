@@ -67,6 +67,15 @@ fi
 [ -n "$_save_fpp" ]  && export FPP="$_save_fpp"
 unset _save_apps _save_core _save_tp _save_fpp
 
+# --- HDF5 file locking on Lustre -------------------------------------------
+# Isambard 3's cylc-run lives on Lustre. HDF5 1.10+ tries to flock() files it
+# creates; Lustre rejects that, so XIOS's nc_create() of a NetCDF-4/HDF5 output
+# (e.g. lfric_ver_tp0.nc) aborts with "Permission denied" *after* leaving a
+# 0-byte file — the model integrates fine, it just can't write diagnostics.
+# Disabling HDF5's own locking is the standard remedy and is safe here (Cylc
+# already serialises task access to these paths). Honour any value already set.
+export HDF5_USE_FILE_LOCKING="${HDF5_USE_FILE_LOCKING:-FALSE}"
+
 # --- Spack env view: includes + libs for the LFRic Makefiles ----------------
 # The modulefile puts $view/bin on PATH and shumlib on LDFLAGS, but the LFRic
 # build also needs the view's headers (xios.mod, …) and libraries (libxios.a,
