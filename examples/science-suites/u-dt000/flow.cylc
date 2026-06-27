@@ -71,6 +71,10 @@
 
 [runtime]
     [[root]]
+        # Stage-3 (this repo): set ROSE_DATA et al. for inline task scripts that run
+        # under `set -u` before `rose task-run` (e.g. the lfric_atm `mkdir $ROSE_DATA`).
+        # Matches the forward-ported u-dr932; the upstream suite relied on it implicitly.
+        env-script = eval $(rose task-env)
         script = "rose task-run --verbose"
         [[[events]]]
             {# mail events = submission failed, submission timeout, submission retry, retry, failed, timeout #}
@@ -78,21 +82,27 @@
             execution timeout  = PT3H  # 3 hours
         [[[environment]]]
             ROSE_ORIG_HOST={{ ROSE_ORIG_HOST }}
-            # Stage 3 builds from THIS repo's vendored, patched source trees (not
-            # a fresh clone of the suite's pinned ref — that would miss our
-            # uncommitted build patches). REPO_ROOT is injected by run-suite.sh -S.
-            SOURCE_ROOT   = $CYLC_WORKFLOW_SHARE_DIR/git_extract_lfric/extract
+            # Stage 3 source: the `git_extract_lfric` task materialises this suite's
+            # declared refs (dependencies.yaml) OFFLINE from the repo's vendored LOCAL
+            # MIRRORS into SOURCE_ROOT, then applies the LFRic-source patch stack. The
+            # build reads the per-suite extracted tree. No network. REPO_ROOT injected
+            # by run-suite.sh -S. (NOTE: u-dt000's intended science needs an LFRic fork
+            # that is in NEITHER vn3.1.1 NOR mainline vn2.2 — see README; with the refs
+            # below it builds the vn3.1.1 binary and aborts at the model on the missing
+            # ice-giant forcing, the documented blocker.)
+            REPO_ROOT     = {{ REPO_ROOT }}
+            DEPENDENCIES_FILE = $CYLC_WORKFLOW_RUN_DIR/dependencies.yaml
+            SOURCE_ROOT   = $CYLC_WORKFLOW_SHARE_DIR/source
             OUTPUT_ROOT   = $CYLC_WORKFLOW_SHARE_DIR/output
             DESTINATION_DIRECTORY = $OUTPUT_ROOT
             SUITE_NAME    = $CYLC_WORKFLOW_NAME
             MESH_DIR      = $OUTPUT_ROOT/meshes
             MESH_RES      = {{ LFRIC_RES[:-3] }}
-            APPS_ROOT_DIR = {{ REPO_ROOT }}/vendor/lfric_apps
-            CORE_ROOT_DIR = {{ REPO_ROOT }}/vendor/lfric_core
-            PHYSICS_ROOT  = {{ REPO_ROOT }}/vendor/physics
+            APPS_ROOT_DIR = $SOURCE_ROOT/lfric_apps
+            CORE_ROOT_DIR = $SOURCE_ROOT/lfric_core
+            PHYSICS_ROOT  = $SOURCE_ROOT/physics
             LAUNCH_SCRIPT = $APPS_ROOT_DIR/rose-stem/site/meto/common/bin
             VN = {{ VN }}
-            LFRIC_DEPS_DIR = $SOURCE_ROOT/deps
             # This repo's Stage-3 env selection (read by site/activate-env.sh).
             LFRIC_STACK = {{ LFRIC_STACK }}
             LFRIC_PREFIX = {{ LFRIC_PREFIX }}
@@ -305,6 +315,9 @@
         {% if EX_HOST == 'isambard3' %}
             --nodes={{LFRIC_NODES}}
             --ntasks={{TOTAL_RANKS_REQ}}
+            # Stage-3 (this repo): give the run task the node's full memory; Slurm's
+            # ~1G/task default OOM-kills lfric_atm (matches forward-ported u-dr932).
+            --mem=0
             --partition={{RUN_QUEUE}}
         {% else %}
             -l select={{LFRIC_NODES}}

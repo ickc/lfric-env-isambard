@@ -41,17 +41,20 @@
             execution timeout  = PT3H  # 3 hours
         [[[environment]]]
             ROSE_ORIG_HOST={{ ROSE_ORIG_HOST }}
-            # Stage 3 builds from THIS repo's vendored, patched source trees (the
-            # sources Stage 1/2 built the env against) — not a fresh clone of the
-            # suite's pinned ref, which would miss our uncommitted build patches.
-            # REPO_ROOT is injected by run-suite.sh via `cylc vip -S`.
+            # Stage 3 source: the `extract` task materialises this suite's declared
+            # refs (dependencies.yaml) OFFLINE from the repo's vendored LOCAL MIRRORS
+            # into SOURCE_ROOT, then applies the LFRic-source patch stack there. The
+            # build reads the per-suite extracted tree (a suite can build a different
+            # ref). No network. REPO_ROOT is injected by run-suite.sh via `cylc vip -S`.
+            REPO_ROOT = {{ REPO_ROOT }}
+            DEPENDENCIES_FILE = $CYLC_WORKFLOW_RUN_DIR/dependencies.yaml
             SOURCE_ROOT=$CYLC_WORKFLOW_SHARE_DIR/source
             OUTPUT_ROOT=$CYLC_WORKFLOW_SHARE_DIR/output
             DESTINATION_DIRECTORY = $OUTPUT_ROOT
             MESH_DIR = $OUTPUT_ROOT/meshes
-            APPS_ROOT_DIR = {{ REPO_ROOT }}/vendor/lfric_apps
-            CORE_ROOT_DIR = {{ REPO_ROOT }}/vendor/lfric_core
-            PHYSICS_ROOT = {{ REPO_ROOT }}/vendor/physics
+            APPS_ROOT_DIR = $SOURCE_ROOT/lfric_apps
+            CORE_ROOT_DIR = $SOURCE_ROOT/lfric_core
+            PHYSICS_ROOT = $SOURCE_ROOT/physics
             LAUNCH_SCRIPT = $APPS_ROOT_DIR/rose-stem/site/meto/common/bin
             # This repo's Stage-3 env selection (read by site/activate-env.sh).
             LFRIC_STACK = {{ LFRIC_STACK }}

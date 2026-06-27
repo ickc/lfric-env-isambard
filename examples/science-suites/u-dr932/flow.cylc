@@ -79,17 +79,19 @@
             execution timeout  = PT3H  # 3 hours
         [[[environment]]]
             ROSE_ORIG_HOST={{ ROSE_ORIG_HOST }}
-            # Stage 3 builds from THIS repo's vendored, patched source trees — the
-            # same sources Stage 1/2 built the environment against. We deliberately
-            # do NOT build from a fresh clone of the suite's pinned ref: our build
-            # patches (e.g. the spack mpic++ g++-14 normalisation in lfric_core's
-            # cxx/mpic++.mk) are uncommitted working-tree changes, so any git clone
-            # would miss them and fail to compile. REPO_ROOT is injected by
-            # run-suite.sh via `cylc vip -S`. PHYSICS_ROOT mirrors Stage 2's build.sh.
+            # Stage 3 source: the `extract` task materialises this suite's declared
+            # refs (dependencies.yaml) OFFLINE from the repo's vendored LOCAL MIRRORS
+            # into SOURCE_ROOT, then applies the LFRic-source patch stack there. So
+            # the build reads the per-suite extracted tree, not vendor/ directly —
+            # this is the per-suite source axis (a suite can build a different ref).
+            # No network: extraction is `git archive` from the mirror. REPO_ROOT is
+            # injected by run-suite.sh via `cylc vip -S`.
+            REPO_ROOT = {{ REPO_ROOT }}
+            DEPENDENCIES_FILE = $CYLC_WORKFLOW_RUN_DIR/dependencies.yaml
             SOURCE_ROOT = $CYLC_WORKFLOW_SHARE_DIR/source
-            APPS_ROOT_DIR = {{ REPO_ROOT }}/vendor/lfric_apps
-            CORE_ROOT_DIR = {{ REPO_ROOT }}/vendor/lfric_core
-            PHYSICS_ROOT = {{ REPO_ROOT }}/vendor/physics
+            APPS_ROOT_DIR = $SOURCE_ROOT/lfric_apps
+            CORE_ROOT_DIR = $SOURCE_ROOT/lfric_core
+            PHYSICS_ROOT = $SOURCE_ROOT/physics
             OUTPUT_ROOT = $CYLC_WORKFLOW_SHARE_DIR/output
             DESTINATION_DIRECTORY = $OUTPUT_ROOT
             SUITE_NAME = $CYLC_WORKFLOW_NAME

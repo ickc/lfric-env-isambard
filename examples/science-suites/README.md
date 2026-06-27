@@ -22,7 +22,7 @@ install — `run-suite.sh` activates the env and the suite tasks use that same
 |-------|--------------|--------------------|
 | **u-dr932** | GungHo Shallow/Deep Hot Jupiter temperature forcing (C48 multigrid, idealised) | ✅ **builds + runs end-to-end** — self-contained (radiation off, analytic init; no external data). Validated on a Grace compute node (`lfric_atm` ran 72 steps to completion). |
 | **u-dn704** | LFRic Atm NWP GAL9 @ C12 | ⚠️ **builds + meshes** (validated on a compute node); run is **data-gated** — at run time it fetches Met-Office `um_aux` ctldata (UKCA radaer + spectral files) over SSH and reads ancillaries + a start dump under `BIG_DATA_DIR`, none of which are in this repo / accessible without MO SSO |
-| **u-dt000** | LFRic Atm Uranus/Neptune temperature forcing | ⚠️ **builds + meshes** (validated; its build also needed the vn2.2→vn3.x `local_build.py` CLI forward-ported); run is **version-gated** — the suite is **VN 2.2**, the furthest from this repo's **vn3.1.1** env, so more of its run namelists need forward-porting |
+| **u-dt000** | LFRic Atm Uranus/Neptune temperature forcing | ⚠️ **builds + meshes + launches the model** (validated on a Grace node: 108 ranks via `srun`, namelists read); run is **blocked on a missing upstream LFRic fork**, not config or version. The suite's core science is `theta_forcing='ice_giants_obs_like'` in `namelist:external_forcing`, which is **absent from both this repo's vendored vn3.1.1 AND the suite's own declared mainline `lfric_apps@vn2.2`** (verified by extracting both: no `ice_giants_obs_like`; `held_suarez_sigma_b` isn't a namelist field in either — `SIGMA_B=0.7` is a hardcoded `parameter`). The upstream suite's extract points only at MetOffice mainline vn2.2, which lacks this science, so the ice-giant forcing lives in an **unidentified fork the suite does not reference**. The model aborts at `Cannot match namelist object name held_suarez_sigma_b` / `STOP 1`. No namelist forward-port can fix this; running dt000's science needs that fork located + staged. See `PLAN.md`. |
 
 ### Version alignment (forward-porting suite configs)
 
@@ -33,23 +33,42 @@ written for. These are mechanical, non-science edits — e.g. u-dr932/u-dn704's
 `finite_element` namelist gained `coord_space='Wchi'` and `coord_order_nonprime=1`
 (required by vn3.1.1, absent in vn3.0). This is the legitimate adaptation: a
 scientist running on *this* env writes vn3.1.1 configs. The deeper a suite's
-version lag, the more such edits its run needs (hence u-dt000's gate).
+version lag, the more such edits its run needs.
+
+There is a limit to forward-porting, though: it can only reshape *run config* for
+science the model already implements. When a suite's science needs **code** that the
+model lacks, no namelist edit can bridge the gap — that's a *source* / build-time
+divergence. The clean way to express it is the upstream-native per-suite
+`dependencies.yaml` (each LFRic-source repo with `source:`+`ref:`, which can even merge
+a fork onto a tag); see `PLAN.md` for the offline-extract design. u-dt000 is the hard
+case: its `ice_giants_obs_like` forcing is in **neither** the vendored vn3.1.1 **nor**
+its own declared mainline vn2.2 — it needs a fork the suite doesn't reference, which
+must be located upstream first. See `PLAN.md`.
 
 ## How it works here (what was adapted)
 
 Each suite is the upstream Rose/Cylc suite with three site-specific changes, so it
 runs offline against *our* env on Isambard 3:
 
-1. **Sources → vendored.** The suites build from this repo's **vendored, patched
-   submodules** (`vendor/lfric_apps`, `vendor/lfric_core`, `vendor/physics/*`) —
-   the exact sources Stage 1/2 built the env against — via `APPS_ROOT_DIR` /
-   `CORE_ROOT_DIR` / `PHYSICS_ROOT` in each `flow.cylc`. We deliberately do **not**
-   build from a fresh clone of the suite's pinned ref: our build patches (e.g. the
-   spack `mpic++` `g++-14` normalisation in `lfric_core`'s `cxx/mpic++.mk`) are
-   uncommitted working-tree changes, so a clone would miss them and fail to
-   compile. The suite's `extract`/`git_extract_lfric` task is therefore reduced to
-   *verifying* the vendored submodules are present (no network, no clone — keeping
-   the repo's offline/reproducible invariant).
+1. **Sources → per-suite offline extract (`dependencies.yaml`).** Each suite
+   declares the LFRic-source refs it builds in a **`dependencies.yaml`** (the
+   upstream-native shape: `lfric_apps`, `lfric_core`, `casim`, `jules`, `socrates`,
+   `ukca`, each with `source:` + `ref:`). The suite's `extract` /
+   `git_extract_lfric` task runs `site/extract-sources.sh`, which materialises each
+   declared ref **offline** from this repo's vendored **local mirrors** — `git
+   archive` from `vendor/lfric_apps` / `vendor/lfric_core` / `vendor/physics/*`, no
+   network — into the suite's `SOURCE_ROOT`, then applies the LFRic-source **patch
+   stack** (the same `patches/*-lfric_*` used by Stage 1/2, retargeted via
+   `LFRIC_SRC_ROOT`). The build reads that per-suite extracted tree
+   (`APPS_ROOT_DIR`/`CORE_ROOT_DIR`/`PHYSICS_ROOT` → `$SOURCE_ROOT/*`). This is the
+   **per-suite source axis**: a suite can build a *different* ref (its science)
+   just by editing `dependencies.yaml`. **Offline contract:** a ref is extractable
+   iff it is already in the local mirror (the mirrors are full clones, carrying all
+   fetched tags/branches); a missing or *fork* ref must be staged once, online,
+   into the mirror first (`git -C vendor/<repo> remote add <fork> <url> && git
+   fetch <fork>`), after which it is offline. Strict-offline by default: a missing
+   ref is a hard error naming what to stage. (Merging a fork branch *onto* a tag,
+   as upstream `dependencies.yaml` allows, is not yet supported here.)
 2. **Env activation → our modulefile.** `site/activate-env.sh` (passed as the
    suite's `ACTIVATE_ENV`) `module load`s `lfric-env/$LFRIC_STACK` and sets the
    variant's MPI/IO compiler wrappers + the view's include/lib — the Stage-3
