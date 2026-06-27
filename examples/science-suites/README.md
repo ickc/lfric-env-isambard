@@ -1,10 +1,10 @@
-# Stage 3 — run real LFRic science suites (Rose/Cylc)
+# The science-suite examples — run real LFRic suites (Rose/Cylc)
 
-This directory holds **worked examples of Stage 3**: running real LFRic
+This directory holds the **science-suite examples**: running real LFRic
 **Rose/Cylc science suites** on the environment that Stage 1 built. Scientists run
 LFRic this way — `cylc` schedules the suite's task graph (extract → build → mesh →
 run) and submits each task to Slurm; `rose` materialises each task's namelist
-config. So Stage 3 runs the suites *that* way, rather than reinventing it.
+config. So these examples run the suites *that* way, rather than reinventing it.
 
 > The reproducible **core** of this repo is the environment (Stage 1,
 > `scripts/build.sh`). These suites are **not** that core — they are things you do
@@ -27,7 +27,7 @@ install — `run-suite.sh` activates the env and the suite tasks use that same
 ### Version alignment (forward-porting suite configs)
 
 This repo's vendored LFRic is **newer** (vn3.1.1) than the upstream suites pin
-(vn3.0 / vn2.2), and Stage 3 builds `lfric_atm` from the vendored source (see
+(vn3.0 / vn2.2), and these examples build `lfric_atm` from the vendored source (see
 below). So a suite's namelists must match **vn3.1.1**, not the version it was
 written for. These are mechanical, non-science edits — e.g. u-dr932/u-dn704's
 `finite_element` namelist gained `coord_space='Wchi'` and `coord_order_nonprime=1`
@@ -58,7 +58,7 @@ runs offline against *our* env on Isambard 3:
    declared ref **offline** from this repo's vendored **local mirrors** — `git
    archive` from `vendor/lfric_apps` / `vendor/lfric_core` / `vendor/physics/*`, no
    network — into the suite's `SOURCE_ROOT`, then applies the LFRic-source **patch
-   stack** (the same `patches/*-lfric_*` used by Stage 1/2, retargeted via
+   stack** (the same `patches/*-lfric_*` used by the env build + minimal-compile, retargeted via
    `LFRIC_SRC_ROOT`). The build reads that per-suite extracted tree
    (`APPS_ROOT_DIR`/`CORE_ROOT_DIR`/`PHYSICS_ROOT` → `$SOURCE_ROOT/*`). This is the
    **per-suite source axis**: a suite can build a *different* ref (its science)
@@ -71,8 +71,8 @@ runs offline against *our* env on Isambard 3:
    as upstream `dependencies.yaml` allows, is not yet supported here.)
 2. **Env activation → our modulefile.** `site/activate-env.sh` (passed as the
    suite's `ACTIVATE_ENV`) `module load`s `lfric-env/$LFRIC_STACK` and sets the
-   variant's MPI/IO compiler wrappers + the view's include/lib — the Stage-3
-   analogue of upstream's `env_lfric/activate.sh`.
+   variant's MPI/IO compiler wrappers + the view's include/lib — the
+   science-suite-example analogue of upstream's `env_lfric/activate.sh`.
 3. **Cylc platform → Slurm.** `run-suite.sh` runs the repo's opt-in
    `scripts/setup-cylc.sh`, which writes the `isambard3` platform
    (`job runner = slurm`, on `localhost`) and a roomy `cylc-run` dir into
@@ -83,7 +83,7 @@ runs offline against *our* env on Isambard 3:
 - **Stage 1 built** for the variant you want (`scripts/build.sbatch`). The
   proven variant for these suites is **`spack`** (the suites' build hard-codes
   `FC=mpif90`, the spack variant's native wrapper).
-- **Physics submodules initialised** (as for Stage 2):
+- **Physics submodules initialised** (as for the minimal-compile example):
   `git submodule update --init --jobs 4 -- vendor/physics/{casim,jules,socrates,ukca}`
   (or `pixi run init-physics`).
 

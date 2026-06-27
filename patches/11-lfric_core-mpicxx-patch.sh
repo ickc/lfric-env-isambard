@@ -3,8 +3,9 @@
 set -o pipefail
 _here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
 REPO_ROOT="${PIXI_PROJECT_ROOT:-$(cd "$_here/.." && pwd)}"
-# Stage 1/2 patch the vendored trees in place; Stage 3's offline extract sets
-# LFRIC_SRC_ROOT to a per-suite extracted tree so the same patch applies there.
+# The env build + minimal-compile example patch the vendored trees in place; the
+# science-suites' offline extract sets LFRIC_SRC_ROOT to a per-suite extracted tree
+# so the same patch applies there.
 WORKING_DIR="${LFRIC_SRC_ROOT:-$REPO_ROOT/vendor}"
 info() { echo "INFO: $*"; }
 warn() { echo "WARN: $*" >&2; }

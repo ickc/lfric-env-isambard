@@ -1,4 +1,4 @@
-# u-dn704 — per-suite LFRic source declaration (Stage-3 mechanism (b), this repo).
+# u-dn704 — per-suite LFRic source declaration (per-suite source mechanism, this repo).
 #
 # Each section is an LFRic-source repo; `ref:` is any git ref (tag/branch/commit)
 # that must be PRESENT IN THIS REPO'S LOCAL MIRROR (vendor/lfric_apps,

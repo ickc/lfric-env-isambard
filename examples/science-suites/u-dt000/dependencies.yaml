@@ -1,4 +1,4 @@
-# u-dt000 — per-suite LFRic source declaration (Stage-3 mechanism (b), this repo).
+# u-dt000 — per-suite LFRic source declaration (per-suite source mechanism, this repo).
 #
 # extract-sources.sh materialises each ref OFFLINE from this repo's local mirror
 # (vendor/lfric_apps, vendor/lfric_core, vendor/physics/<name>) via `git archive`,

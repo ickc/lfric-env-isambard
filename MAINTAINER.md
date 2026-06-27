@@ -32,12 +32,13 @@ scripts/                # Stage 1 + shared helpers
   stage-physics.sh      #   set physics + lfric_core submodules to dependencies.yaml refs
   setup-cylc.sh         #   opt-in: write ~/.cylc run dir + isambard3 platform
   xios-verification.sh  #   check migrated XIOS source matches the pinned commit
-examples/lfric-atm/     # Stage 2 EXAMPLE: compile lfric_atm + run its example
+examples/minimal-compile/  # MINIMAL-COMPILE EXAMPLE: compile lfric_atm + run its example
   build.sh  build.sbatch  README.md
-examples/science-suites/ # Stage 3 EXAMPLES: run real Rose/Cylc LFRic suites
+examples/science-suites/ # SCIENCE-SUITE EXAMPLES: run real Rose/Cylc LFRic suites
   run-suite.sh           #   launcher: cylc vip a suite against the built env
   site/activate-env.sh   #   ACTIVATE_ENV: module-load the env for suite tasks
-  u-dn704/ u-dr932/ u-dt000/  # adapted suites (build from vendored sources) + README
+  site/extract-sources.sh #  offline per-suite source extract (dependencies.yaml)
+  u-dn704/ u-dr932/ u-dt000/  # adapted suites (dependencies.yaml + flow.cylc) + README
 spack-env/              # Spack env TEMPLATES (tracked); build.sh instantiates under PREFIX
   common.yaml           #   shared config: repos, gcc@14.3.0 external, python
   cray/spack.yaml       #   variant: system cray-mpich + Cray HDF5/netCDF (default)
@@ -45,8 +46,8 @@ spack-env/              # Spack env TEMPLATES (tracked); build.sh instantiates u
 spack-repo/lfric-isambard/  # local package repo: lfric-apps-isambard bundle, xios, foxml
 vendor/                 # pinned submodules
   spack/  spack-packages/                     # Spack + its builtin packages
-  lfric_apps/  lfric_core/  mo-spack-packages/ #   Stage-1 LFRic sources + MO package repo
-  physics/{casim,jules,socrates,ukca}/         #   Stage-2-only (lfric_atm science)
+  lfric_apps/  lfric_core/  mo-spack-packages/ #   LFRic sources (mirrors) + MO package repo
+  physics/{casim,jules,socrates,ukca}/         #   LFRic physics sources (examples only)
 patches/                # one *-patch.sh per upstream patch (applied in sorted order)
 logs/                   # sbatch stdout (.gitkeep tracked; *.out ignored)
 $LFRIC_PREFIX/          # OUTSIDE the repo — all build output (see below)
@@ -63,7 +64,7 @@ removed in favour of the sbatch setting `LFRIC_WORKING_DIR` explicitly.
   directory environment + its view (`$PREFIX/spack-env/<variant>/`), the generated
   modulefiles (`$PREFIX/modulefiles/`), the source/misc caches and the redirected
   Spack user config/cache (`$PREFIX/spack-{config,cache}`). It lives **outside the
-  repo** so Stage 2 never depends on the repo's path: the build bakes absolute
+  repo** so the examples never depend on the repo's path: the build bakes absolute
   paths into the modulefile + RPATHs, so once built the repo can move or be deleted
   and `module load lfric-env/<variant>` still works. Stage 1 (the build) still needs
   the repo: the vendored Spack + package repos live here.
@@ -191,7 +192,7 @@ concretizes identically — the two stay apples-to-apples. It is the portable
 fallback; from-source `mpich` will not use the Slingshot/`cxi` fabric unless built
 with libfabric, so it is for correctness/CI/comparison rather than production.
 
-The Stage-2 example compiles differently per variant (see `examples/lfric-atm/build.sh`):
+The minimal-compile example compiles differently per variant (see `examples/minimal-compile/build.sh`):
 `cray` uses the Cray `ftn`/`CC` wrappers (which auto-inject the Cray HDF5/netCDF
 `-I/-L/-l`); `spack` uses the view's `mpif90`/`mpic++` (lfric_core maps these to its
 gfortran/g++ flag sets via `fortran/mpif90.mk` / `cxx/mpic++.mk` — note it must be
@@ -281,22 +282,22 @@ Beyond the user-facing vars in the README:
 | `FETCH_JOBS` | `4` | `scripts/fetch.sh`: concurrency cap (submodule `--jobs` + `submodule.fetchJobs`) for the login node's `ulimit -u`. |
 | `PRGENV_MODULE` / `CRAYPE_TARGET` | `PrgEnv-gnu` / `craype-arm-grace` | _cray only_: Cray PE + CPU-target modules. |
 | `HDF5_MODULE` / `NETCDF_MODULE` | `cray-hdf5-parallel/1.14.3.9` / `cray-netcdf-hdf5parallel/4.9.2.3` | _cray only_: must match the external prefixes in `cray/spack.yaml`. |
-| `PSYCLONE_TRANSFORMATION` | `minimum` | Stage-2 example: PSyclone optimisation set. |
+| `PSYCLONE_TRANSFORMATION` | `minimum` | minimal-compile example: PSyclone optimisation set. |
 
 ## Adding things
 
 - **A new dependency variant:** add `spack-env/<name>/spack.yaml` (include
   `../common.yaml`; set the MPI/IO provider + the manifest-only `view:`/`specs:`);
   extend the `case "$LFRIC_STACK"` validation + solve assertions in `build.sh` and
-  the variant branch in `examples/lfric-atm/build.sh`; add the per-variant lib
+  the variant branch in `examples/minimal-compile/build.sh`; add the per-variant lib
   handling in `gen-modulefile.sh`/`lfric-env.lua` if it needs system libs like cray.
-- **A new science example:** copy `examples/lfric-atm/` and change the build target
+- **A new science example:** copy `examples/minimal-compile/` and change the build target
   + which physics deps you stage. The environment-activation block is reusable —
-  it is the contract between Stage 1 and Stage 2.
+  it is the contract between Stage 1 and anything built on it.
 
 ## Testing
 
-- **Static:** `bash -n scripts/*.sh examples/lfric-atm/build.sh`; `shellcheck` if available.
+- **Static:** `bash -n scripts/*.sh examples/minimal-compile/build.sh`; `shellcheck` if available.
 - **Cheap (login node):** `LFRIC_STACK=cray bash scripts/concretize.sh`
   → `CONCRETIZE_OK`; repeat with `LFRIC_STACK=spack`. Validates the manifest
   instantiation + variant assertions without the multi-hour install. Concretization
@@ -304,4 +305,4 @@ Beyond the user-facing vars in the README:
   fresh re-solve rather than reuse a current lock.)
 - **Full (compute node) — the invariant:** the four cases must build:
   `sbatch scripts/build.sbatch` (+ `--export=ALL,LFRIC_STACK=spack`) → `BUILD_OK`,
-  then `sbatch examples/lfric-atm/build.sbatch` (+ spack) → `LFRIC_ATM_OK`.
+  then `sbatch examples/minimal-compile/build.sbatch` (+ spack) → `LFRIC_ATM_OK`.

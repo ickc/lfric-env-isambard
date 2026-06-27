@@ -13,7 +13,7 @@
 {% if SPACK_ENV is not defined %}{% set SPACK_ENV = '' %}{% endif %}
 {% if ACTIVATE_ENV is not defined %}{% set ACTIVATE_ENV = '' %}{% endif %}
 {% if SPACK is not defined %}{% set SPACK = '' %}{% endif %}
-{# This repo's Stage-3 env + source selection, injected by run-suite.sh via -S. #}
+{# This repo's science-suite env + source selection, injected by run-suite.sh via -S. #}
 {% if LFRIC_STACK is not defined %}{% set LFRIC_STACK = 'cray' %}{% endif %}
 {% if LFRIC_PREFIX is not defined %}{% set LFRIC_PREFIX = '' %}{% endif %}
 {% if REPO_ROOT is not defined %}{% set REPO_ROOT = '' %}{% endif %}
@@ -71,7 +71,7 @@
 
 [runtime]
     [[root]]
-        # Stage-3 (this repo): set ROSE_DATA et al. for inline task scripts that run
+        # Science-suite example (this repo): set ROSE_DATA et al. for inline task scripts that run
         # under `set -u` before `rose task-run` (e.g. the lfric_atm `mkdir $ROSE_DATA`).
         # Matches the forward-ported u-dr932; the upstream suite relied on it implicitly.
         env-script = eval $(rose task-env)
@@ -82,7 +82,7 @@
             execution timeout  = PT3H  # 3 hours
         [[[environment]]]
             ROSE_ORIG_HOST={{ ROSE_ORIG_HOST }}
-            # Stage 3 source: the `git_extract_lfric` task materialises this suite's
+            # Source: the `git_extract_lfric` task materialises this suite's
             # declared refs (dependencies.yaml) OFFLINE from the repo's vendored LOCAL
             # MIRRORS into SOURCE_ROOT, then applies the LFRic-source patch stack. The
             # build reads the per-suite extracted tree. No network. REPO_ROOT injected
@@ -103,7 +103,7 @@
             PHYSICS_ROOT  = $SOURCE_ROOT/physics
             LAUNCH_SCRIPT = $APPS_ROOT_DIR/rose-stem/site/meto/common/bin
             VN = {{ VN }}
-            # This repo's Stage-3 env selection (read by site/activate-env.sh).
+            # This repo's science-suite env selection (read by site/activate-env.sh).
             LFRIC_STACK = {{ LFRIC_STACK }}
             LFRIC_PREFIX = {{ LFRIC_PREFIX }}
 
@@ -315,7 +315,7 @@
         {% if EX_HOST == 'isambard3' %}
             --nodes={{LFRIC_NODES}}
             --ntasks={{TOTAL_RANKS_REQ}}
-            # Stage-3 (this repo): give the run task the node's full memory; Slurm's
+            # Science-suite example (this repo): give the run task the node's full memory; Slurm's
             # ~1G/task default OOM-kills lfric_atm (matches forward-ported u-dr932).
             --mem=0
             --partition={{RUN_QUEUE}}

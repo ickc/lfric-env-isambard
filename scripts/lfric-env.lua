@@ -47,7 +47,7 @@ end
 if d.shumlib_lib then
   -- LDFLAGS is a space-separated flag string (not a path list): compose it and
   -- pushenv so the prior value is restored on unload. LFRic's compile.mk reads
-  -- it (examples/lfric-atm/build.sh prepends the view's -L/-rpath on top of this).
+  -- it (examples/minimal-compile/build.sh prepends the view's -L/-rpath on top of this).
   local ld  = "-L" .. d.shumlib_lib .. " -Wl,-rpath=" .. d.shumlib_lib
   local cur = os.getenv("LDFLAGS")
   if cur and cur ~= "" then

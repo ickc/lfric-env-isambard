@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# examples/science-suites/site/extract-sources.sh — Stage-3 per-suite OFFLINE
+# examples/science-suites/site/extract-sources.sh — science-suite per-suite OFFLINE
 # LFRic source extraction (the "dependencies.yaml" mechanism).
 #
 # Reads a suite's dependencies.yaml and materialises each declared repo@ref from

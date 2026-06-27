@@ -3,8 +3,8 @@
 #
 # Produces a complete, activatable Spack environment (rose, cylc, psyclone, xios,
 # mpich, ...) and its Lmod modulefile under PREFIX. It does NOT compile lfric_atm
-# (that needs the private physics repos and is the Stage-2 example in
-# examples/lfric-atm/).
+# (that needs the private physics repos and is the minimal-compile example in
+# examples/minimal-compile/).
 #
 # The phases live in scripts/lib.sh; this driver just composes them in order:
 # prepare + concretize (the SOLVE — also a standalone step, scripts/concretize.sh)
@@ -29,5 +29,5 @@ lfric_smoke_test
 
 echo ""
 echo "BUILD_OK — environment built ($LFRIC_STACK variant)."
-echo "Use it (Stage 2):  module use $MODULEFILES_DIR && module load $MODULE_NAME"
+echo "Use it:  module use $MODULEFILES_DIR && module load $MODULE_NAME"
 echo "                   (inside pixi: any 'pixi run ...' auto-loads it)"

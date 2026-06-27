@@ -303,4 +303,14 @@ tolerant patch stack**; **full rename** (dirs + tasks). Built so far:
 **Validation:** dr932 `run7` — **end-to-end GREEN** ✅ (`extract → build_lfric_atm →
 lfric_atm` all succeeded) with the new offline extract: 6 repos materialised from the
 mirrors via `git archive` + patch stack, no network, then a normal build+run. Mechanism
-(b) proven. Next: convert dn704/dt000 to the same mechanism, then the full rename.
+(b) proven. All three suites (dr932/dn704/dt000) converted + `cylc validate` clean.
+**Committed** as `09ca75a`.
+
+### Full rename — DONE ✅
+Stage 2/3 reframed as **examples** on the one prerequisite build (Stage 1, kept as the
+core env build). `git mv examples/lfric-atm → examples/minimal-compile`; all path refs,
+pixi task comments, CLAUDE.md/README/MAINTAINER framing, the example READMEs, `.gitignore`,
+and the per-suite provenance comments updated. Artifact names kept (they name *what*
+compiles, not a stage): `BUILD_OK`, `LFRIC_ATM_OK`, the `build-lfric-atm` pixi task.
+Invariant re-checked after the rename: **both `cray` and `spack` `CONCRETIZE_OK`** (solve
+inputs untouched). `bash -n` + `cylc validate` (all 3 suites) clean.

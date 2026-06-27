@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# examples/science-suites/site/activate-env.sh — the ACTIVATE_ENV a Stage-3 suite
-# task SOURCES to put our built environment on the toolchain. It is the Stage-3
+# examples/science-suites/site/activate-env.sh — the ACTIVATE_ENV a science-suite
+# task SOURCES to put our built environment on the toolchain. It is the
 # analogue of the upstream env_lfric/activate.sh, but built on OUR Lmod modulefile
 # (Stage 1) rather than a raw `spack env activate`.
 #
@@ -27,8 +27,8 @@ _aenv_repo="${PIXI_PROJECT_ROOT:-$(cd -- "$_aenv_here/../../.." && pwd)}"
 # common.sh sets PREFIX/MODULEFILES_DIR/MODULE_NAME/SPACK_ENV_DIR/LFRIC_STACK and
 # puts vendored spack on PATH. It respects LFRIC_PREFIX/LFRIC_STACK from the task.
 # BUT it also forces WORKING_DIR=$PREFIX/stage (Stage 1's transient Spack stage) —
-# which would make the suite build reuse Stage 2's stale stage dir (duplicate
-# PSyclone kernels / sqlite module rows). A Stage-3 suite sets its own per-task
+# which would make the suite build reuse a stale shared stage dir (duplicate
+# PSyclone kernels / sqlite module rows). A science-suite sets its own per-task
 # WORKING_DIR ($BUILD_ROOT/<app>, node-local); preserve it across common.sh.
 _save_wd="${WORKING_DIR:-}"
 # shellcheck source=scripts/common.sh
@@ -48,7 +48,8 @@ if ! command -v module >/dev/null 2>&1; then
   done
 fi
 # The modulefile sets APPS_ROOT_DIR/CORE_ROOT_DIR (→ our vendored trees) and
-# LFRIC_TARGET_PLATFORM/FPP for Stage-2 convenience. A Stage-3 suite OWNS these:
+# LFRIC_TARGET_PLATFORM/FPP for the minimal-compile example's convenience. A
+# science-suite OWNS these:
 # it builds from its own extracted source trees ($SOURCE_ROOT/lfric_{apps,core},
 # pinned to the suite's ref) and its own target/FPP. So preserve any value the
 # suite already set in the task environment across the module load — otherwise the
@@ -79,7 +80,7 @@ export HDF5_USE_FILE_LOCKING="${HDF5_USE_FILE_LOCKING:-FALSE}"
 # --- Spack env view: includes + libs for the LFRic Makefiles ----------------
 # The modulefile puts $view/bin on PATH and shumlib on LDFLAGS, but the LFRic
 # build also needs the view's headers (xios.mod, …) and libraries (libxios.a,
-# yaxt, pFUnit, and — spack variant — HDF5/netCDF). Mirror examples/lfric-atm/
+# yaxt, pFUnit, and — spack variant — HDF5/netCDF). Mirror examples/minimal-compile/
 # build.sh: prepend the view's include/lib to FFLAGS/LDFLAGS (the Cray ftn wrapper
 # ignores CPATH/LIBRARY_PATH, so these must go through F/LDFLAGS). Prepend, so a
 # value the task already set is preserved.
@@ -93,7 +94,7 @@ else
 fi
 
 # --- Variant compiler / MPI-IO wrappers ------------------------------------
-# Same contract as examples/lfric-atm/build.sh. The suite's BUILD task sets
+# Same contract as examples/minimal-compile/build.sh. The suite's BUILD task sets
 # FC/LDMPI=mpif90 for isambard3 (the spack variant's native wrapper); for the
 # cray variant we must OVERRIDE to the Cray ftn/CC wrappers and load PrgEnv-gnu +
 # the Cray parallel HDF5/netCDF modules (those inject -I/-L/-l for HDF5/netCDF,

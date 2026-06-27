@@ -5,7 +5,7 @@
 {% if ACTIVATE_ENV is not defined %}{% set ACTIVATE_ENV = '' %}{% endif %}
 {% if EX_HOST is not defined %}{% set EX_HOST = '' %}{% endif %}
 {% if SPACK is not defined %}{% set SPACK = '' %}{% endif %}
-{# This repo's Stage-3 env selection, injected by run-suite.sh via `cylc vip -S`. #}
+{# This repo's science-suite env selection, injected by run-suite.sh via `cylc vip -S`. #}
 {% if LFRIC_STACK is not defined %}{% set LFRIC_STACK = 'cray' %}{% endif %}
 {% if LFRIC_PREFIX is not defined %}{% set LFRIC_PREFIX = '' %}{% endif %}
 {% if REPO_ROOT is not defined %}{% set REPO_ROOT = '' %}{% endif %}
@@ -79,7 +79,7 @@
             execution timeout  = PT3H  # 3 hours
         [[[environment]]]
             ROSE_ORIG_HOST={{ ROSE_ORIG_HOST }}
-            # Stage 3 source: the `extract` task materialises this suite's declared
+            # Source: the `extract` task materialises this suite's declared
             # refs (dependencies.yaml) OFFLINE from the repo's vendored LOCAL MIRRORS
             # into SOURCE_ROOT, then applies the LFRic-source patch stack there. So
             # the build reads the per-suite extracted tree, not vendor/ directly —
@@ -99,7 +99,7 @@
             MESH_RES = {{ LFRIC_RES[:-3] }}
             LAUNCH_SCRIPT = $APPS_ROOT_DIR/rose-stem/site/meto/common/bin
             VN = {{ VN }}
-            # This repo's Stage-3 env selection (read by site/activate-env.sh).
+            # This repo's science-suite env selection (read by site/activate-env.sh).
             LFRIC_STACK = {{ LFRIC_STACK }}
             LFRIC_PREFIX = {{ LFRIC_PREFIX }}
 

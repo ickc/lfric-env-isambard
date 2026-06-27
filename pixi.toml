@@ -24,8 +24,8 @@ python = "3.11.*"
 # This whole block is a CONVENIENCE for working inside pixi, not a requirement:
 # pixi only matters for *building* the environment (Stage 1, where it supplies the
 # Python above). The build's product is a self-contained Lmod modulefile, so the
-# environment is loaded — and a science suite built on top of it (Stage 2) — with
-# nothing but `module load lfric-env/<variant>`, no pixi. See README "Architecture".
+# environment is loaded — and the examples built on top of it — with nothing but
+# `module load lfric-env/<variant>`, no pixi. See README "Architecture".
 [activation]
 scripts = ["scripts/common.sh", "scripts/activate.sh"]
 
@@ -33,12 +33,13 @@ scripts = ["scripts/common.sh", "scripts/activate.sh"]
 # One-time: clone the pinned Stage-1 (core) submodules — Spack, the package repos
 # and the LFRic sources. You are responsible for clone access (an SSH key
 # authorized for the private Met Office repos, or an HTTPS credential helper); see
-# the README MetOffice SSO note. The Stage-2 physics submodules are SEPARATE — see
-# `init-physics` — to keep the two-stage split clear.
+# the README MetOffice SSO note. The physics submodules (used by the examples, not
+# Stage 1) are SEPARATE — see `init-physics`.
 submodule-init = "git submodule update --init --recursive --jobs 4 -- vendor/spack vendor/spack-packages vendor/lfric_apps vendor/lfric_core vendor/mo-spack-packages"
 
-# Stage-2 only: clone the pinned physics submodules (casim/jules/socrates/ukca),
-# needed to compile the lfric_atm example (examples/lfric-atm/). Same SSH access.
+# Examples only (not Stage 1): clone the pinned physics submodules (casim/jules/
+# socrates/ukca), needed to compile lfric_atm (examples/minimal-compile/ and the
+# science-suites extract them per-suite). Same SSH access.
 init-physics = "git submodule update --init --jobs 4 -- vendor/physics/casim vendor/physics/jules vendor/physics/socrates vendor/physics/ukca"
 
 # Stage/update the pinned physics + lfric_core submodules to the refs in
@@ -87,12 +88,13 @@ concretize-spack = "LFRIC_STACK=spack bash scripts/concretize.sh"
 fetch = "bash scripts/fetch.sh"
 fetch-spack = "LFRIC_STACK=spack bash scripts/fetch.sh"
 
-# Stage-2 EXAMPLE: compile lfric_atm and run its example on the built environment.
-# One worked example of building a science target (copy/adapt it for your own
-# suite — see examples/lfric-atm/). Needs the physics submodules (`init-physics`).
-build-lfric-atm = "bash examples/lfric-atm/build.sh"
+# MINIMAL-COMPILE EXAMPLE: compile lfric_atm and run its bundled example on the
+# built environment. The smallest worked example of building a science target
+# (copy/adapt it — see examples/minimal-compile/). Needs the physics submodules
+# (`init-physics`).
+build-lfric-atm = "bash examples/minimal-compile/build.sh"
 
-# Stage-3 EXAMPLE: run a real Rose/Cylc LFRic science suite on the built env.
+# SCIENCE-SUITE EXAMPLE: run a real Rose/Cylc LFRic science suite on the built env.
 # Pass the suite id, e.g. `LFRIC_STACK=spack pixi run run-suite u-dr932`. Drives
 # cylc on the login node -> Slurm (not sbatch); see examples/science-suites/README.md.
 run-suite = "bash examples/science-suites/run-suite.sh"

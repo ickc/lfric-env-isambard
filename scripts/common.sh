@@ -25,7 +25,7 @@ export SPACK_ROOT="$REPO_ROOT/vendor/spack"
 # --- Build locations (the two knobs that matter) ---------------------------
 # PREFIX (LFRIC_PREFIX)      persistent install: the Spack install tree, the
 #   per-variant environment + its view, the generated modulefiles and caches.
-#   Lives OUTSIDE the repo so Stage 2 (`module load`) never depends on the repo's
+#   Lives OUTSIDE the repo so the examples (`module load`) never depend on the repo's
 #   path. BOTH variants share one PREFIX (one install tree). Default:
 #   $PROJECTDIR/$USER/opt/<sysname>-<machine>  (falls back to $SCRATCH/$HOME).
 # WORKING_DIR (LFRIC_WORKING_DIR)  transient Spack build/compile stage ONLY. It

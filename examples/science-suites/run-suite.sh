@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# examples/science-suites/run-suite.sh — launch a Stage-3 LFRic science suite on
+# examples/science-suites/run-suite.sh — launch an LFRic science-suite example on
 # Isambard 3 against our built environment, the way a scientist does: with Cylc.
 #
-# THIS IS A WORKED EXAMPLE of Stage 3. The reproducible core of this repo is the
+# THIS IS A SCIENCE-SUITE EXAMPLE. The reproducible core of this repo is the
 # environment (Stage 1). Running a real Rose/Cylc suite is one thing you do *with*
-# it. Unlike Stages 1–2 (driven by sbatch), Stage 3 is driven by Cylc: the
+# it. Unlike the env build + minimal-compile example (sbatch-driven), the
+# science-suites are Cylc-driven: the
 # scheduler runs here on the login node and submits each task (build/mesh/run) to
 # Slurm itself, per the suite's own [directives]. We do NOT wrap it in sbatch.
 #

@@ -4,7 +4,7 @@
 {% if SPACK_ENV is not defined %}{% set SPACK_ENV = '' %}{% endif %}
 {% if ACTIVATE_ENV is not defined %}{% set ACTIVATE_ENV = '' %}{% endif %}
 {% if EX_HOST is not defined %}{% set EX_HOST = '' %}{% endif %}
-{# This repo's Stage-3 env + source selection, injected by run-suite.sh via -S. #}
+{# This repo's science-suite env + source selection, injected by run-suite.sh via -S. #}
 {% if LFRIC_STACK is not defined %}{% set LFRIC_STACK = 'cray' %}{% endif %}
 {% if LFRIC_PREFIX is not defined %}{% set LFRIC_PREFIX = '' %}{% endif %}
 {% if REPO_ROOT is not defined %}{% set REPO_ROOT = '' %}{% endif %}
@@ -41,7 +41,7 @@
             execution timeout  = PT3H  # 3 hours
         [[[environment]]]
             ROSE_ORIG_HOST={{ ROSE_ORIG_HOST }}
-            # Stage 3 source: the `extract` task materialises this suite's declared
+            # Source: the `extract` task materialises this suite's declared
             # refs (dependencies.yaml) OFFLINE from the repo's vendored LOCAL MIRRORS
             # into SOURCE_ROOT, then applies the LFRic-source patch stack there. The
             # build reads the per-suite extracted tree (a suite can build a different
@@ -56,7 +56,7 @@
             CORE_ROOT_DIR = $SOURCE_ROOT/lfric_core
             PHYSICS_ROOT = $SOURCE_ROOT/physics
             LAUNCH_SCRIPT = $APPS_ROOT_DIR/rose-stem/site/meto/common/bin
-            # This repo's Stage-3 env selection (read by site/activate-env.sh).
+            # This repo's science-suite env selection (read by site/activate-env.sh).
             LFRIC_STACK = {{ LFRIC_STACK }}
             LFRIC_PREFIX = {{ LFRIC_PREFIX }}
 
@@ -225,7 +225,7 @@
         {% if EX_HOST == 'isambard3' %}
             --nodes=1
             --ntasks=6
-            # Stage-3 (this repo): without an explicit --mem the job inherits Slurm's
+            # Science-suite example (this repo): without an explicit --mem the job inherits Slurm's
             # DefMemPerCPU (~1G/task = 6G total), and the GAL9 run OOM-kills a rank
             # while reading the start dump. A Grace node has ~230G; 64G is ample for
             # this C12 run with margin (build_lfric_atm's 6G is fine, it's not the model).
