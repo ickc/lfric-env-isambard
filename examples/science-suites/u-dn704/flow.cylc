@@ -55,7 +55,10 @@
             APPS_ROOT_DIR = $SOURCE_ROOT/lfric_apps
             CORE_ROOT_DIR = $SOURCE_ROOT/lfric_core
             PHYSICS_ROOT = $SOURCE_ROOT/physics
-            LAUNCH_SCRIPT = $APPS_ROOT_DIR/rose-stem/site/meto/common/bin
+            # Isambard launcher (srun + cray-mpich/Slingshot; XIOS server via
+            # srun --multi-prog). The MO meto launch-exe only does the XIOS-server
+            # MPMD for mpiexec, not srun — see site/bin/launch-exe.
+            LAUNCH_SCRIPT = $REPO_ROOT/examples/science-suites/site/bin
             # This repo's science-suite env selection (read by site/activate-env.sh).
             LFRIC_STACK = {{ LFRIC_STACK }}
             LFRIC_PREFIX = {{ LFRIC_PREFIX }}
@@ -214,18 +217,23 @@
             BIN_DIR = $OUTPUT_ROOT/bin/lfric_atm
             TASK_OUTPUT_DIR = $OUTPUT_ROOT/lfric_atm
             RESOLUTION = C12
+            # Make cray-mpich report its OFI provider + per-rank NIC into job.out, so the
+            # run self-documents that it uses the cxi (Slingshot) interconnect across nodes.
+            MPICH_ENV_DISPLAY = 1
+            MPICH_OFI_NIC_VERBOSE = 2
         [[[directives]]]
         {% if EX_HOST == 'isambard3' %}
-            --nodes=1
-            # Science-suite example (this repo): genuine multi-rank run with a dedicated
-            # XIOS server (iodef.xml has using_server=true). The app [env] launches MPMD
-            # `mpiexec -n 6 lfric_atm : -n 1 xios_server.exe`, so the model runs on 6
-            # client ranks (1 per C12 panel) and the server rank owns the parallel-HDF5
-            # one_file write of the native UGRID Mesh2d. (Attached XIOS with no server
-            # aborts that write in nc_enddef.) ntasks = model + server = 7.
-            --ntasks=7
-            # Without an explicit --mem the job inherits Slurm's DefMemPerCPU (~1G), and a
-            # rank OOM-reads the N320L70 start dump. A Grace node has ~230G; 64G is ample.
+            # Multi-node demonstration: 24 model ranks + 1 XIOS server = 25 tasks across
+            # 2 nodes, launched by site/bin/launch-exe (srun --multi-prog, cray-mpich +
+            # Slingshot). --ntasks-per-node=13 forces the block layout to SPLIT the model
+            # across both nodes (ranks 0-12 on node 1, 13-23 on node 2) instead of packing
+            # all 24 model ranks on one node -- so model halo exchange really crosses the
+            # interconnect. Rank 24 (the dedicated XIOS server) lands on node 2 and owns
+            # the parallel-HDF5 one_file write of the native UGRID Mesh2d.
+            --nodes=2
+            --ntasks=25
+            --ntasks-per-node=13
+            # ~230G/Grace node; a rank reads the N320L70 start dump. 64G/node is ample.
             --mem=64G
             --partition={{ RUN_QUEUE }}
         {% else %}
