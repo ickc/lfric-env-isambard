@@ -41,6 +41,12 @@ ensure the branches are mergeable - an error will be raised if conflicts occur (
 although conflicts in the rose-stem directory and repository dependencies.yaml
 file will be ignored).
 
+> **Note — merging is not yet supported in this repo.** The offline extractor used
+> here (`site/extract-sources.sh`) reads each repo's **first** `source`/`ref` entry
+> only and materialises it via `git archive` from the vendored mirror; it does not
+> merge a fork branch onto a tag. Declare a single ref per repo, already staged in
+> the mirror. (Fork-on-tag merge support is tracked as `PLAN.md` follow-up 2.)
+
 Changing a workflow from fcm to git sources
 -------------------------------------------
 
