@@ -119,9 +119,18 @@ To re-run cleanly: `cylc stop --now <suite>; cylc clean <suite> -y`.
 
 ## Adapting this for your own suite
 
-Drop your Rose/Cylc suite in a new directory here and make the same three changes:
-point `APPS_ROOT_DIR`/`CORE_ROOT_DIR`/`PHYSICS_ROOT` at `{{ REPO_ROOT }}/vendor/…`,
-reduce the extract task to a vendored-source check, and let `run-suite.sh` inject
-`ACTIVATE_ENV`/`LFRIC_STACK`/`LFRIC_PREFIX`/`REPO_ROOT`. The `site/activate-env.sh`
-glue (plus `scripts/setup-cylc.sh`) is reusable as-is — that is the contract
-between the built environment and a science suite.
+Drop your Rose/Cylc suite in a new directory here and make the same three changes
+described above:
+
+1. **Sources.** Add a `dependencies.yaml` declaring the LFRic-source refs (each
+   already staged in the vendored mirror), point the suite's `extract` task at
+   `site/extract-sources.sh`, and set `APPS_ROOT_DIR`/`CORE_ROOT_DIR`/`PHYSICS_ROOT`
+   to the **extracted** tree `$SOURCE_ROOT/{lfric_apps,lfric_core,physics}` — *not*
+   `vendor/` directly. The build reads the per-suite extracted tree, not the mirror.
+2. **Env.** Let `run-suite.sh` inject `ACTIVATE_ENV`/`LFRIC_STACK`/`LFRIC_PREFIX`/
+   `REPO_ROOT`; the suite's platform pre-script sources `ACTIVATE_ENV`.
+3. **Platform.** Reuse `scripts/setup-cylc.sh`'s `isambard3` Slurm platform.
+
+The `site/` glue (`activate-env.sh`, `extract-sources.sh`, `bin/launch-exe`) plus
+`scripts/setup-cylc.sh` is reusable as-is — that is the contract between the built
+environment and a science suite.
