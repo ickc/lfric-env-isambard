@@ -217,11 +217,16 @@
         [[[directives]]]
         {% if EX_HOST == 'isambard3' %}
             --nodes=1
-            --ntasks=6
-            # Science-suite example (this repo): without an explicit --mem the job inherits Slurm's
-            # DefMemPerCPU (~1G/task = 6G total), and the GAL9 run OOM-kills a rank
-            # while reading the start dump. A Grace node has ~230G; 64G is ample for
-            # this C12 run with margin (build_lfric_atm's 6G is fine, it's not the model).
+            # Science-suite example (this repo): run the model on a SINGLE rank. With
+            # XIOS attached (no dedicated server) a multi-rank run does a parallel-HDF5
+            # collective write of the native UGRID Mesh2d, which aborts in nc_enddef
+            # ("NetCDF: HDF error") on this Lustre/XIOS build. C12 is tiny, so one rank
+            # writes the UGRID output serially and runs in seconds. (dr932 can use many
+            # ranks because it regrids output to lat-lon and never writes native UGRID.)
+            --ntasks=1
+            # Without an explicit --mem the job inherits Slurm's DefMemPerCPU (~1G), and
+            # the single rank OOM-reads the N320L70 start dump. A Grace node has ~230G;
+            # 64G is ample for this C12 run with margin.
             --mem=64G
             --partition={{ RUN_QUEUE }}
         {% else %}

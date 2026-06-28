@@ -8,10 +8,18 @@ rename** landed. Branch `stage3-science-suites`, PR #8.
 - **u-dr932** runs end-to-end on the built env (`spack`), re-verified after the shared
   `HDF5_USE_FILE_LOCKING=FALSE` change. Now also validated through the new offline-extract
   path (`run7`).
-- **u-dn704** builds + meshes; its NWP `um_aux` ctldata + ancils + C12 start dump are now
-  staged under the default `BIG_DATA_DIR=/projects/u35v/sw/lfricdata` (matches its C12
-  config), so it is **no longer data-gated** — only a confirming end-to-end run is
-  outstanding (see follow-up 3).
+- **u-dn704** runs **end-to-end** on the built env (`spack`, `run2`): extract → build_mesh →
+  generate_mesh → build_lfric_atm → lfric_atm all succeeded; 144 timesteps, "gungho
+  finalised", UGRID + NAME diagnostics written. NWP `um_aux`/ancils/C12 start dump are
+  staged at the default `BIG_DATA_DIR=/projects/u35v/sw/lfricdata`. Two run fixes were
+  needed (now in the suite):
+  1. `HDF5_USE_FILE_LOCKING=FALSE` in `app/lfric_atm/rose-app.conf [env]` — without it
+     XIOS `nc_create` aborts with "Permission denied" creating the NetCDF-4 output on
+     Lustre (the activate-env.sh export didn't reach the XIOS process; matches dr932).
+  2. `lfric_atm` runs on **`--ntasks=1`** — multi-rank attached-XIOS does a parallel-HDF5
+     collective write of the native UGRID `Mesh2d` that aborts in `nc_enddef`
+     ("NetCDF: HDF error"). dr932 avoids this by regridding output to lat-lon; dn704
+     writes native UGRID, so it runs single-rank (C12 is tiny — seconds).
 - **u-dt000** builds + meshes + launches the model, then aborts on its missing science
   (see follow-up 1). Infra fixes in place (`env-script = eval $(rose task-env)` for
   `ROSE_DATA`; `--mem=0`).
@@ -87,9 +95,9 @@ is the merged source, offline.
   `optional :: timing_section_name` after the perl `s///` and only logs "Patched
   stop_timing signature" when the substitution actually applied (perl `s///` exits 0
   even on no-match).
-- **dn704 data — DECIDED (staged).** The NWP ancils/start-dump/`um_aux` are staged at the
-  default `BIG_DATA_DIR=/projects/u35v/sw/lfricdata` and match dn704's C12 config
-  (`start_dumps/nwp-gal9/apps1.1/nwp-gal9_N320L70_C12L70.nc`, `ancils/basic-gal/yak/C12`,
-  `um_aux/spectral/ga7_1`, `um_aux/UKCA/radaer/ga7_1`); `flow.cylc` already defaults to
-  that path. dn704 is **no longer data-gated**. Remaining: a confirming end-to-end run
-  (heavy/scheduler-gated — run when ready).
+- **dn704 data — DONE (staged + runs end-to-end).** The NWP ancils/start-dump/`um_aux` are
+  staged at the default `BIG_DATA_DIR=/projects/u35v/sw/lfricdata` and match dn704's C12
+  config (`start_dumps/nwp-gal9/apps1.1/nwp-gal9_N320L70_C12L70.nc`, `ancils/basic-gal/yak/C12`,
+  `um_aux/spectral/ga7_1`, `um_aux/UKCA/radaer/ga7_1`). The confirming end-to-end run is
+  done (`run2`, see "Done so far"); the two run fixes (HDF5 locking + single-rank UGRID
+  write) are committed.
