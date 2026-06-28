@@ -5,9 +5,11 @@ rename** landed. Branch `stage3-science-suites`, PR #8.
 
 ## Done so far (context, don't redo)
 
-- **u-dr932** runs end-to-end on the built env (`spack`), re-verified after the shared
-  `HDF5_USE_FILE_LOCKING=FALSE` change. Now also validated through the new offline-extract
-  path (`run7`).
+- **u-dr932** runs end-to-end on the **cray environment** (`run8`): cray-mpich + `srun`
+  (attached XIOS, lat-lon output), 24 ranks on one node, succeeded. Ported off mpiexec like
+  dn704 (mesh→`srun`, `LAUNCH_SCRIPT`→`site/bin`); `TOTAL_RANKS_REQ` 64→24 (valid C48
+  decomposition). Single-node, so it uses on-node shared memory — the interconnect is the
+  multi-node case (dn704). (Earlier spack `run7` superseded.)
 - **u-dn704** runs **end-to-end, genuinely multi-node, on the `cray` variant** (`run3`):
   24 model ranks + 1 dedicated XIOS server across **2 nodes** over the **Slingshot (cxi)**
   interconnect; full UGRID + NAME diagnostics written by the XIOS server
@@ -32,10 +34,13 @@ rename** landed. Branch `stage3-science-suites`, PR #8.
     `using_server2=false` in `iodef_gal_nwp.xml` (2-level server tripped an MPICH yaksa
     assertion); mesh app uses `srun --ntasks=1` (cray-mpich has no `mpiexec`).
   - dn704 now **targets the cray variant** (the srun launcher won't drive spack mpich).
-    Earlier spack/mpiexec runs (`run2`, single-node TCP) are superseded. **OPEN:** apply the
-    same cray/srun multi-node pattern to dr932 (still `mpiexec -n 1`, effectively serial).
-- **u-dt000** builds + meshes + launches the model, then aborts on its missing science
-  (see follow-up 1). Infra fixes in place (`env-script = eval $(rose task-env)` for
+    Earlier spack/mpiexec runs (`run2`, single-node TCP) are superseded. dr932 is now also
+    cray/srun (single-node); both could be scaled multi-node by raising the rank count.
+- **All suites run on the cray environment now** (mesh→`srun`, `LAUNCH_SCRIPT`→`site/bin/launch-exe`,
+  no mpiexec). dn704 = multi-node + XIOS server; dr932 = single-node attached; dt000 = config
+  ported (mirrors dn704) but NOT run (ice-giant blocked, follow-up 1).
+- **u-dt000** config ported to cray/srun (validates) but still **blocked on its missing science**
+  (see follow-up 1) — not run. Infra fixes in place (`env-script = eval $(rose task-env)` for
   `ROSE_DATA`; `--mem=0`).
 - **Mechanism (b) — per-suite offline source** (commit `09ca75a`): each suite has a
   `dependencies.yaml`; `examples/science-suites/site/extract-sources.sh` extracts each
