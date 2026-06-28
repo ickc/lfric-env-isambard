@@ -21,8 +21,23 @@ two variants:
   Rose/Cylc suites (compile *and* run) on the built env. Adaptable, not core.
   (Historically "Stage 3".) minimal-compile and science-suites are **siblings** — both
   depend only on Stage 1, not on each other; each compiles its own `lfric_atm`.
-- **Variants** via `LFRIC_STACK`: `cray` (system cray-mpich + Cray HDF5/netCDF;
-  default) and `spack` (mpich + HDF5/netCDF from source).
+- **Variants** via `LFRIC_STACK` (keyword stays `cray`/`spack`; the prose names are for
+  communication). Both are Spack environments — the difference is what satisfies the deps:
+  - **`cray` = the "cray environment"** (default): uses the system Cray libraries wherever
+    possible — cray-mpich + Cray HDF5/netCDF (and the Cray `libfabric`/Slingshot stack).
+  - **`spack` = the "vanilla spack environment"**: satisfies *all* dependencies from Spack
+    (MPI, HDF5, netCDF, …) except the compiler — fully self-contained / portable.
+
+> **Run everything on the cray environment (`cray`).** On Isambard 3 (Cray EX / Slingshot)
+> MPI only works *properly* there — cray-mpich + the system `libfabric` (`cxi` provider) +
+> `srun` give RDMA over the interconnect and multi-node scaling. The vanilla spack
+> environment (`spack`) is a **portable, self-contained fallback only**: its from-source
+> `mpich` is `ch4:ofi` over a `libfabric` with no `cxi` provider (inter-node MPI falls back
+> to TCP) and is built `~slurm` (no srun PMI; needs Hydra `mpiexec`), so it is
+> single-node/TCP at best. So: **all jobs we actually run here use the cray environment**
+> (the default). The vanilla spack environment exists to keep the build portable and is
+> what the build-invariant below exercises — not for production runs. Batch scripts and the
+> science-suite runs must default to `cray`.
 
 ## The invariant — do not break it
 
