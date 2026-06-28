@@ -76,7 +76,15 @@ except Exception:
         elif cur is not None and ":" in line:
             k, _, v = line.strip().partition(":")
             k = k.lstrip("- ").strip()
-            data[cur].setdefault(k.strip(), v.strip().strip("'\""))
+            v = v.strip()
+            # Drop an inline YAML comment (whitespace + '#') before using the value:
+            # the dependencies.yaml refs are written `ref: <sha>   # <describe>`, and
+            # without this the value would be "<sha>   # ..." and git rev-parse fails.
+            for _sep in (" #", "\t#"):
+                _i = v.find(_sep)
+                if _i != -1:
+                    v = v[:_i].rstrip()
+            data[cur].setdefault(k.strip(), v.strip("'\""))
 for name, spec in (data or {}).items():
     if isinstance(spec, list):
         spec = spec[0] if spec else {}
