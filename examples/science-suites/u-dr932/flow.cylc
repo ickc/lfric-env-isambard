@@ -97,7 +97,8 @@
             SUITE_NAME = $CYLC_WORKFLOW_NAME
             MESH_DIR = $OUTPUT_ROOT/meshes
             MESH_RES = {{ LFRIC_RES[:-3] }}
-            LAUNCH_SCRIPT = $APPS_ROOT_DIR/rose-stem/site/meto/common/bin
+            # Isambard launcher (srun + cray-mpich/Slingshot) -- see site/bin/launch-exe.
+            LAUNCH_SCRIPT = $REPO_ROOT/examples/science-suites/site/bin
             VN = {{ VN }}
             # This repo's science-suite env selection (read by site/activate-env.sh).
             LFRIC_STACK = {{ LFRIC_STACK }}
@@ -313,6 +314,9 @@
             TARGET_PLATFORM = meto-ex1a
             METADATA = $APPS_ROOT_DIR/applications/lfric_atm/metadata
             BIN_DIR = $OUTPUT_ROOT/bin/lfric_atm
+            # cray-mpich reports its OFI provider + per-rank NIC into job.out (cxi=Slingshot).
+            MPICH_ENV_DISPLAY = 1
+            MPICH_OFI_NIC_VERBOSE = 2
 	        STARTDATE    = $({{ISODATETIME}} -f "%F %T" {{EXPT_START}})
             STARTTIME    = $({{ISODATETIME}} --as-total=s {{EXPT_START}} ref)
             STOPTIME     = $({{ISODATETIME}} --as-total=s --offset2={{EXPT_RESUB}} {{EXPT_START}} ref)
