@@ -8,28 +8,32 @@ rename** landed. Branch `stage3-science-suites`, PR #8.
 - **u-dr932** runs end-to-end on the built env (`spack`), re-verified after the shared
   `HDF5_USE_FILE_LOCKING=FALSE` change. Now also validated through the new offline-extract
   path (`run7`).
-- **u-dn704** runs **end-to-end** on the built env (`spack`, `run2`): extract → build_mesh →
-  generate_mesh → build_lfric_atm → lfric_atm all succeeded; 144 timesteps, "gungho
-  finalised", full UGRID + NAME diagnostics written by the XIOS server (lfric_gal_diagnostics.nc
-  ~62 MB). NWP `um_aux`/ancils/C12 start dump staged at default
-  `BIG_DATA_DIR=/projects/u35v/sw/lfricdata`. **Runs genuinely multi-rank with a dedicated
-  XIOS server** (6 model ranks + 1 server, parallel-HDF5 one_file write — the point of XIOS).
-  Three fixes, all in the suite:
-  1. `HDF5_USE_FILE_LOCKING=FALSE` in `app/lfric_atm/rose-app.conf [env]` — without it
-     XIOS `nc_create` aborts with "Permission denied" creating the NetCDF-4 output on
-     Lustre (the activate-env.sh export didn't reach the XIOS process; matches dr932).
-  2. Dedicated XIOS server launch. iodef.xml declares `using_server=true`, but the suite
-     launched plain `srun` with **no** server process (meto `launch-exe` only wires the
-     XIOS-server MPMD under `RUN_METHOD=mpiexec`, not `srun`). Set `RUN_METHOD=mpiexec` +
-     `TARGET_PLATFORM=generic` + `XIOS_SERVER_MODE=True` in app `[env]` (authoritative,
-     overriding flow.cylc/family like dr932) → `launch-exe` emits Hydra MPMD
-     `mpiexec -n 6 lfric_atm … : -n 1 xios_server.exe`. `--ntasks=7` (= model+server).
-  3. `using_server2=false` in `iodef_gal_nwp.xml` — the 2-level server tripped an MPICH
-     yaksa assertion ("memcpy ranges overlap") on its secondary rank; single-level server
-     is plenty for C12.
-  NB both suites were *effectively serial before* (dr932 also launches `mpiexec -n 1`); dn704
-  is now the real multi-rank/parallel-HDF5 reference. Applying the same to dr932 is an open
-  option (it works at -n 1; not done to avoid an unprompted regression risk).
+- **u-dn704** runs **end-to-end, genuinely multi-node, on the `cray` variant** (`run3`):
+  24 model ranks + 1 dedicated XIOS server across **2 nodes** over the **Slingshot (cxi)**
+  interconnect; full UGRID + NAME diagnostics written by the XIOS server
+  (lfric_gal_diagnostics.nc ~62 MB). NWP `um_aux`/ancils/C12 start dump staged at default
+  `BIG_DATA_DIR=/projects/u35v/sw/lfricdata`.
+  - **Use the cray variant, not spack, for real runs.** spack `mpich` is `ch4:ofi` over
+    spack `libfabric@2.5.1` whose providers are tcp/sockets/udp only (no `cxi`) → inter-node
+    MPI over TCP; and it's built `~slurm` so srun can't PMI it (hence Hydra/mpiexec). The
+    `cray` variant links cray-mpich + system `libfabric` (cxi) + srun = Slingshot RDMA.
+    Verified on a 2-node MPI micro-test: `MPICH_OFI_USE_PROVIDER=cxi`, NIC `cxi0`, ~7 µs
+    round-trip (RDMA-class, not TCP), cross-node allreduce/pingpong OK.
+  - **Launcher (`examples/science-suites/site/bin/launch-exe`, new):** srun for the model;
+    when `XIOS_SERVER_MODE=True`, launches model + `xios_server.exe` via `srun --multi-prog`
+    → client+server in ONE `MPI_COMM_WORLD` (validated on a 2-node job). The MO meto
+    launch-exe only wires the XIOS-server MPMD for mpiexec, not srun. dn704 flow.cylc points
+    `LAUNCH_SCRIPT` at it.
+  - **Forcing the model across nodes:** `--nodes=2 --ntasks=25 --ntasks-per-node=13` → model
+    ranks 0-12 on node 1, 13-23 on node 2 (server rank 24 on node 2). Without
+    `--ntasks-per-node`, Slurm block-packs all 24 model ranks on node 1 (only the server on
+    node 2) — a weak demo. `MPICH_ENV_DISPLAY` is on so job.out self-documents cxi.
+  - **Other fixes:** `HDF5_USE_FILE_LOCKING=FALSE` in app `[env]` (Lustre nc_create);
+    `using_server2=false` in `iodef_gal_nwp.xml` (2-level server tripped an MPICH yaksa
+    assertion); mesh app uses `srun --ntasks=1` (cray-mpich has no `mpiexec`).
+  - dn704 now **targets the cray variant** (the srun launcher won't drive spack mpich).
+    Earlier spack/mpiexec runs (`run2`, single-node TCP) are superseded. **OPEN:** apply the
+    same cray/srun multi-node pattern to dr932 (still `mpiexec -n 1`, effectively serial).
 - **u-dt000** builds + meshes + launches the model, then aborts on its missing science
   (see follow-up 1). Infra fixes in place (`env-script = eval $(rose task-env)` for
   `ROSE_DATA`; `--mem=0`).
@@ -109,5 +113,5 @@ is the merged source, offline.
   staged at the default `BIG_DATA_DIR=/projects/u35v/sw/lfricdata` and match dn704's C12
   config (`start_dumps/nwp-gal9/apps1.1/nwp-gal9_N320L70_C12L70.nc`, `ancils/basic-gal/yak/C12`,
   `um_aux/spectral/ga7_1`, `um_aux/UKCA/radaer/ga7_1`). The confirming end-to-end run is
-  done (`run2`, see "Done so far"); the run fixes (HDF5 locking + dedicated XIOS server
-  MPMD + single-level server) are committed — runs multi-rank with parallel-HDF5 output.
+  done (`run3`, cray variant); runs **multi-node** (2 nodes, Slingshot/cxi) with a
+  dedicated XIOS server + parallel-HDF5 output — see "Done so far" for the full story.
