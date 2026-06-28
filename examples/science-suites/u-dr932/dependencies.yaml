@@ -1,0 +1,39 @@
+# u-dr932 — per-suite LFRic source declaration (per-suite source mechanism, this repo).
+#
+# Each section is an LFRic-source repo; `ref:` is any git ref (tag/branch/commit)
+# that must be PRESENT IN THIS REPO'S LOCAL MIRROR (vendor/lfric_apps,
+# vendor/lfric_core, vendor/physics/<name>). examples/science-suites/site/
+# extract-sources.sh materialises each ref offline (via `git archive`) into the
+# suite's SOURCE_ROOT, then applies the repo's LFRic-source patch stack.
+#
+# This is the upstream `dependencies.yaml` shape (source:+ref:, fork-merge capable
+# upstream); here `source:` is informational — extraction is offline from the
+# vendored mirror, never the network. To build a DIFFERENT ref, change it below and
+# ensure it is staged in the mirror first (see examples/science-suites/README.md).
+#
+# The refs below are the exact commits this repo's submodules are pinned at (the
+# env's vn3.1.1-era trees), so the extracted build reproduces the validated run.
+
+lfric_apps:
+    source: git@github.com:MetOffice/lfric_apps.git
+    ref: b5aee0b18a071c5b501ecf8a219edff1b1b73e9c   # vn3.1.1-88-gb5aee0b1
+
+lfric_core:
+    source: git@github.com:MetOffice/lfric_core.git
+    ref: bf236737858c4ed29957124a2f64fd0e4f4fd7be   # 2026.03.2-38-gbf2367378
+
+casim:
+    source: git@github.com:MetOffice/casim.git
+    ref: b0a6e38f2a08e663dbbf8fc912337ac022287b20   # 2026.03.2
+
+jules:
+    source: git@github.com:MetOffice/jules.git
+    ref: 3647a42962613d1f50d02d7660c86dece056f87c   # 2026.03.1-13-g3647a42
+
+socrates:
+    source: git@github.com:MetOffice/socrates.git
+    ref: fb97f50a7fb4331d1d27481ab3b6e787bc3a21ca   # 2026.03.2
+
+ukca:
+    source: git@github.com:MetOffice/ukca.git
+    ref: 1cdb9c26d286260d670a8c7b0c8af685ae3c95ac   # 2026.03.2-5-g1cdb9c2

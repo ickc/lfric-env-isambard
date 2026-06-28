@@ -37,3 +37,6 @@ __pycache__/
 *.swp
 *.swo
 .DS_Store
+
+# Science-suite examples (examples/science-suites/) generated state, written by `cylc install`.
+examples/science-suites/*/opt/rose-suite-cylc-install.conf

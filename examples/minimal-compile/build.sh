@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# examples/lfric-atm/build.sh — compile the lfric_atm science target on a built
+# examples/minimal-compile/build.sh — compile the lfric_atm science target on a built
 # LFRic environment, and run its bundled example.
 #
-# THIS IS A WORKED EXAMPLE of Stage 2. The reproducible core of this repo is the
+# THIS IS THE MINIMAL-COMPILE EXAMPLE. The reproducible core of this repo is the
 # environment itself (Stage 1, scripts/build.sh). Compiling a science target is
-# one thing you do *with* that environment — copy and adapt this script for your
-# own suite. See examples/lfric-atm/README.md.
+# the smallest thing you do *with* that environment — copy and adapt this script
+# for your own target. See examples/minimal-compile/README.md.
 #
 # It needs the private Met Office physics repos (casim, jules, socrates, ukca),
 # vendored as pinned submodules under vendor/physics/ and fed to the LFRic extract
 # step via PHYSICS_ROOT, so the compile clones nothing over SSH once those are
-# initialised (README "Stage 2"). It uses an already-built environment for the
+# initialised (see README). It uses an already-built environment for the
 # variant you select; it does NOT build one.
 #
 # Set the variant + prefix EXPLICITLY to match the environment you built:
@@ -18,7 +18,7 @@
 # (defaults: cray, and the same $PROJECTDIR/$USER/opt/<arch> default as Stage 1.)
 set -uo pipefail
 
-# This script lives in examples/lfric-atm/; the shared scripts are in scripts/.
+# This script lives in examples/minimal-compile/; the shared scripts are in scripts/.
 _here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
 REPO_ROOT="${PIXI_PROJECT_ROOT:-$(cd -- "$_here/../.." && pwd)}"
 SCRIPTS="$REPO_ROOT/scripts"
@@ -145,7 +145,7 @@ PROJECT="${PROJECT:-lfric_atm}"
 export PHYSICS_ROOT="${PHYSICS_ROOT:-$REPO_ROOT/vendor/physics}"
 for _dep in casim jules socrates ukca; do
   [ -e "$PHYSICS_ROOT/$_dep/.git" ] \
-    || die "physics submodule '$_dep' not initialised under $PHYSICS_ROOT. Init the Stage-2 physics submodules: git submodule update --init --jobs 4 -- vendor/physics/{casim,jules,socrates,ukca}  (or: pixi run init-physics)"
+    || die "physics submodule '$_dep' not initialised under $PHYSICS_ROOT. Init the physics submodules: git submodule update --init --jobs 4 -- vendor/physics/{casim,jules,socrates,ukca}  (or: pixi run init-physics)"
 done
 info "Physics sources (PHYSICS_ROOT): $PHYSICS_ROOT (casim/jules/socrates/ukca, pinned submodules)"
 

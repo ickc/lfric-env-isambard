@@ -1,0 +1,325 @@
+#!jinja2
+{# ==================================== #}
+{# Set calendar and isodatetime command #}
+{# ==================================== #}
+{% set ISODATETIME = "isodatetime --calendar=" ~ "gregorian" %}
+{# ==================================== #}
+{# Set lfric_atm compute resources      #}
+{# ==================================== #}
+{% set LPPN = 128 %}
+{% set LFRIC_NODES = (TOTAL_RANKS_REQ/LPPN) | round(0, 'ceil') | int %}
+{# Defaults to avoid undefined errors when EX_HOST != isambard3 #}
+{% if SPACK_SETUP is not defined %}{% set SPACK_SETUP = '' %}{% endif %}
+{% if SPACK_ENV is not defined %}{% set SPACK_ENV = '' %}{% endif %}
+{% if ACTIVATE_ENV is not defined %}{% set ACTIVATE_ENV = '' %}{% endif %}
+{% if SPACK is not defined %}{% set SPACK = '' %}{% endif %}
+{# This repo's science-suite env + source selection, injected by run-suite.sh via -S. #}
+{% if LFRIC_STACK is not defined %}{% set LFRIC_STACK = 'cray' %}{% endif %}
+{% if LFRIC_PREFIX is not defined %}{% set LFRIC_PREFIX = '' %}{% endif %}
+{% if REPO_ROOT is not defined %}{% set REPO_ROOT = '' %}{% endif %}
+
+# Machine specific settings
+{% if EX_HOST == 'isambard3' %}
+  {% set SPACK_SETUP = ISAMBARD3_SPACK_SETUP %}
+  {% set SPACK_ENV = ISAMBARD3_SPACK_ENV %}
+  {% set SHARED_QUEUE = ISAMBARD3_SHARED_PARTITION %}
+  {% set RUN_QUEUE = ISAMBARD3_RUN_PARTITION %}
+  {% set BASE_PLATFORM = 'ISAMBARD3' %}
+{% elif EX_HOST == 'ex' %}
+# Monsoon
+  {% set SPACK = '/projects/metoff/spackadmin.mon/releases/2025.10.1/ngms' %}
+  {% set SHARED_QUEUE = 'collabshared' %}
+  {% set RUN_QUEUE = 'collab' %}
+  {% set BASE_PLATFORM = 'EX1A' %}
+{% else %}
+# Met Office ex1a
+  {% set SPACK = '/common/internal/spack/ngms' %}
+  {% set SHARED_QUEUE = 'shared' %}
+  {% set RUN_QUEUE = 'normal' %}
+  {% set BASE_PLATFORM = 'EX1A' %}
+{% endif %}
+
+[scheduler]
+    UTC mode = True
+
+[scheduling]
+    cycling mode        = "gregorian"
+    initial cycle point = {{EXPT_START}}
+    stop after cycle point = +{{EXPT_RUNLEN}}-{{EXPT_RESUB}}
+    runahead limit      = P1D
+
+    [[graph]]
+       # Initial cycle point
+       R1 = """
+          {{ '' }}
+
+          {# Build executable, if required #}
+          {% if BUILD_LFRIC %}
+               git_extract_lfric => build_mesh => generate_mesh
+               git_extract_lfric => build_lfric_atm
+               build_lfric_atm => lfric_atm
+          {% else %} {# Not building execs #}
+               build_mesh => generate_mesh
+          {% endif %} {# Test on build #}
+          generate_mesh => lfric_atm
+       """
+
+       # Following cycle points
+       {{EXPT_RESUB}} = lfric_atm[-{{EXPT_RESUB}}] => lfric_atm
+
+{# ############################## RUNTIME ################################ #}
+
+[runtime]
+    [[root]]
+        # Science-suite example (this repo): set ROSE_DATA et al. for inline task scripts that run
+        # under `set -u` before `rose task-run` (e.g. the lfric_atm `mkdir $ROSE_DATA`).
+        # Matches the forward-ported u-dr932; the upstream suite relied on it implicitly.
+        env-script = eval $(rose task-env)
+        script = "rose task-run --verbose"
+        [[[events]]]
+            {# mail events = submission failed, submission timeout, submission retry, retry, failed, timeout #}
+            submission timeout = PT3H # 12 hours
+            execution timeout  = PT3H  # 3 hours
+        [[[environment]]]
+            ROSE_ORIG_HOST={{ ROSE_ORIG_HOST }}
+            # Source: the `git_extract_lfric` task materialises this suite's
+            # declared refs (dependencies.yaml) OFFLINE from the repo's vendored LOCAL
+            # MIRRORS into SOURCE_ROOT, then applies the LFRic-source patch stack. The
+            # build reads the per-suite extracted tree. No network. REPO_ROOT injected
+            # by run-suite.sh -S. (NOTE: u-dt000's intended science needs an LFRic fork
+            # that is in NEITHER vn3.1.1 NOR mainline vn2.2 — see README; with the refs
+            # below it builds the vn3.1.1 binary and aborts at the model on the missing
+            # ice-giant forcing, the documented blocker.)
+            REPO_ROOT     = {{ REPO_ROOT }}
+            DEPENDENCIES_FILE = $CYLC_WORKFLOW_RUN_DIR/dependencies.yaml
+            SOURCE_ROOT   = $CYLC_WORKFLOW_SHARE_DIR/source
+            OUTPUT_ROOT   = $CYLC_WORKFLOW_SHARE_DIR/output
+            DESTINATION_DIRECTORY = $OUTPUT_ROOT
+            SUITE_NAME    = $CYLC_WORKFLOW_NAME
+            MESH_DIR      = $OUTPUT_ROOT/meshes
+            MESH_RES      = {{ LFRIC_RES[:-3] }}
+            APPS_ROOT_DIR = $SOURCE_ROOT/lfric_apps
+            CORE_ROOT_DIR = $SOURCE_ROOT/lfric_core
+            PHYSICS_ROOT  = $SOURCE_ROOT/physics
+            LAUNCH_SCRIPT = $APPS_ROOT_DIR/rose-stem/site/meto/common/bin
+            VN = {{ VN }}
+            # This repo's science-suite env selection (read by site/activate-env.sh).
+            LFRIC_STACK = {{ LFRIC_STACK }}
+            LFRIC_PREFIX = {{ LFRIC_PREFIX }}
+
+    [[EX1A]]
+    {% if COMPILER == 'cce' %}
+        pre-script = """
+                        module use {{SPACK}}
+                        module switch PrgEnv-cray PrgEnv-cray/8.4.0
+                        module load cpe/23.05
+                        module switch cce cce/15.0.0
+                        module load lfric-cray/15.0.0/3.0+ || true
+                        if [ -n "{{ ACTIVATE_ENV }}" ]; then
+                          source "{{ ACTIVATE_ENV }}"
+                        fi
+                        ulimit -s unlimited -c unlimited
+                        ulimit -a
+                        module list 2>&1
+                        """
+    {% else %}
+        pre-script = """
+                        module use {{SPACK}}
+                        module switch cpe/22.11 cpe/23.05
+                        module load PrgEnv-gnu
+                        module load gcc/12.3.0
+                        module load lfric-gnu/12.3.0/3.0+ || true
+                        if [ -n "{{ ACTIVATE_ENV }}" ]; then
+                          source "{{ ACTIVATE_ENV }}"
+                        fi
+                        ulimit -s unlimited -c unlimited
+                        ulimit -a
+                        module list 2>&1
+                        """
+    {% endif %}
+        platform = {{ EX_HOST }}
+        [[[environment]]]
+            BIG_DATA_DIR = '/data/users/lfricadmin/data'
+            BUILD_ROOT   = ${TMPDIR}
+            CORES_PER_NODE  = {{LPPN}}
+            HYPERTHREADS    = 1
+            NUMA_REGIONS_PER_NODE = 2
+            RUN_METHOD = mpiexec
+            TOTAL_RANKS_REQ = {{TOTAL_RANKS_REQ}}
+
+    [[ISAMBARD3]]
+        pre-script = """
+                        if [ -n "{{ SPACK_SETUP }}" ]; then
+                          source "{{ SPACK_SETUP }}"
+                          spack env activate -p "{{ SPACK_ENV }}"
+                          spack load metomi-rose cylc-flow cylc-rose || true
+                        fi
+                        if [ -n "{{ ACTIVATE_ENV }}" ]; then
+                          source "{{ ACTIVATE_ENV }}"
+                        fi
+                        ulimit -s unlimited -c unlimited
+                        ulimit -a
+                        """
+        platform = isambard3
+        [[[environment]]]
+            BIG_DATA_DIR = $CYLC_WORKFLOW_SHARE_DIR/data
+            BUILD_ROOT   = ${TMPDIR}
+            CORES_PER_NODE  = {{LPPN}}
+            HYPERTHREADS    = 1
+            NUMA_REGIONS_PER_NODE = 2
+            RUN_METHOD = srun
+            TOTAL_RANKS_REQ = {{TOTAL_RANKS_REQ}}
+
+    [[BUILD]]
+        inherit = {{ BASE_PLATFORM }}
+        script = "rose task-run --app-key=build"
+        [[[environment]]]
+        {% if EX_HOST == 'isambard3' %}
+            FC = mpif90
+            LDMPI = mpif90
+            FPP = "cpp -traditional-cpp"
+        {% endif %}
+            COMPILER = {{COMPILER}}
+            PROFILE = 'production'
+            TARGET = build
+            PSYCLONE_TRANSFORMATION = meto-ex1a
+            UM_FCM_TARGET_PLATFORM = meto-ex1a
+            LFRIC_TARGET_PLATFORM = meto-ex1a
+            MAKE_THREADS = 6
+            RDEF_PRECISION = 64
+            R_TRAN_PRECISION = 64
+            R_BL_PRECISION = 64
+            R_SOLVER_PRECISION = 32
+            R_PHYS_PRECISION = 64
+            PRE_PROCESS_MACROS = ""
+            FFLAGS = -fallow-argument-mismatch
+            F90FLAGS = -fallow-argument-mismatch
+            FCFLAGS = -fallow-argument-mismatch
+        [[[directives]]]
+        {% if EX_HOST == 'isambard3' %}
+            --nodes=1
+            --ntasks=1
+            --cpus-per-task=24
+            --mem=40G
+            --time=01:00:00
+            --partition={{SHARED_QUEUE}}
+        {% else %}
+            -l select=1:ncpus=24:mem=40GB:tmpsize=12GB
+            -l walltime=01:00:00
+            -q={{SHARED_QUEUE}}
+        {% endif %}
+
+
+    [[git_extract_lfric]]
+        {% if EX_HOST == 'isambard3' %}
+        inherit = root
+        platform = localhost
+        {% else %}
+        inherit = {{ BASE_PLATFORM }}
+        [[[directives]]]
+            -l ncpus=1
+            -l mem=2GB
+            -l walltime=00:10:00
+            -q={{SHARED_QUEUE}}
+        {% endif %}
+
+
+    [[build_mesh]]
+        inherit = BUILD
+        script = "rose task-run --app-key=build"
+        execution time limit = PT10M
+        [[[environment]]]
+            SOURCE_DIRECTORY = $CORE_ROOT_DIR/mesh_tools
+            WORKING_DIR = $BUILD_ROOT/mesh
+            BIN_DIR = $OUTPUT_ROOT/bin/mesh
+        {% if EX_HOST == 'isambard3' %}
+            WORKING_DIR = $CYLC_TASK_WORK_DIR/mesh
+            MAKE_THREADS = 1
+            NO_MPI = 1
+            FFLAGS_OPENMP = -fopenmp
+            LDFLAGS_OPENMP = -fopenmp
+        {% endif %}
+
+
+    [[build_lfric_atm]]
+        inherit = BUILD
+        script = "rose task-run --app-key=build_lfric_atm"
+        execution time limit = PT1H
+        [[[environment]]]
+            SOURCE_DIRECTORY = $APPS_ROOT_DIR/applications/lfric_atm
+            WORKING_DIR = $BUILD_ROOT/lfric_atm
+            BIN_DIR = $OUTPUT_ROOT/bin/lfric_atm
+        {% if EX_HOST == 'isambard3' %}
+            WORKING_DIR = $CYLC_TASK_WORK_DIR/lfric_atm
+        {% endif %}
+
+
+    [[generate_mesh]]
+        inherit = {{ BASE_PLATFORM }}
+        script = "rose task-run --app-key=mesh"
+        execution time limit = PT10M
+        [[[environment]]]
+            BIN_DIR = $OUTPUT_ROOT/bin/mesh
+            ROSE_APP_OPT_CONF_KEYS = {{LFRIC_RES}}
+            OUTPUT_FILE_PREFIX = $MESH_DIR/mesh_{{LFRIC_RES}}
+        [[[directives]]]
+        {% if EX_HOST == 'isambard3' %}
+            --nodes=1
+            --ntasks=1
+            --cpus-per-task=1
+            --mem=6G
+            --time=00:10:00
+            --partition={{SHARED_QUEUE}}
+        {% else %}
+            -l select=1:ncpus=1:mem=6GB:tmpsize=6GB
+            -l walltime=00:10:00
+            -q={{SHARED_QUEUE}}
+        {% endif %}
+
+
+    [[lfric_atm]]
+        inherit = {{ BASE_PLATFORM }}
+        script = """
+           echo "====Forecast times===="
+           echo "Forecast start date="${STARTDATE}
+           echo "Forecast starttime="${STARTTIME}
+           echo "Forecast STOPTIME="${STOPTIME}
+           echo "Forecast TIME_ORIGIN="${TIME_ORIGIN}
+           echo "Forecast RESTART_READ="${RESTART_READ}
+           echo "Forecast RESTART_START="${RESTART_START}
+           echo "Forecast RESTART_STOP="${RESTART_STOP}
+           echo "====Computational resources===="
+           echo "TOTAL_RANKS_REQ="${TOTAL_RANKS_REQ}
+           echo "CORES_PER_NODE="${CORES_PER_NODE}
+           mkdir -p $ROSE_DATA/History_Data
+           rose task-run --app-key=lfric_atm
+                 """
+        execution time limit = {{LFRIC_CPU}}
+        [[[environment]]]
+            DT           = {{EXPT_DT}}
+            TARGET_PLATFORM = meto-ex1a
+            METADATA     = $APPS_ROOT_DIR/applications/lfric_atm/metadata
+            BIN_DIR      = $OUTPUT_ROOT/bin/lfric_atm
+            STARTDATE    = $({{ISODATETIME}} -f "%F %T" {{EXPT_START}})
+            STARTTIME    = $({{ISODATETIME}} --as-total=s {{EXPT_START}} ref)
+            STOPTIME     = $({{ISODATETIME}} --as-total=s --offset2={{EXPT_RESUB}} {{EXPT_START}} ref)
+            TIME_ORIGIN  = $({{ISODATETIME}} -f "%F %T" {{EXPT_START}})
+            RESTART_READ = $(if [ $CYLC_TASK_CYCLE_POINT = $CYLC_WORKFLOW_INITIAL_CYCLE_POINT ]; then echo ".false."; else echo ".true."; fi)
+            RESTART_WRITE= .true.
+            RESTART_START= $(bc <<< $STARTTIME/$DT+1)
+            RESTART_STOP = $(bc <<< $STOPTIME/$DT)
+
+            ROSE_APP_OPT_CONF_KEYS = {{CASE_SETUP}} {{PHYSICS_CONF}} {{LFRIC_LEVS}}
+            TASK_OUTPUT_DIR = $OUTPUT_ROOT/lfric_atm
+        [[[directives]]]
+        {% if EX_HOST == 'isambard3' %}
+            --nodes={{LFRIC_NODES}}
+            --ntasks={{TOTAL_RANKS_REQ}}
+            # Science-suite example (this repo): give the run task the node's full memory; Slurm's
+            # ~1G/task default OOM-kills lfric_atm (matches forward-ported u-dr932).
+            --mem=0
+            --partition={{RUN_QUEUE}}
+        {% else %}
+            -l select={{LFRIC_NODES}}
+            -q={{RUN_QUEUE}}
+        {% endif %}
