@@ -10,16 +10,26 @@ rename** landed. Branch `stage3-science-suites`, PR #8.
   path (`run7`).
 - **u-dn704** runs **end-to-end** on the built env (`spack`, `run2`): extract → build_mesh →
   generate_mesh → build_lfric_atm → lfric_atm all succeeded; 144 timesteps, "gungho
-  finalised", UGRID + NAME diagnostics written. NWP `um_aux`/ancils/C12 start dump are
-  staged at the default `BIG_DATA_DIR=/projects/u35v/sw/lfricdata`. Two run fixes were
-  needed (now in the suite):
+  finalised", full UGRID + NAME diagnostics written by the XIOS server (lfric_gal_diagnostics.nc
+  ~62 MB). NWP `um_aux`/ancils/C12 start dump staged at default
+  `BIG_DATA_DIR=/projects/u35v/sw/lfricdata`. **Runs genuinely multi-rank with a dedicated
+  XIOS server** (6 model ranks + 1 server, parallel-HDF5 one_file write — the point of XIOS).
+  Three fixes, all in the suite:
   1. `HDF5_USE_FILE_LOCKING=FALSE` in `app/lfric_atm/rose-app.conf [env]` — without it
      XIOS `nc_create` aborts with "Permission denied" creating the NetCDF-4 output on
      Lustre (the activate-env.sh export didn't reach the XIOS process; matches dr932).
-  2. `lfric_atm` runs on **`--ntasks=1`** — multi-rank attached-XIOS does a parallel-HDF5
-     collective write of the native UGRID `Mesh2d` that aborts in `nc_enddef`
-     ("NetCDF: HDF error"). dr932 avoids this by regridding output to lat-lon; dn704
-     writes native UGRID, so it runs single-rank (C12 is tiny — seconds).
+  2. Dedicated XIOS server launch. iodef.xml declares `using_server=true`, but the suite
+     launched plain `srun` with **no** server process (meto `launch-exe` only wires the
+     XIOS-server MPMD under `RUN_METHOD=mpiexec`, not `srun`). Set `RUN_METHOD=mpiexec` +
+     `TARGET_PLATFORM=generic` + `XIOS_SERVER_MODE=True` in app `[env]` (authoritative,
+     overriding flow.cylc/family like dr932) → `launch-exe` emits Hydra MPMD
+     `mpiexec -n 6 lfric_atm … : -n 1 xios_server.exe`. `--ntasks=7` (= model+server).
+  3. `using_server2=false` in `iodef_gal_nwp.xml` — the 2-level server tripped an MPICH
+     yaksa assertion ("memcpy ranges overlap") on its secondary rank; single-level server
+     is plenty for C12.
+  NB both suites were *effectively serial before* (dr932 also launches `mpiexec -n 1`); dn704
+  is now the real multi-rank/parallel-HDF5 reference. Applying the same to dr932 is an open
+  option (it works at -n 1; not done to avoid an unprompted regression risk).
 - **u-dt000** builds + meshes + launches the model, then aborts on its missing science
   (see follow-up 1). Infra fixes in place (`env-script = eval $(rose task-env)` for
   `ROSE_DATA`; `--mem=0`).
@@ -99,5 +109,5 @@ is the merged source, offline.
   staged at the default `BIG_DATA_DIR=/projects/u35v/sw/lfricdata` and match dn704's C12
   config (`start_dumps/nwp-gal9/apps1.1/nwp-gal9_N320L70_C12L70.nc`, `ancils/basic-gal/yak/C12`,
   `um_aux/spectral/ga7_1`, `um_aux/UKCA/radaer/ga7_1`). The confirming end-to-end run is
-  done (`run2`, see "Done so far"); the two run fixes (HDF5 locking + single-rank UGRID
-  write) are committed.
+  done (`run2`, see "Done so far"); the run fixes (HDF5 locking + dedicated XIOS server
+  MPMD + single-level server) are committed — runs multi-rank with parallel-HDF5 output.

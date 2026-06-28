@@ -108,9 +108,12 @@
       <variable_group id = "parameters" >
         <variable id = "using_server" type = "bool" >true</variable>
         <variable id = "info_level" type = "int" >50</variable>
-        <variable id = "using_server2" type = "bool">true</variable>
-        <variable id = "ratio_server2" type="int">50</variable>
-        <variable id = "number_pools_server2">4</variable>
+        <!-- Science-suite example (this repo): single-level XIOS server. The 2-level
+             server (using_server2) crashes here: with few secondary ranks XIOS can't
+             make number_pools_server2 pools, and the secondary-server path then trips an
+             MPICH yaksa assertion ("memcpy ranges overlap") on this mpich build. One
+             primary server writing the one_file UGRID output is plenty for C12. -->
+        <variable id = "using_server2" type = "bool">false</variable>
         <variable id = "print_file" type="bool">true</variable>
       </variable_group>
     </variable_definition>
