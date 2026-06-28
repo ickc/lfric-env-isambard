@@ -317,7 +317,7 @@
             # cray-mpich reports its OFI provider + per-rank NIC into job.out (cxi=Slingshot).
             MPICH_ENV_DISPLAY = 1
             MPICH_OFI_NIC_VERBOSE = 2
-	        STARTDATE    = $({{ISODATETIME}} -f "%F %T" {{EXPT_START}})
+            STARTDATE    = $({{ISODATETIME}} -f "%F %T" {{EXPT_START}})
             STARTTIME    = $({{ISODATETIME}} --as-total=s {{EXPT_START}} ref)
             STOPTIME     = $({{ISODATETIME}} --as-total=s --offset2={{EXPT_RESUB}} {{EXPT_START}} ref)
             TIME_ORIGIN  = $({{ISODATETIME}} -f "%F %T" {{EXPT_START}})
