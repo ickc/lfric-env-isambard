@@ -51,7 +51,7 @@ rename** landed. Branch `stage3-science-suites`, PR #8.
 - **Rename** (commit `bedd813`): Stage 2/3 reframed as sibling *examples* on the one
   prerequisite build (Stage 1); `examples/lfric-atm → examples/minimal-compile`.
 
-**Run a suite (spack):** `LFRIC_STACK=spack bash examples/science-suites/run-suite.sh <id>`.
+**Run a suite (cray, the default):** `bash examples/science-suites/run-suite.sh <id>`.
 **Fast iterate:** `. scripts/common.sh; . examples/science-suites/site/activate-env.sh`
 then `cylc reinstall <id>/run1 && cylc trigger <id>//<cycle>/lfric_atm` (build+mesh cached;
 extract re-runs from the mirror). Logs: `~/cylc-run/<id>/run1/log/job/<cycle>/<task>/NN/`.

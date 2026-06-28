@@ -20,7 +20,7 @@ install — `run-suite.sh` activates the env and the suite tasks use that same
 
 | Suite | Science case | Status on this env |
 |-------|--------------|--------------------|
-| **u-dr932** | GungHo Shallow/Deep Hot Jupiter temperature forcing (C48 multigrid, idealised) | ✅ **builds + runs end-to-end** — self-contained (radiation off, analytic init; no external data). Validated on a Grace compute node (`lfric_atm` ran 72 steps to completion). |
+| **u-dr932** | GungHo Shallow/Deep Hot Jupiter temperature forcing (C48 multigrid, idealised) | ✅ **builds + runs end-to-end** — self-contained (radiation off, analytic init; no external data). Validated on the **cray** environment (Grace node, 24 ranks single-node; `lfric_atm` ran 72 steps to completion). |
 | **u-dn704** | LFRic Atm NWP GAL9 @ C12 | ⚠️ **builds + meshes** (validated on a compute node); run is **data-gated** — at run time it fetches Met-Office `um_aux` ctldata (UKCA radaer + spectral files) over SSH and reads ancillaries + a start dump under `BIG_DATA_DIR`, none of which are in this repo / accessible without MO SSO |
 | **u-dt000** | LFRic Atm Uranus/Neptune temperature forcing | ⚠️ **builds + meshes + launches the model** (validated on a Grace node: 108 ranks via `srun`, namelists read); run is **blocked on a missing upstream LFRic fork**, not config or version. The suite's core science is `theta_forcing='ice_giants_obs_like'` in `namelist:external_forcing`, which is **absent from both this repo's vendored vn3.1.1 AND the suite's own declared mainline `lfric_apps@vn2.2`** (verified by extracting both: no `ice_giants_obs_like`; `held_suarez_sigma_b` isn't a namelist field in either — `SIGMA_B=0.7` is a hardcoded `parameter`). The upstream suite's extract points only at MetOffice mainline vn2.2, which lacks this science, so the ice-giant forcing lives in an **unidentified fork the suite does not reference**. The model aborts at `Cannot match namelist object name held_suarez_sigma_b` / `STOP 1`. No namelist forward-port can fix this; running dt000's science needs that fork located + staged. See `PLAN.md`. |
 
@@ -80,9 +80,13 @@ runs offline against *our* env on Isambard 3:
 
 ## Prerequisites
 
-- **Stage 1 built** for the variant you want (`scripts/build.sbatch`). The
-  proven variant for these suites is **`spack`** (the suites' build hard-codes
-  `FC=mpif90`, the spack variant's native wrapper).
+- **Stage 1 built** for the variant you want (`scripts/build.sbatch`). Run the
+  suites on the **`cray`** environment (the default): on Isambard 3 only
+  cray-mpich + Slingshot + `srun` give RDMA over the interconnect and multi-node
+  scaling — the `spack` variant is a single-node/TCP portable fallback. The
+  suites' build hard-codes `FC=mpif90`, but `site/activate-env.sh` overrides the
+  compiler/IO wrappers per variant (cray → Cray `ftn`/`CC` + Cray parallel
+  HDF5/netCDF), so switching variant needs no suite edit.
 - **Physics submodules initialised** (as for the minimal-compile example):
   `git submodule update --init --jobs 4 -- vendor/physics/{casim,jules,socrates,ukca}`
   (or `pixi run init-physics`).
@@ -93,8 +97,11 @@ From the repo root, on a **login node** (the Cylc scheduler runs here and submit
 the heavy tasks to Slurm — do **not** wrap this in `sbatch`):
 
 ```bash
-LFRIC_STACK=spack bash examples/science-suites/run-suite.sh u-dr932
+bash examples/science-suites/run-suite.sh u-dr932   # cray environment (the default)
 ```
+
+(Choose the variant with `LFRIC_STACK=cray|spack`; `cray` is the default and the
+only one that scales across nodes — see Prerequisites.)
 
 Watch it:
 

@@ -38,7 +38,7 @@ Example: science-suites   —  RUN a real suite   (cylc on the login node ─▶
 - **The science-suite examples** (`examples/science-suites/`) run real Rose/Cylc suites
   on the built env the way scientists do — `cylc` schedules the suite and submits to
   Slurm; each suite declares its LFRic source refs in `dependencies.yaml` and compiles
-  its own `lfric_atm` (e.g. `LFRIC_STACK=spack pixi run run-suite u-dr932`).
+  its own `lfric_atm` (e.g. `pixi run run-suite u-dr932`, on the default `cray` env).
 
 There are **two dependency variants**, chosen with `LFRIC_STACK`:
 

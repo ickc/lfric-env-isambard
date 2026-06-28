@@ -18,7 +18,7 @@
 #      LFRIC_PREFIX/ACTIVATE_ENV so its tasks load our env.
 #
 # Usage:   bash examples/science-suites/run-suite.sh <suite-id> [cylc vip args...]
-#   e.g.   LFRIC_STACK=spack bash examples/science-suites/run-suite.sh u-dr932
+#   e.g.   bash examples/science-suites/run-suite.sh u-dr932   # cray env (the default)
 # Watch:   cylc tui <suite-id>     /     cylc workflow-state <suite-id>
 set -uo pipefail
 

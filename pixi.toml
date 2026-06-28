@@ -95,7 +95,7 @@ fetch-spack = "LFRIC_STACK=spack bash scripts/fetch.sh"
 build-lfric-atm = "bash examples/minimal-compile/build.sh"
 
 # SCIENCE-SUITE EXAMPLE: run a real Rose/Cylc LFRic science suite on the built env.
-# Pass the suite id, e.g. `LFRIC_STACK=spack pixi run run-suite u-dr932`. Drives
+# Pass the suite id, e.g. `pixi run run-suite u-dr932` (cray env by default). Drives
 # cylc on the login node -> Slurm (not sbatch); see examples/science-suites/README.md.
 run-suite = "bash examples/science-suites/run-suite.sh"
 
