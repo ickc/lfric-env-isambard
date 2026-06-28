@@ -46,10 +46,10 @@ Changing a workflow from fcm to git sources
 
 To change a workflow to work with git sources will involve some manual changes.
 
-* Take a copy of the `app/extract` directory from here.
-* Copy the file extracts for `get_git_sources.py` and `merge_sources.py` as well
-  as the template variables `MIRROR_LOC`, `USE_MIRRORS` and `USE_TOKENS` from
-  the `rose-suite.conf`. You may also need to update the tweak_iodef source.
+* Take a copy of the `app/extract` directory from here — it runs this repo's
+  offline `site/extract-sources.sh` (`git archive` from the vendored local
+  mirrors), not the upstream `get_git_sources.py`/`merge_sources.py` clone step.
+  You may also need to update the tweak_iodef source.
 * In the `flow.cylc`:
   * add the new `extract` task. See the `graph` section and the `[[extract]]`
     sections.
@@ -57,10 +57,8 @@ To change a workflow to work with git sources will involve some manual changes.
   * Add `install = dependencies.yaml` to the `scheduler` section.
 * Create a `dependencies.yaml` file - see above.
 
-By default the workflow uses local git mirrors. Directly cloning from github can
-also be done if correct authentication has been setup by setting
-`-S USE_MIRROR=false`.
-
-Using the mirrors requires either setting the `MIRROR_LOC` variable or setting
-up the `localmirrors:` alias by running,
-`git config --global url."hostname:/path/to/git_mirrors/".insteadOf "localmirrors:"`
+Source extraction here is fully offline: `extract-sources.sh` reads each declared
+`repo@ref` from this repo's vendored local mirrors (`vendor/lfric_apps`,
+`lfric_core`, `physics/*`) via `git archive` — no github clone, no mirror/token
+auth. A ref must be staged into the mirror before a suite can build it; a ref
+absent from the mirror is a hard error naming what to stage.

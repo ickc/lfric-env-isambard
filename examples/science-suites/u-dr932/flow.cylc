@@ -227,13 +227,6 @@
         inherit = {{ BASE_PLATFORM }}
         {% endif %}
         script = "rose task-run --app-key=extract"
-        [[[environment]]]
-            MIRROR_LOC = {{ MIRROR_LOC }}
-{% if USE_MIRRORS %}
-            ROSE_APP_COMMAND_KEY = mirrors
-{% elif USE_TOKENS %}
-            ROSE_APP_COMMAND_KEY = tokens
-{% endif %}
         {% if EX_HOST != 'isambard3' %}
         [[[directives]]]
             -l select=1:ncpus=1:mem=6GB:tmpsize=6GB

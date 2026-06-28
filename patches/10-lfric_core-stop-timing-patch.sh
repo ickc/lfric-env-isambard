@@ -24,7 +24,10 @@ patch_stop_timing_signature() {
     warn "Failed to patch stop_timing signature in $timing_file."
     return 0
   fi
-  info "Patched stop_timing signature for compatibility."
+  # perl s/// exits 0 even when it matched nothing; only log a real change.
+  if grep -q "optional :: timing_section_name" "$timing_file"; then
+    info "Patched stop_timing signature for compatibility."
+  fi
   return 0
 }
 

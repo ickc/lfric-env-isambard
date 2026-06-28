@@ -8,9 +8,10 @@ rename** landed. Branch `stage3-science-suites`, PR #8.
 - **u-dr932** runs end-to-end on the built env (`spack`), re-verified after the shared
   `HDF5_USE_FILE_LOCKING=FALSE` change. Now also validated through the new offline-extract
   path (`run7`).
-- **u-dn704** builds + meshes; its run is **data-gated** (needs MetOffice `um_aux`
-  ctldata + ancils + start dump under `BIG_DATA_DIR`, partly staged at
-  `/projects/u35v/sw/lfricdata`).
+- **u-dn704** builds + meshes; its NWP `um_aux` ctldata + ancils + C12 start dump are now
+  staged under the default `BIG_DATA_DIR=/projects/u35v/sw/lfricdata` (matches its C12
+  config), so it is **no longer data-gated** — only a confirming end-to-end run is
+  outstanding (see follow-up 3).
 - **u-dt000** builds + meshes + launches the model, then aborts on its missing science
   (see follow-up 1). Infra fixes in place (`env-script = eval $(rose task-env)` for
   `ROSE_DATA`; `--mem=0`).
@@ -73,14 +74,22 @@ takes only the FIRST entry (single ref). Follow-up 1 may need a fork merged onto
 **Done when:** a suite can declare `[tag, fork-branch]` for a repo and the extracted tree
 is the merged source, offline.
 
-## Follow-up 3 — Minor cleanups (low priority)
+## Follow-up 3 — Minor cleanups (DONE)
 
-- **Dead upstream extract Jinja** in the suite `flow.cylc` `extract`/`git_extract_lfric`
-  task blocks (`MIRROR_LOC`, `USE_MIRRORS`, `USE_TOKENS`, the `ROSE_APP_COMMAND_KEY`
-  branch) — leftover from the old clone-based extract; the new app ignores them
-  (flags are `false`). Remove for clarity (and the matching `rose-suite.conf` vars).
-- **patch-10 cosmetic log:** `10-lfric_core-stop-timing-patch.sh` prints "Patched
-  stop_timing signature" even when its perl regex doesn't match the ref (no-op on the
-  current core, which doesn't need it). Make the log honest (only on actual change).
-- **dn704 data:** decide whether to stage the NWP ancils/start-dump/`um_aux` so dn704
-  runs end-to-end, or leave it documented as data-gated.
+- **Dead upstream extract Jinja — DONE.** Removed `MIRROR_LOC`/`USE_MIRRORS`/
+  `USE_TOKENS` + the `ROSE_APP_COMMAND_KEY` Jinja branch from the `[[extract]]` task
+  in u-dn704 + u-dr932 `flow.cylc`, the matching `rose-suite.conf` vars, their
+  `meta/rose-meta.conf` schema sections, and the now-inaccurate mirror/`get_git_sources`
+  text in both READMEs (replaced with the offline `extract-sources.sh` description).
+  u-dt000 had none of these. `grep -rn MIRROR_LOC|USE_MIRRORS|USE_TOKENS|ROSE_APP_COMMAND_KEY
+  examples/science-suites/` → empty.
+- **patch-10 cosmetic log — DONE.** `10-lfric_core-stop-timing-patch.sh` now re-greps for
+  `optional :: timing_section_name` after the perl `s///` and only logs "Patched
+  stop_timing signature" when the substitution actually applied (perl `s///` exits 0
+  even on no-match).
+- **dn704 data — DECIDED (staged).** The NWP ancils/start-dump/`um_aux` are staged at the
+  default `BIG_DATA_DIR=/projects/u35v/sw/lfricdata` and match dn704's C12 config
+  (`start_dumps/nwp-gal9/apps1.1/nwp-gal9_N320L70_C12L70.nc`, `ancils/basic-gal/yak/C12`,
+  `um_aux/spectral/ga7_1`, `um_aux/UKCA/radaer/ga7_1`); `flow.cylc` already defaults to
+  that path. dn704 is **no longer data-gated**. Remaining: a confirming end-to-end run
+  (heavy/scheduler-gated — run when ready).
