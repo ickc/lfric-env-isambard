@@ -1,0 +1,242 @@
+#!jinja2
+{# Defaults to avoid undefined errors when EX_HOST != isambard3 #}
+{% if SPACK_SETUP is not defined %}{% set SPACK_SETUP = '' %}{% endif %}
+{% if SPACK_ENV is not defined %}{% set SPACK_ENV = '' %}{% endif %}
+{% if ACTIVATE_ENV is not defined %}{% set ACTIVATE_ENV = '' %}{% endif %}
+{% if EX_HOST is not defined %}{% set EX_HOST = '' %}{% endif %}
+{# This repo's science-suite env + source selection, injected by run-suite.sh via -S. #}
+{% if LFRIC_STACK is not defined %}{% set LFRIC_STACK = 'cray' %}{% endif %}
+{% if LFRIC_PREFIX is not defined %}{% set LFRIC_PREFIX = '' %}{% endif %}
+{% if REPO_ROOT is not defined %}{% set REPO_ROOT = '' %}{% endif %}
+{# NWP ancillaries + start dump + um_aux ctldata, staged on the Isambard project FS. #}
+{% if BIG_DATA_DIR is not defined %}{% set BIG_DATA_DIR = '/projects/u35v/sw/lfricdata' %}{% endif %}
+
+# Machine specific settings
+{% if EX_HOST == 'isambard3' %}
+  {% set SPACK_SETUP = ISAMBARD3_SPACK_SETUP %}
+  {% set SPACK_ENV = ISAMBARD3_SPACK_ENV %}
+  {% set SHARED_QUEUE = ISAMBARD3_SHARED_PARTITION %}
+  {% set RUN_QUEUE = ISAMBARD3_RUN_PARTITION %}
+  {% set BASE_PLATFORM = 'ISAMBARD3' %}
+{% else %}
+  {% set BASE_PLATFORM = 'EX1A' %}
+{% endif %}
+
+[scheduler]
+    UTC mode = True
+
+[scheduling]
+    [[graph]]
+        R1 = """
+        extract => build_mesh => generate_mesh
+        extract => build_lfric_atm => lfric_atm
+        generate_mesh => lfric_atm
+        """
+
+[runtime]
+    [[root]]
+        script = "rose task-run --verbose"
+        [[[events]]]
+            submission timeout = PT3H # 12 hours
+            execution timeout  = PT3H  # 3 hours
+        [[[environment]]]
+            ROSE_ORIG_HOST={{ ROSE_ORIG_HOST }}
+            # Source: the `extract` task materialises this suite's declared
+            # refs (dependencies.yaml) OFFLINE from the repo's vendored LOCAL MIRRORS
+            # into SOURCE_ROOT, then applies the LFRic-source patch stack there. The
+            # build reads the per-suite extracted tree (a suite can build a different
+            # ref). No network. REPO_ROOT is injected by run-suite.sh via `cylc vip -S`.
+            REPO_ROOT = {{ REPO_ROOT }}
+            DEPENDENCIES_FILE = $CYLC_WORKFLOW_RUN_DIR/dependencies.yaml
+            SOURCE_ROOT=$CYLC_WORKFLOW_SHARE_DIR/source
+            OUTPUT_ROOT=$CYLC_WORKFLOW_SHARE_DIR/output
+            DESTINATION_DIRECTORY = $OUTPUT_ROOT
+            MESH_DIR = $OUTPUT_ROOT/meshes
+            APPS_ROOT_DIR = $SOURCE_ROOT/lfric_apps
+            CORE_ROOT_DIR = $SOURCE_ROOT/lfric_core
+            PHYSICS_ROOT = $SOURCE_ROOT/physics
+            # Isambard launcher (srun + cray-mpich/Slingshot; XIOS server via
+            # srun --multi-prog). The MO meto launch-exe only does the XIOS-server
+            # MPMD for mpiexec, not srun — see site/bin/launch-exe.
+            LAUNCH_SCRIPT = $REPO_ROOT/examples/science-suites/site/bin
+            # This repo's science-suite env selection (read by site/activate-env.sh).
+            LFRIC_STACK = {{ LFRIC_STACK }}
+            LFRIC_PREFIX = {{ LFRIC_PREFIX }}
+
+    [[EX1A]]
+        pre-script = """
+                        module use /common/internal/spack/releases/2025.10.1/ngms
+                        module switch cpe/22.11 cpe/23.05
+                        module load PrgEnv-gnu
+                        module load gcc/12.2.0
+                        module load lfric-gnu/12.2.0/3.0+ || true
+                        if [ -n "{{ ACTIVATE_ENV }}" ]; then
+                          source "{{ ACTIVATE_ENV }}"
+                        fi
+                        ulimit -s unlimited -c unlimited
+                        ulimit -a
+                        module list 2>&1
+                        """
+        platform = {{ EX_HOST }}
+        [[[environment]]]
+            BIG_DATA_DIR = '/data/users/lfricadmin/data'
+            BUILD_ROOT = ${TMPDIR}
+            HYPERTHREADS    = 1
+            CORES_PER_NODE  = 128
+            NUMA_REGIONS_PER_NODE = 2
+            RUN_METHOD = mpiexec
+
+    [[ISAMBARD3]]
+        pre-script = """
+                        if [ -n "{{ SPACK_SETUP }}" ]; then
+                          source "{{ SPACK_SETUP }}"
+                          spack env activate -p "{{ SPACK_ENV }}"
+                          spack load metomi-rose cylc-flow cylc-rose || true
+                        fi
+                        if [ -n "{{ ACTIVATE_ENV }}" ]; then
+                          source "{{ ACTIVATE_ENV }}"
+                        fi
+                        ulimit -s unlimited -c unlimited
+                        ulimit -a
+                        """
+        platform = isambard3
+        [[[environment]]]
+            BIG_DATA_DIR = {{ BIG_DATA_DIR }}
+            BUILD_ROOT = ${TMPDIR}
+            HYPERTHREADS    = 1
+            CORES_PER_NODE  = 128
+            NUMA_REGIONS_PER_NODE = 2
+            RUN_METHOD = srun
+
+    [[BUILD]]
+        inherit = {{ BASE_PLATFORM }}
+        script = "rose task-run --app-key=build"
+        [[[environment]]]
+            COMPILER = 'gnu'
+            PROFILE = 'fast-debug'
+            TARGET = build
+{% if EX_HOST == 'isambard3' %}
+            FC = mpif90
+            LDMPI = mpif90
+            FPP = "cpp -traditional-cpp"
+{% endif %}
+            PSYCLONE_TRANSFORMATION = meto-ex1a
+            LFRIC_TARGET_PLATFORM = meto-ex1a
+            MAKE_THREADS = 6
+            RDEF_PRECISION = 64
+            R_TRAN_PRECISION = 64
+            R_BL_PRECISION = 64
+            R_SOLVER_PRECISION = 32
+            R_PHYS_PRECISION = 64
+            PRE_PROCESS_MACROS = ""
+        [[[directives]]]
+        {% if EX_HOST == 'isambard3' %}
+            --nodes=1
+            --ntasks=1
+            --cpus-per-task=24
+            --mem=40G
+            --time=01:00:00
+            --partition={{ SHARED_QUEUE }}
+        {% else %}
+            -l select=1:ncpus=24:mem=40GB:tmpsize=12GB
+            -l walltime=01:00:00
+            -q=shared
+        {% endif %}
+
+    [[extract]]
+        {% if EX_HOST == 'isambard3' %}
+        inherit = root
+        platform = localhost
+        {% else %}
+        inherit = {{ BASE_PLATFORM }}
+        {% endif %}
+        script = "rose task-run --app-key=extract"
+
+
+    [[build_mesh]]
+        inherit = BUILD
+        execution time limit = PT10M
+        [[[environment]]]
+            SOURCE_DIRECTORY = $CORE_ROOT_DIR/mesh_tools
+            WORKING_DIR = $BUILD_ROOT/mesh
+            BIN_DIR = $OUTPUT_ROOT/bin/mesh
+        {% if EX_HOST == 'isambard3' %}
+            WORKING_DIR = $CYLC_TASK_WORK_DIR/mesh
+            MAKE_THREADS = 1
+            NO_MPI = 1
+            FFLAGS_OPENMP = -fopenmp
+            LDFLAGS_OPENMP = -fopenmp
+        {% endif %}
+
+
+    [[build_lfric_atm]]
+        inherit = BUILD
+        execution time limit = PT1H
+        [[[environment]]]
+            SOURCE_DIRECTORY = $APPS_ROOT_DIR/applications/lfric_atm
+            WORKING_DIR = $BUILD_ROOT/lfric_atm
+            BIN_DIR = $OUTPUT_ROOT/bin/lfric_atm
+        {% if EX_HOST == 'isambard3' %}
+            WORKING_DIR = $CYLC_TASK_WORK_DIR/lfric_atm
+        {% endif %}
+
+
+    [[generate_mesh]]
+        inherit = {{ BASE_PLATFORM }}
+        script = "rose task-run --app-key=mesh"
+        execution time limit = PT10M
+        [[[environment]]]
+            BIN_DIR = $OUTPUT_ROOT/bin/mesh
+            OUTPUT_FILE_PREFIX = $MESH_DIR/mesh_C12
+        {% if EX_HOST == 'isambard3' %}
+            RUN_METHOD =
+            OMP_NUM_THREADS = 1
+        {% endif %}
+        [[[directives]]]
+        {% if EX_HOST == 'isambard3' %}
+            --nodes=1
+            --ntasks=1
+            --cpus-per-task=1
+            --mem=6G
+            --time=00:10:00
+            --partition={{ SHARED_QUEUE }}
+        {% else %}
+            -l select=1:ncpus=1:mem=6GB:tmpsize=6GB
+            -l walltime=00:10:00
+            -q=shared
+        {% endif %}
+
+
+    [[lfric_atm]]
+        inherit = {{ BASE_PLATFORM }}
+        script = "rose task-run --app-key=lfric_atm"
+        execution time limit = PT15M
+        [[[environment]]]
+            TARGET_PLATFORM = meto-ex1a
+            METADATA = $APPS_ROOT_DIR/applications/lfric_atm/metadata
+            BIN_DIR = $OUTPUT_ROOT/bin/lfric_atm
+            TASK_OUTPUT_DIR = $OUTPUT_ROOT/lfric_atm
+            RESOLUTION = C12
+            # Make cray-mpich report its OFI provider + per-rank NIC into job.out, so the
+            # run self-documents that it uses the cxi (Slingshot) interconnect across nodes.
+            MPICH_ENV_DISPLAY = 1
+            MPICH_OFI_NIC_VERBOSE = 2
+        [[[directives]]]
+        {% if EX_HOST == 'isambard3' %}
+            # Multi-node demonstration: 24 model ranks + 1 XIOS server = 25 tasks across
+            # 2 nodes, launched by site/bin/launch-exe (srun --multi-prog, cray-mpich +
+            # Slingshot). --ntasks-per-node=13 forces the block layout to SPLIT the model
+            # across both nodes (ranks 0-12 on node 1, 13-23 on node 2) instead of packing
+            # all 24 model ranks on one node -- so model halo exchange really crosses the
+            # interconnect. Rank 24 (the dedicated XIOS server) lands on node 2 and owns
+            # the parallel-HDF5 one_file write of the native UGRID Mesh2d.
+            --nodes=2
+            --ntasks=25
+            --ntasks-per-node=13
+            # ~230G/Grace node; a rank reads the N320L70 start dump. 64G/node is ample.
+            --mem=64G
+            --partition={{ RUN_QUEUE }}
+        {% else %}
+            -l select=1
+            -q=normal
+        {% endif %}

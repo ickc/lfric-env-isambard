@@ -10,23 +10,35 @@ You do **not** need to know Spack or [pixi](https://pixi.sh) to use this repo.
 The steps below use plain `git`, `module` and `sbatch`. A pixi shortcut is
 offered separately at the end for those who want it.
 
-## The two stages
+## The build, and two tiers of example
+
+One prerequisite build (Stage 1), then examples you run *on* the built env. The
+examples are **siblings**, not later "stages" — each depends only on Stage 1.
 
 ```
 Stage 1  —  BUILD the environment            (run once; heavy; on a compute node)
   pinned sources ─▶ Spack builds everything ─▶ a loadable module under $LFRIC_PREFIX
 
-Stage 2  —  USE the environment              (just `module load`; lightweight)
+Example: minimal-compile  —  USE the env to compile a target   (lightweight)
   module load lfric-env/<variant> ─▶ rose / cylc / psyclone / spack …
-                                   └▶ compile a science suite (examples/lfric-atm/)
+                                   └▶ compile lfric_atm (examples/minimal-compile/)
+
+Example: science-suites   —  RUN a real suite   (cylc on the login node ─▶ Slurm)
+  cylc vip a Rose/Cylc LFRic suite (examples/science-suites/u-*/) on the built env
 ```
 
-- **Stage 1** is the reproducible core of this repo. It needs the repo + a Python
-  in [3.7, 3.12). It produces a self-contained Lmod modulefile under `$LFRIC_PREFIX`.
-- **Stage 2** is everything you do *with* the built environment. It needs only the
-  modulefile — no Spack, no pixi, and the repo can even have moved or been deleted.
-  Compiling the `lfric_atm` example (`examples/lfric-atm/`) is one worked example
-  of Stage 2; adapt it for your own science suite.
+- **Stage 1** is the reproducible core of this repo — the one true prerequisite. It
+  needs the repo + a Python in [3.7, 3.12). It produces a self-contained Lmod
+  modulefile under `$LFRIC_PREFIX`. (We keep the name "Stage 1"; the examples below
+  build on it rather than following it as stages.)
+- **The minimal-compile example** (`examples/minimal-compile/`) is the smallest thing
+  you do *with* the built env: compile the `lfric_atm` target, no science run. It needs
+  only the modulefile — no Spack, no pixi, and the repo can even have moved or been
+  deleted. Adapt it for your own science target.
+- **The science-suite examples** (`examples/science-suites/`) run real Rose/Cylc suites
+  on the built env the way scientists do — `cylc` schedules the suite and submits to
+  Slurm; each suite declares its LFRic source refs in `dependencies.yaml` and compiles
+  its own `lfric_atm` (e.g. `pixi run run-suite u-dr932`, on the default `cray` env).
 
 There are **two dependency variants**, chosen with `LFRIC_STACK`:
 
@@ -35,7 +47,8 @@ There are **two dependency variants**, chosen with `LFRIC_STACK`:
 | `cray` (default) | system **cray-mpich** + Cray parallel HDF5/netCDF | production runs on Isambard |
 | `spack` | **mpich** + HDF5/netCDF **built from source** | portability / CI / comparison |
 
-So there are four things you can build: {Stage 1, Stage 2 example} × {`cray`, `spack`}.
+So there are four things you can build: {the env build (Stage 1), the minimal-compile
+example} × {`cray`, `spack`}.
 
 ## Prerequisites
 
@@ -103,7 +116,7 @@ Concurrency is capped for the login node's process limit (`FETCH_JOBS`, default 
 
 ---
 
-## Stage 2 — use the environment (without pixi)
+## Use the environment — the minimal-compile example (without pixi)
 
 Once Stage 1 has finished, load the environment in any shell — no pixi, no Spack:
 
@@ -146,8 +159,8 @@ A worked example of building a science target on the environment. It needs the
 git submodule update --init --jobs 4 -- \
   vendor/physics/casim vendor/physics/jules vendor/physics/socrates vendor/physics/ukca
 
-sbatch examples/lfric-atm/build.sbatch                                  # cray
-sbatch --export=ALL,LFRIC_STACK=spack examples/lfric-atm/build.sbatch   # spack
+sbatch examples/minimal-compile/build.sbatch                                  # cray
+sbatch --export=ALL,LFRIC_STACK=spack examples/minimal-compile/build.sbatch   # spack
 ```
 
 > Build one variant at a time — both compile in the same lfric_apps working tree,
@@ -155,7 +168,7 @@ sbatch --export=ALL,LFRIC_STACK=spack examples/lfric-atm/build.sbatch   # spack
 > `LFRIC_ATM_OK`.
 
 A successful run ends with `LFRIC_ATM_OK`. See
-[`examples/lfric-atm/README.md`](examples/lfric-atm/README.md) for how to adapt it
+[`examples/minimal-compile/README.md`](examples/minimal-compile/README.md) for how to adapt it
 for your own suite.
 
 ---
@@ -177,9 +190,9 @@ pixi run build              # = scripts/build.sh (cray)   — run on a compute n
 pixi run build-spack        # = scripts/build.sh (spack)
 pixi run activate           # report rose / cylc / psyclone versions
 
-# Stage 2:
+# minimal-compile example:
 pixi run init-physics       # = the physics `git submodule update` above
-pixi run build-lfric-atm    # = examples/lfric-atm/build.sh
+pixi run build-lfric-atm    # = examples/minimal-compile/build.sh
 pixi run setup-cylc         # = scripts/setup-cylc.sh
 ```
 
@@ -205,10 +218,10 @@ to see/change exactly where things go.
 | `LFRIC_PREFIX` | `$PROJECTDIR/$USER/opt/<arch>` | **Persistent** install location: the Spack install tree, the per-variant environment + view, the modulefiles and caches. Outside the repo; shared by both variants. |
 | `LFRIC_WORKING_DIR` | `$LFRIC_PREFIX/stage` | **Transient** Spack build/compile scratch. On a compute node the sbatch points this at node‑local NVMe (`$LOCALDIR/…`) so the build stays off the shared Lustre. Safe to delete anytime. |
 | `SPACK_JOBS` | `$SLURM_CPUS_PER_TASK` | Parallel build jobs (Stage 1). |
-| `MAKE_JOBS` | `$SLURM_CPUS_PER_TASK` | Parallel make jobs (Stage 2 example). |
+| `MAKE_JOBS` | `$SLURM_CPUS_PER_TASK` | Parallel make jobs (minimal-compile example). |
 | `FETCH_JOBS` | `4` | Concurrency cap for the optional login-node pre-fetch (`scripts/fetch.sh`); kept small for the login node's process limit. |
 
-`LFRIC_PREFIX` is what makes Stage 2 repo-independent: the build records absolute
+`LFRIC_PREFIX` is what makes the minimal-compile example repo-independent: the build records absolute
 paths into it, so once built you can move or delete the repo and `module load`
 still works.
 
@@ -242,6 +255,8 @@ generally cleared with the node; delete it directly if you want it gone sooner.
 
 - [`MAINTAINER.md`](MAINTAINER.md) — how it works inside, and how to maintain it
   (variants, patches, bumping pinned versions, the modulefile, tuning).
-- [`examples/lfric-atm/README.md`](examples/lfric-atm/README.md) — the Stage-2
-  example and how to adapt it.
+- [`examples/minimal-compile/README.md`](examples/minimal-compile/README.md) — the
+  minimal-compile example and how to adapt it.
+- [`examples/science-suites/README.md`](examples/science-suites/README.md) — the
+  science-suite examples: running real Rose/Cylc LFRic suites on the built env.
 - [`CLAUDE.md`](CLAUDE.md) — orientation for AI coding agents working in this repo.

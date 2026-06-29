@@ -39,7 +39,7 @@ view="$SPACK_ENV_DIR/.spack-env/view"
 [ -f "$logic" ] || die "missing modulefile logic: $logic"
 # Snapshot the committed logic next to the generated modulefiles, under PREFIX,
 # and have the modulefile loadfile() THAT copy — not the in-repo original — so
-# `module load` stays self-contained: Stage 2 must not depend on the repo path
+# `module load` stays self-contained: the examples must not depend on the repo path
 # (it may have moved/been deleted since the build). Byte-identical to the tracked
 # scripts/lfric-env.lua, refreshed every build.
 installed_logic="$MODULEFILES_DIR/lfric-env.lua"
@@ -108,7 +108,7 @@ local data = {
   variant         = $(lua_q  "$LFRIC_STACK"),
   repo_root       = $(lua_q  "$REPO_ROOT"),
   -- Absolute paths to the (relocated, under-PREFIX) Spack env + its view, so the
-  -- modulefile does not derive them from repo_root: Stage 2 stays repo-independent.
+  -- modulefile does not derive them from repo_root: the examples stay repo-independent.
   spack_env       = $(lua_q  "$SPACK_ENV_DIR"),
   view            = $(lua_q  "$SPACK_ENV_DIR/.spack-env/view"),
   shumlib         = $(lua_qn "$shumlib_prefix"),

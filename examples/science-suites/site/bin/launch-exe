@@ -1,0 +1,41 @@
+#!/bin/bash
+# Isambard 3 launcher for the science-suite examples (drop-in for the MO meto
+# rose-stem launch-exe; the suite's [command] runs "$LAUNCH_SCRIPT/launch-exe").
+#
+# WHY THIS EXISTS. On Isambard 3 (Cray EX / Slingshot) the model must be launched
+# with srun so it uses cray-mpich + the cxi (Slingshot) OFI provider over the
+# interconnect, and so it scales across nodes. The MO meto launch-exe only wires up
+# the dedicated-XIOS-server MPMD under RUN_METHOD=mpiexec (Hydra colon syntax); its
+# srun path emits a plain `srun <exe>` with no server. Hydra/mpiexec here would use
+# the from-source (spack) mpich over a libfabric without cxi (TCP only) and does not
+# launch cleanly multi-node. So for srun we launch the XIOS server alongside the model
+# with `srun --multi-prog`, which puts client + server in a SINGLE MPI_COMM_WORLD
+# (what XIOS requires) within one job step.
+#
+# Honours the same env the suite already sets:
+#   BIN_DIR, EXEC_NAME, EXTRA_NAMELIST_FILES (default configuration.nml),
+#   XIOS_SERVER_MODE (True/False), TOTAL_RANKS (model ranks), XIOS_SERVER_RANKS.
+# Requires xios_server.exe on PATH (the activated Spack view provides it).
+set -eu
+
+EXEC="${BIN_DIR:?BIN_DIR unset}/${EXEC_NAME:?EXEC_NAME unset}"
+NAMELIST="${EXTRA_NAMELIST_FILES:-configuration.nml}"
+
+if [ "${XIOS_SERVER_MODE:-False}" = "True" ]; then
+  M="${TOTAL_RANKS:?TOTAL_RANKS unset}"        # model (client) ranks
+  S="${XIOS_SERVER_RANKS:?XIOS_SERVER_RANKS unset}"  # dedicated XIOS server ranks
+  XIOS_EXEC="$(command -v xios_server.exe)" \
+    || { echo "launch-exe: xios_server.exe not on PATH" >&2; exit 1; }
+  total=$((M + S))
+  conf="$(pwd)/lfric_xios_mpmd.conf"
+  {
+    printf '%d-%d %s %s\n' 0 "$((M - 1))" "$EXEC" "$NAMELIST"
+    printf '%d-%d %s\n'   "$M" "$((total - 1))" "$XIOS_EXEC"
+  } > "$conf"
+  echo "launch-exe: srun --ntasks=$total --multi-prog $conf  (model=$M xios_server=$S)"
+  cat "$conf"
+  exec srun --ntasks="$total" --multi-prog "$conf"
+else
+  echo "launch-exe: srun $EXEC $NAMELIST  (XIOS attached, no dedicated server)"
+  exec srun "$EXEC" "$NAMELIST"
+fi
