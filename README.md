@@ -20,7 +20,7 @@ Stage 1  —  BUILD the environment            (run once; heavy; on a compute no
   pinned sources ─▶ Spack builds everything ─▶ a loadable module under $LFRIC_PREFIX
 
 Example: minimal-compile  —  USE the env to compile a target   (lightweight)
-  module load lfric-env/<variant> ─▶ rose / cylc / psyclone / spack …
+  module load lfric-env/<version>/<variant> ─▶ rose / cylc / psyclone / spack …
                                    └▶ compile lfric_atm (examples/minimal-compile/)
 
 Example: science-suites   —  RUN a real suite   (cylc on the login node ─▶ Slurm)
@@ -88,9 +88,11 @@ The job writes its log to `logs/build-<jobid>.out`; a successful run ends with
 (Spack skips already-built packages). The two variants **share one install tree**,
 so building the second one only rebuilds the MPI-dependent part.
 
-Everything installs under **`$LFRIC_PREFIX`** (default
-`$PROJECTDIR/$USER/opt/Linux-aarch64`), which is **outside the repo** — see
-[Configuration](#configuration).
+Everything installs under a **versioned** prefix `$LFRIC_PREFIX/<version>` (default
+base `$PROJECTDIR/$USER/opt/Linux-aarch64`, version read from the repo's `VERSION`
+file, e.g. `v2026.06.30`), which is **outside the repo** — see
+[Configuration](#configuration). The version keeps independent builds in distinct
+trees, so a rebuild never silently overwrites an environment others are loading.
 
 > **Why a compute node?** The login nodes cap the number of processes per user, so
 > a full parallel build fails there with `fork: Resource temporarily unavailable`.
@@ -109,7 +111,7 @@ LFRIC_STACK=spack bash scripts/fetch.sh        # spack variant
 ```
 
 This clones any missing Stage-1 submodules, concretizes the variant, then
-downloads every source into the cache under `$LFRIC_PREFIX`. The subsequent
+downloads every source into the shared cache under `$LFRIC_PREFIX`. The subsequent
 `sbatch` build reuses that cache and fetches nothing. Like the build, it needs a
 Python in [3.7, 3.12) (`module load cray-python/3.11.7`, or use `pixi run fetch`).
 Concurrency is capped for the login node's process limit (`FETCH_JOBS`, default 4).
@@ -121,15 +123,18 @@ Concurrency is capped for the login node's process limit (`FETCH_JOBS`, default 
 Once Stage 1 has finished, load the environment in any shell — no pixi, no Spack:
 
 ```bash
-# Point at the prefix you built into (the default is shown):
+# Point at the base you built into (the default is shown):
 export LFRIC_PREFIX="$PROJECTDIR/$USER/opt/$(uname -sm | tr ' ' -)"
 
 module use "$LFRIC_PREFIX/modulefiles"
-module load lfric-env/cray          # or: module load lfric-env/spack
+module avail lfric-env              # list every built version × variant
+module load lfric-env/v2026.06.30/cray     # or: .../v2026.06.30/spack
 rose --version; cylc --version; psyclone --version
 ```
 
-Expected (exact versions track the pinned sources):
+The modulefiles live in ONE shared tree (`$LFRIC_PREFIX/modulefiles`) keyed by
+`lfric-env/<version>/<variant>`, so `module avail lfric-env` shows every build —
+pick the version you want. Expected (exact versions track the pinned sources):
 
 ```
 rose 2.4.2
@@ -138,8 +143,9 @@ PSyclone version: 3.2.2
 ```
 
 The modulefile carries absolute paths, so this keeps working even if the repo
-moves or is deleted. Loading one variant swaps out the other; bare
-`module load lfric-env` resolves to the default (`cray`).
+moves or is deleted. Loading one variant/version swaps out the other; bare
+`module load lfric-env` resolves to the most-recently-built version's `cray`, and
+`module load lfric-env/<version>` to that version's `cray`.
 
 ### Optional: configure cylc (only if you will run rose/cylc suites)
 
@@ -215,23 +221,28 @@ to see/change exactly where things go.
 | Variable | Default | What it controls |
 |----------|---------|------------------|
 | `LFRIC_STACK` | `cray` | Dependency variant: `cray` or `spack`. |
-| `LFRIC_PREFIX` | `$PROJECTDIR/$USER/opt/<arch>` | **Persistent** install location: the Spack install tree, the per-variant environment + view, the modulefiles and caches. Outside the repo; shared by both variants. |
-| `LFRIC_WORKING_DIR` | `$LFRIC_PREFIX/stage` | **Transient** Spack build/compile scratch. On a compute node the sbatch points this at node‑local NVMe (`$LOCALDIR/…`) so the build stays off the shared Lustre. Safe to delete anytime. |
+| `LFRIC_ENV_VERSION` | contents of `./VERSION` (e.g. `v2026.06.30`) | **Environment version** (CalVer). Selects the versioned install prefix `$LFRIC_PREFIX/<version>` and the module name `lfric-env/<version>/<variant>`. Read from the committed `VERSION` file; bump it with `bash scripts/bump-env-version.sh` (`pixi run bump-env-version`). Distinct from any LFRic apps/core version. |
+| `LFRIC_PREFIX` | `$PROJECTDIR/$USER/opt/<arch>` | **Base** install location (the per-arch container, shared across versions). The actual install goes into the **versioned** prefix `$LFRIC_PREFIX/$LFRIC_ENV_VERSION`: the Spack install tree, the per-variant environment + view. The shared modulefiles tree (`$LFRIC_PREFIX/modulefiles`) and the source/misc download caches sit at this base and are version-independent. Outside the repo. |
+| `LFRIC_WORKING_DIR` | `$LFRIC_PREFIX/<version>/stage` | **Transient** Spack build/compile scratch. On a compute node the sbatch points this at node‑local NVMe (`$LOCALDIR/…`) so the build stays off the shared Lustre. Safe to delete anytime. |
 | `SPACK_JOBS` | `$SLURM_CPUS_PER_TASK` | Parallel build jobs (Stage 1). |
 | `MAKE_JOBS` | `$SLURM_CPUS_PER_TASK` | Parallel make jobs (minimal-compile example). |
 | `FETCH_JOBS` | `4` | Concurrency cap for the optional login-node pre-fetch (`scripts/fetch.sh`); kept small for the login node's process limit. |
 
-`LFRIC_PREFIX` is what makes the minimal-compile example repo-independent: the build records absolute
+The versioned prefix is what makes the minimal-compile example repo-independent: the build records absolute
 paths into it, so once built you can move or delete the repo and `module load`
-still works.
+still works. To publish a rebuilt environment without disturbing the one already in
+use, `pixi run bump-env-version` (or `bash scripts/bump-env-version.sh`), commit
+`VERSION`, then rebuild — the new build lands in a fresh `$LFRIC_PREFIX/<version>`
+and shows up alongside the old one in `module avail lfric-env`.
 
 ## Cleaning up
 
-There is no clean task — removal is a plain `rm`. To remove **all** build output,
-delete your prefix:
+There is no clean task — removal is a plain `rm`. To remove **one** built version,
+delete its versioned prefix; to remove **all** versions, delete the base:
 
 ```bash
-rm -rf "$LFRIC_PREFIX"          # the whole install (tree, env, view, modulefiles, caches)
+rm -rf "$LFRIC_PREFIX/$(cat VERSION)"   # just this version's install tree + env
+rm -rf "$LFRIC_PREFIX"                  # ALL versions + the shared modulefiles/caches
 ```
 
 The transient stage (`$LFRIC_WORKING_DIR`, on node-local disk) is disposable and

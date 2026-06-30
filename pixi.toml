@@ -56,6 +56,12 @@ patch = "bash scripts/patch-all.sh"
 # Revert all patches by resetting the patched submodules to their pinned commit.
 unpatch = "bash scripts/unpatch.sh"
 
+# Bump the ENVIRONMENT version (CalVer in ./VERSION) so the next build lands in a
+# fresh, distinct prefix ($BASE/<version>) + module (lfric-env/<version>/<variant>)
+# instead of overwriting the current install. No arg -> today's date; or pass an
+# explicit version. Commit ./VERSION afterwards. See scripts/bump-env-version.sh.
+bump-env-version = "bash scripts/bump-env-version.sh"
+
 # Build the Spack environment — the bulk of the work (~2-4 h from scratch;
 # re-runs are incremental). Run it on a compute node (see scripts/build.sbatch).
 # Applies patches first, then concretizes and installs into PREFIX.

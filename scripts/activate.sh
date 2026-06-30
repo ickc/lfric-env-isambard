@@ -8,7 +8,7 @@
 # Deliberately a NO-OP until the environment is built: `module load` of a
 # not-yet-generated modulefile just fails quietly. End users without pixi do not
 # need this script at all — they activate the same environment directly with:
-#   module use "$PREFIX/modulefiles" && module load lfric-env/<variant>
+#   module use "$BASE/modulefiles" && module load lfric-env/<version>/<variant>
 #
 # We do NOT source spack's setup-env.sh (its exported shell functions error
 # noisily when pixi runs a command under /bin/sh); Lmod's `module` function is
@@ -25,9 +25,11 @@ if ! command -v module >/dev/null 2>&1; then
   done
 fi
 
-# Load the variant selected by LFRIC_STACK (default cray). Quiet in this
-# auto-activation path (mirrors the old silent snippet source); `pixi run
-# activate` / build.sh surface any real problems loudly.
+# Load the version+variant selected by common.sh (MODULE_NAME =
+# lfric-env/$LFRIC_ENV_VERSION/$LFRIC_STACK; default version from ./VERSION,
+# default variant cray). Quiet in this auto-activation path (mirrors the old
+# silent snippet source); `pixi run activate` / build.sh surface any real problems
+# loudly. Fall back to the legacy unversioned name if MODULE_NAME is unset.
 if command -v module >/dev/null 2>&1; then
-  module load "lfric-env/${LFRIC_STACK:-cray}" 2>/dev/null || true
+  module load "${MODULE_NAME:-lfric-env/${LFRIC_STACK:-cray}}" 2>/dev/null || true
 fi

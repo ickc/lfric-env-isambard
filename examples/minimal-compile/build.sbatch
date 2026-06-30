@@ -21,13 +21,16 @@ cd "${SLURM_SUBMIT_DIR:-$(pwd)}" || exit 1
 
 # ---- Configuration --------------------------------------------------------
 export LFRIC_STACK="${LFRIC_STACK:-cray}"                 # cray | spack (must be built)
-# The prefix Stage 1 installed into (where the modulefile + view live):
+# BASE that Stage 1 installed into; the env it loads is the VERSIONED prefix
+# $LFRIC_PREFIX/$LFRIC_ENV_VERSION (LFRIC_ENV_VERSION read from ./VERSION). It MUST
+# match the version Stage 1 built — both default to ./VERSION, so they agree.
 export LFRIC_PREFIX="${LFRIC_PREFIX:-$PROJECTDIR/$USER/opt/$(uname -sm | tr ' ' -)}"
 export MAKE_JOBS="${MAKE_JOBS:-${SLURM_CPUS_PER_TASK:-24}}"
 # ---------------------------------------------------------------------------
 
 echo "host=$(hostname) jobid=${SLURM_JOB_ID:-?} cpus=${SLURM_CPUS_PER_TASK:-?} LFRIC_STACK=$LFRIC_STACK MAKE_JOBS=$MAKE_JOBS"
-echo "  LFRIC_PREFIX=$LFRIC_PREFIX"
+echo "  LFRIC_ENV_VERSION=${LFRIC_ENV_VERSION:-$(cat VERSION 2>/dev/null || echo '?')}  (env -> \$LFRIC_PREFIX/<version>)"
+echo "  LFRIC_PREFIX(base)=$LFRIC_PREFIX"
 
 bash examples/minimal-compile/build.sh
 
