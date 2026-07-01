@@ -5,37 +5,38 @@
 # then applies the LFRic-source patch stack. A ref must be present in the mirror.
 #
 # ⚠️  u-dt000 IS BLOCKED — its science `theta_forcing='ice_giants_obs_like'` is in
-# NEITHER the env's vendored vn3.1.1 NOR mainline `lfric_apps@vn2.2` (both verified
-# by extraction); it needs an unidentified upstream fork the suite never references
-# (see README.md). The refs below are therefore the env's vn3.1.1-era commits (same
-# as u-dn704/u-dr932): with them the suite extracts + builds the vn3.1.1 binary and
-# aborts at the model on the missing forcing — the documented blocker. To actually
-# run dt000's science: (1) locate the ice-giant fork (Exeter RSE), (2) stage it in
-# the mirror (`git -C vendor/lfric_apps remote add <fork> <url> && git fetch <fork>`),
+# NEITHER the mainline LFRic releases (2026.03.2 here — an ancestor of the vn3.1.1
+# tree previously verified absent — NOR `lfric_apps@vn2.2`); it needs an unidentified
+# upstream fork the suite never references (see README.md). The refs below are
+# therefore the standard `2026.03.2` release baseline (same as u-dn704/u-dr932):
+# with them the suite extracts + builds the 2026.03.2 binary and aborts at the model
+# on the missing forcing — the documented blocker. To actually run dt000's science:
+# (1) locate the ice-giant fork (Exeter RSE), (2) stage it in the mirror
+# (`git -C vendor/lfric_apps remote add <fork> <url> && git fetch <fork>`),
 # (3) point lfric_apps (and any deps) at that ref here. NB also: mainline vn2.2's
 # `jules@apps2.2` is NOT in the local mirror, so a literal vn2.2 build would need
 # jules staged first too.
 
 lfric_apps:
     source: git@github.com:MetOffice/lfric_apps.git
-    ref: b5aee0b18a071c5b501ecf8a219edff1b1b73e9c   # vn3.1.1-88-gb5aee0b1
+    ref: 2026.03.2
 
 lfric_core:
     source: git@github.com:MetOffice/lfric_core.git
-    ref: bf236737858c4ed29957124a2f64fd0e4f4fd7be   # 2026.03.2-38-gbf2367378
+    ref: 2026.03.2
 
 casim:
     source: git@github.com:MetOffice/casim.git
-    ref: b0a6e38f2a08e663dbbf8fc912337ac022287b20   # 2026.03.2
+    ref: 2026.03.2
 
 jules:
     source: git@github.com:MetOffice/jules.git
-    ref: 3647a42962613d1f50d02d7660c86dece056f87c   # 2026.03.1-13-g3647a42
+    ref: 2026.03.2
 
 socrates:
     source: git@github.com:MetOffice/socrates.git
-    ref: fb97f50a7fb4331d1d27481ab3b6e787bc3a21ca   # 2026.03.2
+    ref: 2026.03.2
 
 ukca:
     source: git@github.com:MetOffice/ukca.git
-    ref: 1cdb9c26d286260d670a8c7b0c8af685ae3c95ac   # 2026.03.2-5-g1cdb9c2
+    ref: 2026.03.2
