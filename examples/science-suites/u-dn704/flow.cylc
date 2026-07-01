@@ -35,6 +35,21 @@
 
 [runtime]
     [[root]]
+        # Re-activate our built env in init-script — for EVERY task. Cylc runs each
+        # job under a login shell (`bash -l`), which resets Lmod to the system
+        # defaults and PURGES the lfric-env module the scheduler had loaded (so the
+        # inherited view/bin is dropped: `cylc`/`rose: command not found`, exit 127).
+        # init-script runs BEFORE cylc's first `cylc message` ('started') AND before
+        # env-script's `rose task-env`, so rose/cylc are on PATH for the whole job and
+        # ROSE_SUITE_DIR gets set (the ISAMBARD3 pre-script references it under
+        # `set -u`). The family pre-scripts source ACTIVATE_ENV too, but that is too
+        # late for the 'started' message; this is the authoritative activation.
+        init-script = """
+                        activate_env="{{ ACTIVATE_ENV }}"
+                        if [ -n "$activate_env" ] && [ -f "$activate_env" ]; then
+                          source "$activate_env"
+                        fi
+                        """
         script = "rose task-run --verbose"
         [[[events]]]
             submission timeout = PT3H # 12 hours

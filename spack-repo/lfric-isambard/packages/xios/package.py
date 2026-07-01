@@ -15,8 +15,10 @@ class Xios(Package):
     homepage = "https://gitlab.in2p3.fr/ipsl/projets/xios-projects/xios"
     git = "https://gitlab.in2p3.fr/ipsl/projets/xios-projects/xios.git"
 
-    # Former SVN revision 2252, pinned to the migrated Git history.
-    version("2252", commit="26cc7d88e4f3fa1960461b377d9b8c82550a180e")
+    # Former SVN revision 2701 (what LFRic wants; matches MetOffice mo-spack-packages
+    # xios@2.2701), pinned to the migrated Git history. Commit "Fix for recent
+    # compilers" on the XIOS2 branch.
+    version("2701", commit="2eb572f0986eca19031eb6c294d116646010687c")
 
     variant(
         "mode",
@@ -25,9 +27,12 @@ class Xios(Package):
         description="Build for debugging, development or production",
     )
 
-    # XIOS revision 2252 assumes transitive STL headers that newer GCC/libstdc++
-    # no longer expose consistently during the remap build.
-    patch("gcc12_remap_standard_headers.patch", when="@2252")
+    # r2701 already restores most of the STL includes the older r2252 lacked
+    # (its own "Fix for recent compilers"), but earcut.hpp still comments out
+    # <tuple> and <cstddef> while using std::tuple_element/std::get and
+    # std::size_t — which newer GCC/libstdc++ no longer expose transitively.
+    # Uncomment them so the remap translation unit compiles.
+    patch("gcc_remap_standard_headers.patch", when="@2701")
 
     depends_on("c", type="build")
     depends_on("cxx", type="build")  # XIOS is heavily C++; Spack 1.x needs this declared

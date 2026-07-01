@@ -289,20 +289,28 @@ sources, in priority order:
 Where *we* encode the pins:
 
 - **`spack-repo/lfric-isambard/packages/lfric-apps-isambard/package.py`** — the
-  Spack-drawn pins: `py-psyclone@3.2.2`, `python@3.12`, `xios@2252`,
+  Spack-drawn pins: `py-psyclone@3.2.2`, `python@3.12`, `xios@2701`,
   `py-setuptools@:79`, etc.
 - **`spack-repo/lfric-isambard/packages/xios/package.py`** — the XIOS revision +
   its build patch.
 
-**`xios@2252` is special — read this before bumping it.** It is **not** what
-current LFRic wants: the core docs and the MetO CI configs use **XIOS2 r2701**, and
-`mo-spack-packages` already ships `xios@3.0.4.0`. `2252` is an *Isambard
-build-pragmatic* choice carried since the initial commit — the old SVN r2252 mapped
-to git `26cc7d88`, with our `gcc12_remap_standard_headers.patch` (`when @2252`) to
-make that vintage compile against modern libstdc++. So bumping XIOS means: (a) add
-the new revision/commit to `xios/package.py`, (b) check whether the gcc-headers
-patch still applies / is still needed, (c) confirm lfric links against it. Treat
-XIOS as the **highest-risk single bump** in the stack.
+**`xios@2701` — read this before bumping it.** r2701 is what current LFRic wants
+(the core docs and the MetO CI configs use **XIOS2 r2701**, and `mo-spack-packages`
+ships `xios@2.2701` at the same commit); `mo-spack-packages` also ships
+`xios@3.0.4.0` if a future move to XIOS 3 is wanted. We build r2701 from the migrated
+Git history: former SVN r2701 maps to git `2eb572f0` on the `XIOS2` branch (commit
+"Fix for recent compilers"). That commit already restores most STL includes the
+older r2252 lacked, but earcut.hpp *still* comments out `<tuple>`/`<cstddef>` while
+using `std::tuple_element`/`std::get`/`std::size_t`, which newer GCC/libstdc++ no
+longer expose transitively — so we keep a minimal `gcc_remap_standard_headers.patch`
+(`when @2701`) that just uncomments them (meshutil.cpp already `#include`s `<array>`
+at r2701, so no meshutil hunk). Historical note: the previous pin was r2252 (git
+`26cc7d88`, patched by `gcc12_remap_standard_headers.patch`), an *Isambard
+build-pragmatic* choice carried from the upstream UniExeterRSE Isambard env. So
+bumping XIOS again means: (a) add the new revision/commit to `xios/package.py`, (b)
+check whether the header patch still applies / is still needed (regenerate it from
+the pinned checkout — the earcut.hpp context drifts between revisions), (c) confirm
+lfric links against it. Treat XIOS as the **highest-risk single bump** in the stack.
 
 Pinned commits at time of writing (snapshot — `git submodule status` is authoritative):
 
