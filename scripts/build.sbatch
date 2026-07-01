@@ -24,7 +24,9 @@ cd "${SLURM_SUBMIT_DIR:-$(pwd)}" || exit 1
 
 # ---- Configuration: everything this build needs, set explicitly -----------
 export LFRIC_STACK="${LFRIC_STACK:-cray}"                 # cray | spack
-# Persistent install (shared by both variants); on Lustre, survives the job:
+# BASE: the per-arch container, shared across env versions (Lustre; survives the
+# job). common.sh installs into the VERSIONED prefix $LFRIC_PREFIX/$LFRIC_ENV_VERSION,
+# where LFRIC_ENV_VERSION is read from ./VERSION. Set LFRIC_ENV_VERSION to override.
 export LFRIC_PREFIX="${LFRIC_PREFIX:-$PROJECTDIR/$USER/opt/$(uname -sm | tr ' ' -)}"
 # Transient Spack build stage; node-local NVMe (fast, off the contended Lustre).
 # $LOCALDIR is Isambard's per-node local disk; edit if your system differs.
@@ -33,7 +35,8 @@ export SPACK_JOBS="${SPACK_JOBS:-${SLURM_CPUS_PER_TASK:-24}}"
 # ---------------------------------------------------------------------------
 
 echo "host=$(hostname) jobid=${SLURM_JOB_ID:-?} cpus=${SLURM_CPUS_PER_TASK:-?} LFRIC_STACK=$LFRIC_STACK"
-echo "  LFRIC_PREFIX=$LFRIC_PREFIX"
+echo "  LFRIC_ENV_VERSION=${LFRIC_ENV_VERSION:-$(cat VERSION 2>/dev/null || echo '?')}  (install -> \$LFRIC_PREFIX/<version>)"
+echo "  LFRIC_PREFIX(base)=$LFRIC_PREFIX"
 echo "  LFRIC_WORKING_DIR=$LFRIC_WORKING_DIR"
 
 # Spack 1.0 needs Python in [3.7,3.12); Isambard ships cray-python. (build.sh

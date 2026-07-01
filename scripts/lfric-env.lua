@@ -41,6 +41,21 @@ for _, p in ipairs(d.pythonpath) do
   prepend_path("PYTHONPATH", p)
 end
 
+-- Both cylc and rose deliberately STRIP every PYTHONPATH item from sys.path at
+-- entry (cylc-flow #5124: `pythonpath_manip()`), to stop PYTHONPATH contaminating
+-- their environment. That drops the view site-packages we just added, which breaks
+-- them in two ways: `cylc` fails to import its deps (`ModuleNotFoundError:
+-- ansimarkup`), and `rose` loses its `rose.commands` entry points so subcommands
+-- vanish (`No such command: rose task-run` — fatal to the science suites, whose
+-- tasks run `rose task-run`). Each re-adds its OWN pythonpath var (CYLC_PYTHONPATH /
+-- ROSE_PYTHONPATH) *before* the strip, and the strip removes only one occurrence —
+-- so mirroring the view site-packages into both leaves them on sys.path. Harmless
+-- to other tools (they ignore these vars).
+for _, p in ipairs(d.pythonpath) do
+  prepend_path("CYLC_PYTHONPATH", p)
+  prepend_path("ROSE_PYTHONPATH", p)
+end
+
 if d.shumlib then
   setenv("SHUMLIB_ROOT", d.shumlib)
 end

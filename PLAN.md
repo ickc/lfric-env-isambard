@@ -79,7 +79,7 @@ the forcing lives in a **fork the suite never references**.
    that ref. If the fork is a *branch on top of a tag*, see follow-up 2.
 4. Run u-dt000; iterate the run task on any remaining vn-schema gaps (methodology above).
 5. If the fork needs a different PSyclone/XIOS than the env pins (`py-psyclone@3.2.2`,
-   `xios@2252`) → it's an L2 case needing a second env; flag to maintainer before building.
+   `xios@2701`) → it's an L2 case needing a second env; flag to maintainer before building.
 
 **Done when:** u-dt000 runs end-to-end with its real ice-giant forcing, **or** the fork is
 confirmed unavailable/inaccessible (documented in PR #8 with whom was asked).

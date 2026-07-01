@@ -18,7 +18,7 @@ class LfricAppsIsambard(Package):
     depends_on("netcdf-c+mpi~dap")
     depends_on("netcdf-fortran")
     depends_on("yaxt")
-    depends_on("xios@2252")
+    depends_on("xios@2701")
     depends_on("pfunit+mpi")
     depends_on("shumlib")
     depends_on("blitz")

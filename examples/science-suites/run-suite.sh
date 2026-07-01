@@ -55,11 +55,17 @@ bash "$REPO_ROOT/scripts/setup-cylc.sh" || die "setup-cylc.sh failed"
 #    builds from $REPO_ROOT/vendor/* (the patched submodules), exports LFRIC_STACK/
 #    LFRIC_PREFIX into the task env, and the ISAMBARD3 pre-script sources
 #    ACTIVATE_ENV. The scheduler daemonises; watch with `cylc tui $SUITE`.
+# NB: pass LFRIC_PREFIX=$BASE (the per-arch, UNVERSIONED base), NOT $PREFIX.
+# common.sh treats LFRIC_PREFIX as the base and appends $LFRIC_ENV_VERSION itself
+# (same contract as the sbatch scripts). Passing $PREFIX double-versions the path
+# ($BASE/<ver>/<ver>), so activate-env.sh can't find the view and drops its
+# -I<view>/include from FFLAGS — which makes the suite build depend on a racy
+# copy of external .mod files (intermittent `Cannot open module file 'xios.mod'`).
 info "cylc vip $SUITE_DIR --workflow-name $SUITE"
 exec cylc vip "$SUITE_DIR" \
   --workflow-name "$SUITE" \
   -S "REPO_ROOT='$REPO_ROOT'" \
   -S "LFRIC_STACK='$LFRIC_STACK'" \
-  -S "LFRIC_PREFIX='$PREFIX'" \
+  -S "LFRIC_PREFIX='$BASE'" \
   -S "ACTIVATE_ENV='$SITE/activate-env.sh'" \
   "$@"
