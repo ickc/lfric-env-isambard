@@ -19,9 +19,13 @@ repo_root="$(cd -- "$_here/.." && pwd)"
 version_file="$repo_root/VERSION"
 
 new="${1:-v$(date +%Y.%m.%d)}"
-# Basic sanity: a single non-empty, whitespace-free token.
+# Basic sanity: a single non-empty token that is safe to embed in paths. The
+# version forms install/module directory paths ($BASE/<version>,
+# modulefiles/.../<version>), so reject whitespace and any path separator or
+# traversal ('/', '\', '..').
 case "$new" in
   ''|*[[:space:]]*) echo "ERROR: invalid version '$new' (want a single token, e.g. v2026.07.01)" >&2; exit 1 ;;
+  */*|*\\*|*..*)    echo "ERROR: invalid version '$new' (no '/', '\\' or '..' — it forms install/module paths)" >&2; exit 1 ;;
 esac
 
 old="$(tr -d '[:space:]' < "$version_file" 2>/dev/null || true)"

@@ -36,6 +36,16 @@ if [ -z "${LFRIC_ENV_VERSION:-}" ]; then
   fi
   LFRIC_ENV_VERSION="${LFRIC_ENV_VERSION:-unversioned}"
 fi
+# The version is embedded verbatim in install + modulefile paths ($BASE/<version>,
+# $BASE/modulefiles/lfric-env/<version>/...). It is maintainer-controlled (committed
+# ./VERSION, written by the validated bump-env-version.sh, or a deliberate override),
+# but fail fast on a value that would escape or mangle those paths rather than create
+# them silently — no path separator ('/', '\'), traversal ('..') or whitespace.
+case "$LFRIC_ENV_VERSION" in
+  *[/\\]*|*..*|*[[:space:]]*)
+    echo "ERROR: invalid LFRIC_ENV_VERSION '$LFRIC_ENV_VERSION' (no '/', '\\', '..' or whitespace — it forms install/module paths)" >&2
+    return 1 2>/dev/null || exit 1 ;;
+esac
 export LFRIC_ENV_VERSION
 
 # --- Build locations (the knobs that matter) -------------------------------
