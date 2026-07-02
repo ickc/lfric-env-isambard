@@ -61,11 +61,17 @@ bash "$REPO_ROOT/scripts/setup-cylc.sh" || die "setup-cylc.sh failed"
 # ($BASE/<ver>/<ver>), so activate-env.sh can't find the view and drops its
 # -I<view>/include from FFLAGS — which makes the suite build depend on a racy
 # copy of external .mod files (intermittent `Cannot open module file 'xios.mod'`).
+# Pin the ENV VERSION into the workflow too: we validated the modulefile for THIS
+# version (above), so the tasks must load the same one. Otherwise each task re-sources
+# common.sh with no LFRIC_ENV_VERSION and reads the live ./VERSION — which can drift
+# (an LFRIC_ENV_VERSION override at launch, or a VERSION bump while a long suite runs)
+# and load a different lfric-env/<version>/<variant> than was launched.
 info "cylc vip $SUITE_DIR --workflow-name $SUITE"
 exec cylc vip "$SUITE_DIR" \
   --workflow-name "$SUITE" \
   -S "REPO_ROOT='$REPO_ROOT'" \
   -S "LFRIC_STACK='$LFRIC_STACK'" \
   -S "LFRIC_PREFIX='$BASE'" \
+  -S "LFRIC_ENV_VERSION='$LFRIC_ENV_VERSION'" \
   -S "ACTIVATE_ENV='$SITE/activate-env.sh'" \
   "$@"
