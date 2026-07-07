@@ -18,7 +18,7 @@ concretizer:
   unify: when_possible
 # Repo paths are resolved relative to this file. Order matters: the first repo
 # that defines a package wins.
-#   - lfric: the local LFRic bundle + Isambard xios@2252 + foxml.
+#   - lfric: the local LFRic bundle + Isambard xios@2701 + foxml.
 #   - metoffice: MetOffice/mo-spack-packages (Spack 1.0 native, namespace
 #     "metoffice", api v2.0). Provides the MO-maintained mpich/hdf5/netcdf/yaxt/
 #     shumlib/pfunit/blitz and build tools (py-psyclone 3.2.2, py-fparser,

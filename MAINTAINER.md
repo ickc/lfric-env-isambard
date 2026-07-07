@@ -53,21 +53,37 @@ logs/                   # sbatch stdout (.gitkeep tracked; *.out ignored)
 $LFRIC_PREFIX/          # OUTSIDE the repo — all build output (see below)
 ```
 
-## Build locations: `PREFIX` vs `WORKING_DIR`
+## Build locations: `BASE` / `PREFIX` / `WORKING_DIR` (and the env version)
 
-Two explicit locations, set in `scripts/common.sh` and overridden by the sbatch
-config blocks. No auto-probing — the previous build-stage filesystem probe was
-removed in favour of the sbatch setting `LFRIC_WORKING_DIR` explicitly.
+Locations are set in `scripts/common.sh` and overridden by the sbatch config
+blocks. No auto-probing — the previous build-stage filesystem probe was removed in
+favour of the sbatch setting `LFRIC_WORKING_DIR` explicitly.
 
-- **`PREFIX`** (`LFRIC_PREFIX`, default `$PROJECTDIR/$USER/opt/<sysname>-<machine>`):
-  the **persistent** install — Spack install tree (`$PREFIX/opt`), the per-variant
-  directory environment + its view (`$PREFIX/spack-env/<variant>/`), the generated
-  modulefiles (`$PREFIX/modulefiles/`), the source/misc caches and the redirected
-  Spack user config/cache (`$PREFIX/spack-{config,cache}`). It lives **outside the
-  repo** so the examples never depend on the repo's path: the build bakes absolute
-  paths into the modulefile + RPATHs, so once built the repo can move or be deleted
-  and `module load lfric-env/<variant>` still works. Stage 1 (the build) still needs
-  the repo: the vendored Spack + package repos live here.
+The install tree is **versioned** by `LFRIC_ENV_VERSION` (CalVer, e.g.
+`v2026.06.30`), read from the committed `./VERSION` file (a plain file read, not
+inference; overridable via the env var). The point is discipline: many commits do
+not change Stage 1, so the version is bumped *deliberately* (`scripts/bump-env-
+version.sh` / `pixi run bump-env-version` writes `v$(date +%Y.%m.%d)`), and a
+rebuild then lands in a fresh prefix instead of silently overwriting an environment
+others are already loading. It is the **environment's** version — deliberately
+distinct from any LFRic apps/core version.
+
+- **`BASE`** (`LFRIC_PREFIX`, default `$PROJECTDIR/$USER/opt/<sysname>-<machine>`):
+  the per-arch container, **shared across env versions**. Holds the version-
+  independent bits: the shared **modulefiles** tree (`$BASE/modulefiles/`) and the
+  content-addressed download caches (`$BASE/source-cache`, `$BASE/misc-cache`, i.e.
+  `LFRIC_SOURCE_CACHE`/`LFRIC_MISC_CACHE`). Sharing the download caches lets a new
+  version reuse already-downloaded sources instead of re-fetching (and avoids re-
+  hitting the flaky `gitlab.in2p3.fr` XIOS host). Setting `LFRIC_PREFIX` overrides
+  `BASE`; versioning still applies underneath it.
+- **`PREFIX`** = `$BASE/$LFRIC_ENV_VERSION`: the **persistent, per-version** install
+  — Spack install tree (`$PREFIX/opt`), the per-variant directory environment + its
+  view (`$PREFIX/spack-env/<variant>/`), and the redirected Spack user config/cache
+  (`$PREFIX/spack-{config,cache}`). It lives **outside the repo** so the examples
+  never depend on the repo's path: the build bakes absolute paths into the modulefile
+  + RPATHs, so once built the repo can move or be deleted and `module load
+  lfric-env/<version>/<variant>` still works. Stage 1 (the build) still needs the
+  repo: the vendored Spack + package repos live here.
 - **`WORKING_DIR`** (`LFRIC_WORKING_DIR`, default `$PREFIX/stage`): Spack's
   **transient** build/compile stage *only* (`config:build_stage`). It is
   metadata-heavy (autotools/libtool touch thousands of small files); on a busy
@@ -84,6 +100,16 @@ xios, shumlib, lfric) is built per variant. So keep `PREFIX` variant-independent
 
 The build redirects `SPACK_USER_CONFIG_PATH`/`SPACK_USER_CACHE_PATH` under `PREFIX`
 so it neither reads nor writes the user's global `~/.spack`.
+
+**Modulefiles + discoverability.** The generated modulefiles are written to the
+shared `$BASE/modulefiles/` tree keyed `lfric-env/<version>/<variant>` (e.g.
+`lfric-env/v2026.06.30/cray.lua`), with the committed logic snapshot at
+`$BASE/modulefiles/lfric-env.lua`. So a single `module use $BASE/modulefiles`
+makes `module avail lfric-env` list every built version × variant at once. Default
+selectors (`.modulerc.lua`, rewritten each build): within a version `cray` is the
+default variant, and a bare `module load lfric-env` resolves to the most recently
+built version's `cray`. `scripts/gen-modulefile.sh` writes all of this; it is
+standalone-runnable, so the selectors can be refreshed without a rebuild.
 
 ## Activation: the two-part Lmod modulefile
 
@@ -234,6 +260,57 @@ The authoritative pins are the submodule gitlinks (`git submodule status`).
   `git add vendor/physics vendor/lfric_core && git commit`. This is the explicit,
   reviewable way to pull in new science — `local_build.py` no longer auto-clones
   (patch 30), so the build only reads what you stage.
+
+### Where the dependency versions come from (constraints)
+
+The versions are not free choices — they are dictated upstream. Authoritative
+sources, in priority order:
+
+1. **`vendor/lfric_apps/dependencies.yaml`** — the single source of truth for the
+   **LFRic source set**. A given `lfric_apps` ref pins the exact `lfric_core` +
+   physics refs it must build against (jules/ukca by commit; casim/socrates/moci/
+   socrates-spectral by tag). When you bump `lfric_apps`, **re-read this file and
+   bump `vendor/lfric_core` + `vendor/physics/*` to match it** — that is exactly
+   what `scripts/stage-physics.sh` consumes. Do not pick physics versions
+   independently; our submodule pins are downstream of this file.
+2. **`vendor/lfric_core/documentation/source/getting_started/installation/software_dependencies.rst`**
+   — the Met Office **reference software stack** per release, plus the tested
+   compilers. For the `2025.12.1` / apps-3.0 baseline it lists: gfortran 12.2.0 /
+   Cray 15.0.0; Python 3.12.5; HDF5 1.14.5; netCDF C 4.9.2 / Fortran 4.6.1; mpich
+   4.2.3; **PSyclone 3.2.2**; **fparser 0.2.1**; **YAXT 0.11.0**; **XIOS2 r2701**;
+   **blitz 1.0.2**; **rose-picker 2.0.0**; **Rose 2.3.1 / Cylc 8+**; **PFUnit
+   4.10.0**. These are the versions our `lfric-apps-isambard` package should track.
+   The doc is per-release prose and can lag the checked-out tag — cross-check it
+   against the rose-stem site configs below.
+3. **`vendor/lfric_apps/rose-stem/site/meto/common/suite_config_*.cylc`** — the
+   module versions the Met Office actually loads in CI (e.g. `module load
+   xios/2701`, `xios/2701-oasis`). A reality check on the `.rst` prose.
+
+Where *we* encode the pins:
+
+- **`spack-repo/lfric-isambard/packages/lfric-apps-isambard/package.py`** — the
+  Spack-drawn pins: `py-psyclone@3.2.2`, `python@3.12`, `xios@2701`,
+  `py-setuptools@:79`, etc.
+- **`spack-repo/lfric-isambard/packages/xios/package.py`** — the XIOS revision +
+  its build patch.
+
+**`xios@2701` — read this before bumping it.** r2701 is what current LFRic wants
+(the core docs and the MetO CI configs use **XIOS2 r2701**, and `mo-spack-packages`
+ships `xios@2.2701` at the same commit); `mo-spack-packages` also ships
+`xios@3.0.4.0` if a future move to XIOS 3 is wanted. We build r2701 from the migrated
+Git history: former SVN r2701 maps to git `2eb572f0` on the `XIOS2` branch (commit
+"Fix for recent compilers"). That commit already restores most STL includes the
+older r2252 lacked, but earcut.hpp *still* comments out `<tuple>`/`<cstddef>` while
+using `std::tuple_element`/`std::get`/`std::size_t`, which newer GCC/libstdc++ no
+longer expose transitively — so we keep a minimal `gcc_remap_standard_headers.patch`
+(`when @2701`) that just uncomments them (meshutil.cpp already `#include`s `<array>`
+at r2701, so no meshutil hunk). Historical note: the previous pin was r2252 (git
+`26cc7d88`, patched by `gcc12_remap_standard_headers.patch`), an *Isambard
+build-pragmatic* choice carried from the upstream UniExeterRSE Isambard env. So
+bumping XIOS again means: (a) add the new revision/commit to `xios/package.py`, (b)
+check whether the header patch still applies / is still needed (regenerate it from
+the pinned checkout — the earcut.hpp context drifts between revisions), (c) confirm
+lfric links against it. Treat XIOS as the **highest-risk single bump** in the stack.
 
 Pinned commits at time of writing (snapshot — `git submodule status` is authoritative):
 

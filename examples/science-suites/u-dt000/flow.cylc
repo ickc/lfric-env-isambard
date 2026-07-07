@@ -16,6 +16,7 @@
 {# This repo's science-suite env + source selection, injected by run-suite.sh via -S. #}
 {% if LFRIC_STACK is not defined %}{% set LFRIC_STACK = 'cray' %}{% endif %}
 {% if LFRIC_PREFIX is not defined %}{% set LFRIC_PREFIX = '' %}{% endif %}
+{% if LFRIC_ENV_VERSION is not defined %}{% set LFRIC_ENV_VERSION = '' %}{% endif %}
 {% if REPO_ROOT is not defined %}{% set REPO_ROOT = '' %}{% endif %}
 
 # Machine specific settings
@@ -71,6 +72,28 @@
 
 [runtime]
     [[root]]
+        # Re-activate our built env in init-script — for EVERY task. Cylc runs each
+        # job under a login shell (`bash -l`), which resets Lmod to the system
+        # defaults and PURGES the lfric-env module the scheduler had loaded (so the
+        # inherited view/bin is dropped: `cylc`/`rose: command not found`, exit 127).
+        # init-script runs BEFORE cylc's first `cylc message` ('started') AND before
+        # env-script's `rose task-env`, so rose/cylc are on PATH for the whole job and
+        # ROSE_SUITE_DIR gets set (the ISAMBARD3 pre-script references it under
+        # `set -u`). The family pre-scripts source ACTIVATE_ENV too, but that is too
+        # late for the 'started' message; this is the authoritative activation.
+        # init-script ALSO runs before the task [[[environment]]] block, so export
+        # the launcher's env selection (rendered by Jinja from run-suite.sh's -S
+        # vars) HERE, before sourcing — otherwise activate-env/common.sh fall back to
+        # the cray / default-base / live-VERSION defaults instead of the selected env.
+        init-script = """
+                        {% if LFRIC_STACK %}export LFRIC_STACK="{{ LFRIC_STACK }}"{% endif %}
+                        {% if LFRIC_PREFIX %}export LFRIC_PREFIX="{{ LFRIC_PREFIX }}"{% endif %}
+                        {% if LFRIC_ENV_VERSION %}export LFRIC_ENV_VERSION="{{ LFRIC_ENV_VERSION }}"{% endif %}
+                        activate_env="{{ ACTIVATE_ENV }}"
+                        if [ -n "$activate_env" ] && [ -f "$activate_env" ]; then
+                          source "$activate_env"
+                        fi
+                        """
         # Science-suite example (this repo): set ROSE_DATA et al. for inline task scripts that run
         # under `set -u` before `rose task-run` (e.g. the lfric_atm `mkdir $ROSE_DATA`).
         # Matches the forward-ported u-dr932; the upstream suite relied on it implicitly.

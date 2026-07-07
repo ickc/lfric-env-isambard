@@ -156,9 +156,11 @@ lfric_bootstrap_spack() {
   spack --version || die "spack unavailable after sourcing setup-env.sh"
 }
 
-# Write Spack's config under PREFIX: install_tree + caches persist (so built
-# packages + downloaded sources survive a re-run); build_stage is the transient,
-# metadata-heavy compile area (node-local NVMe on a compute node). See MAINTAINER.md.
+# Write Spack's config under PREFIX: install_tree persists per-version; the
+# source/misc caches are SHARED across versions (LFRIC_SOURCE_CACHE/LFRIC_MISC_CACHE
+# from common.sh — content-addressed, so a new version reuses downloaded sources);
+# build_stage is the transient, metadata-heavy compile area (node-local NVMe on a
+# compute node). See MAINTAINER.md.
 lfric_write_config() {
   local build_stage="$WORKING_DIR"
   # mkdir -p returns 0 for an already-existing dir even when it is not writable,
@@ -174,8 +176,8 @@ config:
     root: $PREFIX/opt
   build_stage:
   - $build_stage
-  source_cache: $PREFIX/source-cache
-  misc_cache: $PREFIX/misc-cache
+  source_cache: $LFRIC_SOURCE_CACHE
+  misc_cache: $LFRIC_MISC_CACHE
   build_jobs: $SPACK_JOBS
 EOF
 }
@@ -267,9 +269,9 @@ lfric_assert_variant() {
 # Download/clone the source of every concretized spec into the persistent source
 # cache. Externals (cray-mpich, Cray HDF5/netCDF) have no source and are skipped.
 lfric_fetch() {
-  info "Fetching all sources for $ENV_NAME into $PREFIX/source-cache"
+  info "Fetching all sources for $ENV_NAME into $LFRIC_SOURCE_CACHE"
   spack -e "$SPACK_ENV_DIR" fetch || die "spack fetch failed"
-  info "Sources cached under $PREFIX/source-cache — the compute-node build can run offline."
+  info "Sources cached under $LFRIC_SOURCE_CACHE — the compute-node build can run offline."
 }
 
 # --- Install ---------------------------------------------------------------
