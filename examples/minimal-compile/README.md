@@ -15,13 +15,16 @@ the science-suite examples in `../science-suites/`).
 
 ## What it does
 
-1. Loads the built environment via Lmod (`module load lfric-env/<variant>`).
-2. Sets the compiler + MPI/IO wrappers for the active variant
-   (`cray`: Cray `ftn`/`CC`; `spack`: the view's `mpif90`/`mpic++`).
-3. Runs `lfric_apps`' `local_build.py` to compile `lfric_atm`, using the **pinned
+1. Loads the built environment via Lmod (`module load lfric-env/<version>/<variant>`)
+   and **nothing else** — that one module supplies the entire toolchain for the
+   active variant: `FC`/`CXX`/`LDMPI` (`cray`: Cray `ftn`/`CC`; `spack`: the view's
+   `mpif90`/`mpic++`), the Cray PE modules (`cray` variant), and the view's
+   `FFLAGS`/`LDFLAGS` (XIOS/HDF5/netCDF/shumlib). The script configures none of it;
+   it only asserts the load took (`FC` set and on `PATH`).
+2. Runs `lfric_apps`' `local_build.py` to compile `lfric_atm`, using the **pinned
    physics submodules** under `vendor/physics/` (no build-time SSH/clone — see the
    reproducible-sources note in `MAINTAINER.md`).
-4. Runs the bundled example (`applications/lfric_atm/example/configuration.nml`).
+3. Runs the bundled example (`applications/lfric_atm/example/configuration.nml`).
 
 ## Prerequisites
 
@@ -81,7 +84,10 @@ A successful run ends with `LFRIC_ATM_OK`. The build log is written to
 ## Adapting this for your own science target
 
 Copy `build.sh` and change: `PROJECT` (and the `local_build.py … <app>` target),
-the `PSYCLONE_TRANSFORMATION`, and which physics dependencies you stage. The
-environment activation (the `module load` + the variant compiler/MPI wrapper
-block) is reusable as-is — that part is the contract between Stage 1 and anything
-built on it (this example and the science-suites alike).
+the `PSYCLONE_TRANSFORMATION`, and which physics dependencies you stage. You do
+**not** touch the environment activation — a single `module load
+lfric-env/<version>/<variant>` is the whole contract between Stage 1 and anything
+built on it (this example and the science-suites alike): it exposes the compiler,
+the Cray PE modules, and the view's `FFLAGS`/`LDFLAGS`, so an adapted script never
+re-derives them. See the top-level `README.md` ("Run your own science suite") for
+the same contract from a Rose/Cylc suite's point of view.

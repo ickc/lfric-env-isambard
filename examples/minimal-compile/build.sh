@@ -7,6 +7,12 @@
 # the smallest thing you do *with* that environment — copy and adapt this script
 # for your own target. See examples/minimal-compile/README.md.
 #
+# It is also an INTEGRATION TEST of the built environment: it loads the env the
+# way an end user does — `module load lfric-env/<version>/<variant>`, nothing
+# more — and relies on that module to supply the whole toolchain. It deliberately
+# does NOT know which Cray modules or compiler wrappers back a given variant; that
+# is the modulefile's job (scripts/lfric-env.lua), baked in by Stage 1.
+#
 # It needs the private Met Office physics repos (casim, jules, socrates, ukca),
 # vendored as pinned submodules under vendor/physics/ and fed to the LFRic extract
 # step via PHYSICS_ROOT, so the compile clones nothing over SSH once those are
@@ -45,87 +51,29 @@ bash "$SCRIPTS/patch-all.sh" || die "patch-all failed"
 # symlinks them); keep them pristine by not dropping __pycache__ into the tree.
 export PYTHONDONTWRITEBYTECODE=1
 
-# --- Toolchain + MPI/IO compiler wrappers ----------------------------------
-# lfric_atm is compiled here directly via local_build.py (NOT through Spack), so
-# this step needs the same MPI/IO stack as the active environment (LFRIC_STACK).
-# Either way the compiler is gcc@14.3.0; LFRic's Makefiles require FC (fortran.mk
-# errors if unset), LDMPI (the MPI linker; compile.mk has no default) and CXX.
-#   cray  - Cray PE GNU stack. Loading PrgEnv-gnu is REQUIRED: it puts the Cray
-#           compiler wrappers (ftn/cc/CC) on PATH and sets PE_ENV/CRAY_*. The
-#           cray-hdf5-parallel/cray-netcdf-hdf5parallel modules make ftn/CC inject
-#           the parallel HDF5/netCDF -I/-L/-l automatically (those are Cray
-#           externals, not in the view — exactly how MPI is handled). PE_ENV=GNU
-#           makes lfric.mk set CRAY_ENVIRONMENT so fortran/cxx.mk pick the
-#           gfortran/g++ flag sets. FC/LDMPI=ftn, CXX=CC.
-#   spack - from-source mpich + HDF5/netCDF, all in the env view. The MPI compiler
-#           wrappers are the view's mpif90 + mpic++ (which wrap gfortran-14 /
-#           g++-14); HDF5/netCDF/XIOS/shumlib come from the view via FFLAGS/
-#           LDFLAGS below. No Cray modules; with PE_ENV unset, lfric.mk uses the
-#           non-Cray profile. lfric_core picks its per-compiler flag set from the
-#           wrapper LEAF NAME (fortran/<fc>.mk, cxx/<cxx>.mk): it ships mpif90.mk
-#           and mpic++.mk, which each run `<wrapper> --version` and map the real
-#           compiler (GNU) to gfortran.mk / g++.mk. So CXX must be `mpic++` — NOT
-#           mpich's `mpicxx` alias, for which there is no cxx/mpicxx.mk.
-if [ "$LFRIC_STACK" = cray ]; then
-  PRGENV_MODULE="${PRGENV_MODULE:-PrgEnv-gnu}"
-  CRAYPE_TARGET="${CRAYPE_TARGET:-craype-arm-grace}"
-  HDF5_MODULE="${HDF5_MODULE:-cray-hdf5-parallel/1.14.3.9}"
-  NETCDF_MODULE="${NETCDF_MODULE:-cray-netcdf-hdf5parallel/4.9.2.3}"
-  if ! command -v module >/dev/null 2>&1; then
-    for f in /opt/cray/pe/lmod/lmod/init/bash /etc/profile.d/lmod.sh \
-             /etc/profile.d/modules.sh /usr/share/lmod/lmod/init/bash; do
-      # shellcheck source=/dev/null
-      [ -f "$f" ] && . "$f" && break
-    done
-  fi
-  command -v module >/dev/null 2>&1 \
-    || die "no 'module' command found — cannot load $PRGENV_MODULE for the Cray ftn/cray-mpich wrappers"
-  module load "$PRGENV_MODULE" || die "could not 'module load $PRGENV_MODULE'"
-  module load "$CRAYPE_TARGET" 2>/dev/null \
-    || warn "could not load $CRAYPE_TARGET (target may default to aarch64)"
-  module load "$HDF5_MODULE" "$NETCDF_MODULE" \
-    || die "could not load $HDF5_MODULE / $NETCDF_MODULE — Cray ftn/CC wrappers cannot resolve HDF5/netCDF"
-  if [ -z "${CRAY_MPICH_DIR:-}" ] || [ ! -d "${CRAY_MPICH_DIR:-/nonexistent}" ]; then
-    die "CRAY_MPICH_DIR unset/missing after 'module load $PRGENV_MODULE' — Cray MPI wrappers cannot resolve"
-  fi
-  info "cray-mpich: $CRAY_MPICH_DIR (v${CRAY_MPICH_VERSION:-?})"
-  info "cray HDF5/netCDF: ${HDF5_ROOT:-?} | ${NETCDF_DIR:-?}"
-  export FC="${FC:-ftn}"
-  export LDMPI="${LDMPI:-ftn}"
-  export CXX="${CXX:-CC}"
-else
-  info "LFRIC_STACK=spack: compiling lfric_atm with the view's mpich wrappers (mpif90 + mpic++, wrapping gcc@14.3)"
-  _mpifc=""; for _c in mpif90 mpifort; do command -v "$_c" >/dev/null 2>&1 && { _mpifc="$_c"; break; }; done
-  [ -n "$_mpifc" ] || die "no mpich Fortran wrapper (mpif90/mpifort) on PATH — is the spack env built and active?"
-  # CXX must be `mpic++`: lfric_core ships cxx/mpic++.mk (it runs the wrapper's
-  # --version and maps GNU -> g++.mk) but no cxx/mpicxx.mk, so mpich's `mpicxx`
-  # alias would fail at cxx.mk. mpif90.mk handles the Fortran side likewise.
-  command -v mpic++ >/dev/null 2>&1 \
-    || die "no mpich C++ wrapper 'mpic++' on PATH — is the spack env built and active? (cxx/mpic++.mk is the only MPI C++ profile lfric_core ships)"
-  export FC="${FC:-$_mpifc}"
-  export LDMPI="${LDMPI:-$_mpifc}"
-  export CXX="${CXX:-mpic++}"
+# --- Load the built environment (exactly as an end user would) --------------
+# Everything the compile needs from the environment now comes from the modulefile
+# Stage 1 generated. `module load lfric-env/<version>/<variant>` puts rose/cylc/
+# psyclone + the Spack view on PATH and sets the COMPLETE toolchain for the
+# selected variant: FC/CXX/LDMPI (cray: ftn/CC; spack: the view's mpif90/mpic++),
+# the Cray PE modules (cray) or the view's MPI wrappers (spack), and the view's
+# FFLAGS/LDFLAGS (XIOS/HDF5/netCDF/shumlib .mod files + libs). This example adds
+# NOTHING to that. It used to hand-roll the Cray module loads, FC/CXX/LDMPI and
+# FFLAGS/LDFLAGS right here — duplicating (and liable to drift from) what the
+# modulefile now owns; see scripts/lfric-env.lua. Removing that is the point of
+# this example: it demonstrates that an end user needs only the `module load`.
+#
+# activate.sh (sourced above) already did the load quietly (the pixi path). Assert
+# it took — the module sets FC — so a not-yet-built or broken env is a clear error
+# here, not a cryptic compile failure later; retry loudly to surface the reason.
+if [ -z "${FC:-}" ] && command -v module >/dev/null 2>&1; then
+  module load "$MODULE_NAME" \
+    || die "could not 'module load $MODULE_NAME' — is the '$LFRIC_STACK' env built? (Stage 1: ${LFRIC_STACK:+LFRIC_STACK=$LFRIC_STACK }sbatch scripts/build.sbatch)"
 fi
-info "MPI compiler: $("$FC" --version 2>/dev/null | head -1) (FC=$FC LDMPI=$LDMPI CXX=$CXX)"
-
-# Spack-built libraries (XIOS, YAXT, shumlib, pFUnit, ...) live in the env view;
-# the LFRic Makefiles locate them via FFLAGS (-I, for .mod files like xios.mod)
-# and LDFLAGS (-L + -rpath, for libxios.a/libyaxt.so/...), mirroring the Met
-# Office Spack build (rose-stem esnz cascade). The Cray ftn wrapper ignores
-# CPATH/LIBRARY_PATH, so these MUST go through F/LDFLAGS. For the cray variant
-# HDF5 and netCDF are NOT in the view (they are Cray externals): the cray-hdf5-
-# parallel / cray-netcdf-hdf5parallel modules loaded above make the ftn/CC
-# wrappers inject their -I/-L/-l automatically — exactly like mpi.mod and the MPI
-# libs. For the spack variant HDF5/netCDF ARE in the view, so the same -I$view/
-# include / -L$view/lib below already covers them. The lfric-env module (loaded
-# by activate.sh) already put shumlib on LDFLAGS/LIBRARY_PATH/LD_LIBRARY_PATH;
-# prepend the view's dirs here.
-_view="$SPACK_ENV_DIR/.spack-env/view"
-[ -d "$_view/include" ] || die "Spack env view missing at $_view — build Stage 1 first: ${LFRIC_STACK:+LFRIC_STACK=$LFRIC_STACK }sbatch scripts/build.sbatch"
-export FFLAGS="-I$_view/include${FFLAGS:+ $FFLAGS}"
-export LDFLAGS="-L$_view/lib -L$_view/lib64 -Wl,-rpath=$_view/lib -Wl,-rpath=$_view/lib64${LDFLAGS:+ $LDFLAGS}"
-export LD_LIBRARY_PATH="$_view/lib:$_view/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-info "External libs (view): FFLAGS/LDFLAGS point at $_view"
+: "${FC:?FC unset after loading $MODULE_NAME (the Stage-1 env for '$LFRIC_STACK'). Build it first: ${LFRIC_STACK:+LFRIC_STACK=$LFRIC_STACK }sbatch scripts/build.sbatch}"
+command -v "$FC" >/dev/null 2>&1 \
+  || die "toolchain compiler '$FC' (set by $MODULE_NAME) not on PATH — environment load incomplete"
+info "Toolchain from $MODULE_NAME: FC=$FC LDMPI=${LDMPI:-?} CXX=${CXX:-?} — $("$FC" --version 2>/dev/null | head -1)"
 
 APPS_ROOT_DIR="${APPS_ROOT_DIR:-$REPO_ROOT/vendor/lfric_apps}"
 CORE_ROOT_DIR="${CORE_ROOT_DIR:-$REPO_ROOT/vendor/lfric_core}"
