@@ -32,12 +32,16 @@ repos:
   metoffice: ../vendor/mo-spack-packages/spack_repo/metoffice
   builtin: ../vendor/spack-packages/repos/spack_repo/builtin
 packages:
-  # Compiler. Isambard 3 dropped the complete gcc 12.3 toolchain earlier builds
-  # used (gcc 12/13 are now C-only — no g++/gfortran); gcc 14.3.0 is the only
-  # complete cray-native C/C++/Fortran toolchain on the system. Define it as an
-  # explicit external (these paths exist on both the login and grace compute
-  # nodes) and pin the whole environment to it, so the solve is deterministic
-  # and never drifts to another gcc that `spack compiler find` might register.
+  # Compiler. gcc@14.3.0 is a complete cray-native C/C++/Fortran toolchain
+  # (/usr/bin/{gcc,g++,gfortran}-14, all vanilla GNU — not Cray wrappers) and
+  # the newest available, so it's the pin. gcc@12.3.0/13.3.1 are also complete
+  # C/C++/Fortran toolchains as of the 2026-06-22 system fix (an earlier
+  # Isambard 3 upgrade had left 12/13 as C-only, but that's since been
+  # resolved) — 14.3.0 stays the pin as the most current option, not because
+  # it's uniquely complete. Define it as an explicit external (these paths
+  # exist on both the login and grace compute nodes) and pin the whole
+  # environment to it, so the solve is deterministic and never drifts to
+  # another gcc that `spack compiler find` might register.
   gcc:
     externals:
     - spec: gcc@14.3.0 languages:='c,c++,fortran'
