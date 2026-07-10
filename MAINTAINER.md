@@ -114,10 +114,18 @@ standalone-runnable, so the selectors can be refreshed without a rebuild.
 ## Activation: the two-part Lmod modulefile
 
 The built environment is loaded through **Lmod**, so pixi is only needed to *build*
-it. The modulefile is self-contained — it puts the Spack view + package prefixes on
-`PATH`/`PYTHONPATH`/`SHUMLIB_ROOT`/`LD_LIBRARY_PATH`/`SPACK_ENV`/… with **no nested
-`module load`** — so it is fast and works under `/bin/sh`. To stay auditable it is
-split in two:
+it. A single `module load lfric-env/<version>/<variant>` is the **whole contract**
+for compiling or running against the env: it puts the Spack view + package prefixes
+on `PATH`/`PYTHONPATH`/`SHUMLIB_ROOT`/`LD_LIBRARY_PATH`/`SPACK_ENV`/…, sets the
+compile toolchain (`FC`/`CXX`/`LDMPI` + view-wide `FFLAGS`/`LDFLAGS`), and — for the
+`cray` variant — `load()`s the Cray PE modules it needs (`PrgEnv-gnu` + Cray HDF5/
+netCDF). Those Cray `load()`s are the **one** exception to "no nested `module
+load`": Lmod resolves module hierarchy by statically scanning the *top-level*
+generated modulefile for `load(...)`, so they must be emitted there by
+`gen-modulefile.sh`, not inside the `loadfile()`d logic (where a `load()` is
+silently a no-op — `try_load()` is unaffected). The `spack` variant needs none: its
+MPI/HDF5/netCDF are from-source in the view. Either way it works under `/bin/sh`. To
+stay auditable it is split in two:
 
 - **Logic** — [`scripts/lfric-env.lua`](scripts/lfric-env.lua): version-controlled
   Lua holding all the `setenv`/`prepend_path`/`pushenv` rules. `build` snapshots a
@@ -133,6 +141,21 @@ Regenerate a modulefile without a full rebuild (e.g. after moving `$PREFIX`):
 `bash scripts/gen-modulefile.sh` (cray; prefix `LFRIC_STACK=spack` for spack). For
 the cray variant, run it with the Cray PE modules loaded so `CRAY_LD_LIBRARY_PATH`
 is populated.
+
+**The examples consume exactly this contract and nothing more.** Both the
+minimal-compile example (`examples/minimal-compile/build.sh`) and the science-suite
+examples (`examples/science-suites/site/activate-env.sh` + each `u-*/flow.cylc`,
+which do `FC = $FC`) are **integration tests**: they load the module the way an end
+user would and rely on it for the whole toolchain, rather than hand-rolling the Cray
+module loads / `FC`-`CXX`-`LDMPI` / `FFLAGS`-`LDFLAGS` themselves (they used to —
+that duplicated, and could drift from, what the modulefile now owns). So when you
+change what the modulefile exports, these are what prove a bare `module load` still
+suffices. The same reasoning covers a suite an **end user** brings — a real Rose/Cylc
+suite whose sources we do *not* stage — since we configure none of their toolchain
+for them: it must work off the `module load` alone (see the top-level README's "Run
+your own science suite"). The examples deliberately keep *their own* concerns (the
+science-suite's per-task `WORKING_DIR`, source trees, and the Lustre HDF5 file-lock
+workaround) but never re-derive the toolchain.
 
 ## Build phases (`scripts/lib.sh`)
 
@@ -383,3 +406,11 @@ Beyond the user-facing vars in the README:
 - **Full (compute node) — the invariant:** the four cases must build:
   `sbatch scripts/build.sbatch` (+ `--export=ALL,LFRIC_STACK=spack`) → `BUILD_OK`,
   then `sbatch examples/minimal-compile/build.sbatch` (+ spack) → `LFRIC_ATM_OK`.
+- **Integration (the examples are the test).** minimal-compile and the science-suites
+  double as integration tests that a bare `module load` is a sufficient toolchain —
+  they load the env like an end user and add nothing of their own to it. After
+  changing `gen-modulefile.sh` / `lfric-env.lua` (what the module exports), re-run
+  both minimal-compile variants and, on `cray`, at least one science suite
+  (`bash examples/science-suites/run-suite.sh u-dn704` or `u-dr932`) — an end-user
+  suite gets no toolchain setup from us, so this is what proves the `module load`
+  alone still compiles + runs.

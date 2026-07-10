@@ -199,9 +199,15 @@
         script = "rose task-run --app-key=build"
         [[[environment]]]
         {% if EX_HOST == 'isambard3' %}
-            FC = mpif90
-            LDMPI = mpif90
-            FPP = "cpp -traditional-cpp"
+            # FC/LDMPI/CXX come from the loaded lfric-env module (the root
+            # init-script sources ACTIVATE_ENV, which `module load`s it): ftn/CC
+            # for the cray variant, the view's mpif90/mpic++ for spack. Inherit
+            # them here instead of hardcoding a compiler — this is the pattern an
+            # end-user suite uses to build against our env (see README.md). FPP is
+            # set by the module too; inherit it the same way.
+            FC = $FC
+            LDMPI = $LDMPI
+            FPP = $FPP
         {% endif %}
             COMPILER = {{COMPILER}}
             PROFILE = 'production'

@@ -179,6 +179,61 @@ for your own suite.
 
 ---
 
+## Run your own science suite (business as usual)
+
+Already have your own LFRic Rose/Cylc suite? You do **not** need anything under
+`examples/` to run it against this environment — those directories are integration
+tests and adaptation templates, not a required layer. Point your own suite at the
+built environment the way you would at any prebuilt toolchain: **load the module,
+then let your suite inherit the toolchain from it.**
+
+1. **Build Stage 1 once** (above) and `module load lfric-env/<version>/<variant>`
+   wherever your suite activates its environment — for a Rose/Cylc suite that is a
+   task `env-script`/`pre-script`, or an `ACTIVATE_ENV`-style script the tasks
+   source.
+
+2. **Inherit the compiler — don't hard-code it.** That single `module load` already
+   exports the whole toolchain for the variant you loaded; you configure none of it:
+
+   | The module sets | on `cray` | on `spack` |
+   |-----------------|-----------|------------|
+   | `FC`, `LDMPI` | `ftn` | the view's `mpif90` |
+   | `CXX` | `CC` | the view's `mpic++` |
+   | Cray PE modules | `PrgEnv-gnu` + Cray HDF5/netCDF **loaded** | *(none — self-contained)* |
+   | `FFLAGS` | `-I<view>/include` *(prepended)* | same |
+   | `LDFLAGS` | `-L<view>/lib{,64}` + `-rpath` + shumlib *(prepended)* | same |
+
+   So in your suite's environment, **refer to those** instead of naming a literal
+   compiler:
+
+   ```ini
+   # flow.cylc [[[environment]]] / rose-app.conf [env] — inherit from the module
+   FC = $FC
+   LDMPI = $LDMPI
+   # CXX likewise if your suite sets it; otherwise the module's value is used as-is
+   ```
+
+   The one thing to watch: if your suite currently **hard-codes** a compiler — the
+   upstream Met Office EX suites ship `FC = mpif90` / `LDMPI = mpif90` — that literal
+   overrides the module's `ftn` and breaks the build on the `cray` env. Change it to
+   `$FC` / `$LDMPI`. If your suite doesn't set `FC` at all, there is nothing to do:
+   it already inherits the module's.
+
+3. **You don't wire include/lib paths by hand.** The module puts the view's headers
+   on `FFLAGS` and its libraries (plus shumlib) on `LDFLAGS`, **prepended** to any
+   existing value. As long as your build chain *appends* its own flags rather than
+   overwriting these — LFRic's Makefiles do — XIOS/HDF5/netCDF/shumlib are found with
+   no extra `-I`/`-L` from you.
+
+That is the entire contract: **`module load` + inherit `FC`/`LDMPI`.** Everything the
+Stage-1 build knows about the Cray toolchain lives in the modulefile, so your suite
+stays decoupled from how the environment was built. The science-suite examples under
+[`examples/science-suites/`](examples/science-suites/) are exactly this pattern wired
+into real suites — `site/activate-env.sh` (a thin module-load activator) and each
+`u-*/flow.cylc` (`FC = $FC`) — so copy from them if it helps.
+
+---
+
 ## Using pixi instead (optional)
 
 [pixi](https://pixi.sh) is **only a convenience for Stage 1**: it supplies the

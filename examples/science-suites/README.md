@@ -70,8 +70,11 @@ runs offline against *our* env on Isambard 3:
    ref is a hard error naming what to stage. (Merging a fork branch *onto* a tag,
    as upstream `dependencies.yaml` allows, is not yet supported here.)
 2. **Env activation → our modulefile.** `site/activate-env.sh` (passed as the
-   suite's `ACTIVATE_ENV`) `module load`s `lfric-env/$LFRIC_STACK` and sets the
-   variant's MPI/IO compiler wrappers + the view's include/lib — the
+   suite's `ACTIVATE_ENV`) is a **thin activator**: it `module load`s
+   `lfric-env/<version>/$LFRIC_STACK`, and that one module supplies the whole
+   toolchain (compiler wrappers + Cray PE modules + the view's `FFLAGS`/`LDFLAGS`).
+   The script itself only initialises Lmod, preserves the source/target vars the
+   suite owns, and adds the Lustre HDF5 file-locking workaround — the
    science-suite-example analogue of upstream's `env_lfric/activate.sh`.
 3. **Cylc platform → Slurm.** `run-suite.sh` runs the repo's opt-in
    `scripts/setup-cylc.sh`, which writes the `isambard3` platform
@@ -84,9 +87,9 @@ runs offline against *our* env on Isambard 3:
   suites on the **`cray`** environment (the default): on Isambard 3 only
   cray-mpich + Slingshot + `srun` give RDMA over the interconnect and multi-node
   scaling — the `spack` variant is a single-node/TCP portable fallback. The
-  suites' build hard-codes `FC=mpif90`, but `site/activate-env.sh` overrides the
-  compiler/IO wrappers per variant (cray → Cray `ftn`/`CC` + Cray parallel
-  HDF5/netCDF), so switching variant needs no suite edit.
+  suites' build **inherits** the compiler from the loaded module (`flow.cylc` does
+  `FC = $FC` / `LDMPI = $LDMPI`), which resolves to Cray `ftn`/`CC` on `cray` or the
+  view's `mpif90`/`mpic++` on `spack` — so switching variant needs no suite edit.
 - **Physics submodules initialised** (as for the minimal-compile example):
   `git submodule update --init --jobs 4 -- vendor/physics/{casim,jules,socrates,ukca}`
   (or `pixi run init-physics`).

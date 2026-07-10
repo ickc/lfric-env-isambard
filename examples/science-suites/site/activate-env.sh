@@ -6,10 +6,18 @@
 #
 # A Cylc/Rose suite task runs in a clean shell; its platform pre-script sources
 # this file (passed as the suite's ACTIVATE_ENV template variable). After this
-# returns, the task has: rose/cylc/psyclone + the Spack view on PATH, the MPI/IO
-# compiler wrappers for the selected variant, and XIOS/HDF5/netCDF/shumlib
-# locatable by the LFRic Makefiles (FFLAGS/LDFLAGS) — exactly what `build_*` and
-# the `lfric_atm` run tasks need.
+# returns, the task has rose/cylc/psyclone + the Spack view on PATH, the MPI/IO
+# compiler wrappers for the selected variant (FC/CXX/LDMPI), and XIOS/HDF5/netCDF/
+# shumlib locatable by the LFRic Makefiles (FFLAGS/LDFLAGS) — exactly what
+# `build_*` and the `lfric_atm` run tasks need.
+#
+# Crucially, ALL of that toolchain setup is supplied by the `module load` alone:
+# this file is a THIN activator, like an end user's. It no longer hand-rolls the
+# Cray module loads / FC-CXX-LDMPI exports / view FFLAGS-LDFLAGS (that moved into
+# the modulefile — scripts/lfric-env.lua); it only initialises Lmod, loads the
+# module (preserving the vars a suite OWNS — see below), and adds the one thing
+# the module cannot: the Lustre HDF5 file-locking workaround. The suite inherits
+# the compiler from the module via `FC = $FC` in its flow.cylc (see README.md).
 #
 # It reads two variables from the task environment (the suite injects them via
 # its [runtime][root][[environment]] block — see the suite's flow.cylc):
@@ -77,54 +85,15 @@ unset _save_apps _save_core _save_tp _save_fpp
 # already serialises task access to these paths). Honour any value already set.
 export HDF5_USE_FILE_LOCKING="${HDF5_USE_FILE_LOCKING:-FALSE}"
 
-# --- Spack env view: includes + libs for the LFRic Makefiles ----------------
-# The modulefile puts $view/bin on PATH and shumlib on LDFLAGS, but the LFRic
-# build also needs the view's headers (xios.mod, …) and libraries (libxios.a,
-# yaxt, pFUnit, and — spack variant — HDF5/netCDF). Mirror examples/minimal-compile/
-# build.sh: prepend the view's include/lib to FFLAGS/LDFLAGS (the Cray ftn wrapper
-# ignores CPATH/LIBRARY_PATH, so these must go through F/LDFLAGS). Prepend, so a
-# value the task already set is preserved.
-_aenv_view="$SPACK_ENV_DIR/.spack-env/view"
-if [ -d "$_aenv_view/include" ]; then
-  export FFLAGS="-I$_aenv_view/include${FFLAGS:+ $FFLAGS}"
-  export LDFLAGS="-L$_aenv_view/lib -L$_aenv_view/lib64 -Wl,-rpath=$_aenv_view/lib -Wl,-rpath=$_aenv_view/lib64${LDFLAGS:+ $LDFLAGS}"
-  export LD_LIBRARY_PATH="$_aenv_view/lib:$_aenv_view/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-else
-  _aenv_warn "Spack env view missing at $_aenv_view — is the '$LFRIC_STACK' variant built?"
-fi
+# --- Toolchain / FFLAGS / LDFLAGS: all from the loaded module ----------------
+# The lfric-env module loaded above supplies the COMPLETE compile toolchain for
+# the selected variant — FC/CXX/LDMPI (cray: ftn/CC; spack: the view's mpif90/
+# mpic++), the Cray PE modules (cray variant), and the view's FFLAGS/LDFLAGS
+# (XIOS/HDF5/netCDF/shumlib .mod files + libs). So this file no longer sets any
+# of it. It used to OVERRIDE the suite's FC=mpif90 to ftn for cray and re-derive
+# the view flags — exactly the coupling to Stage-1 internals we removed. The
+# suite now inherits the compiler from the module (its flow.cylc [[BUILD]] does
+# `FC = $FC` / `LDMPI = $LDMPI`), which is the end-user pattern in README.md.
 
-# --- Variant compiler / MPI-IO wrappers ------------------------------------
-# Same contract as examples/minimal-compile/build.sh. The suite's BUILD task sets
-# FC/LDMPI=mpif90 for isambard3 (the spack variant's native wrapper); for the
-# cray variant we must OVERRIDE to the Cray ftn/CC wrappers and load PrgEnv-gnu +
-# the Cray parallel HDF5/netCDF modules (those inject -I/-L/-l for HDF5/netCDF,
-# which are Cray externals, not in the view).
-if [ "$LFRIC_STACK" = cray ]; then
-  PRGENV_MODULE="${PRGENV_MODULE:-PrgEnv-gnu}"
-  CRAYPE_TARGET="${CRAYPE_TARGET:-craype-arm-grace}"
-  HDF5_MODULE="${HDF5_MODULE:-cray-hdf5-parallel/1.14.3.9}"
-  NETCDF_MODULE="${NETCDF_MODULE:-cray-netcdf-hdf5parallel/4.9.2.3}"
-  if command -v module >/dev/null 2>&1; then
-    module load "$PRGENV_MODULE" || _aenv_warn "could not 'module load $PRGENV_MODULE'"
-    module load "$CRAYPE_TARGET" 2>/dev/null || true
-    module load "$HDF5_MODULE" "$NETCDF_MODULE" \
-      || _aenv_warn "could not load $HDF5_MODULE / $NETCDF_MODULE"
-  fi
-  # Override the suite's mpif90 defaults — the Cray PE has no mpif90.
-  export FC=ftn
-  export LDMPI=ftn
-  export CXX=CC
-  export FPP="${FPP:-cpp -traditional-cpp}"
-else
-  # spack variant: the view's mpich wrappers (mpif90 wraps gfortran-14, mpic++
-  # wraps g++-14). Set only if the task did not already (it usually sets mpif90).
-  _aenv_fc=""; for _c in mpif90 mpifort; do command -v "$_c" >/dev/null 2>&1 && { _aenv_fc="$_c"; break; }; done
-  [ -n "$_aenv_fc" ] || _aenv_warn "no mpich Fortran wrapper (mpif90/mpifort) on PATH — is the spack variant built?"
-  export FC="${FC:-$_aenv_fc}"
-  export LDMPI="${LDMPI:-$_aenv_fc}"
-  export CXX="${CXX:-mpic++}"
-  export FPP="${FPP:-cpp -traditional-cpp}"
-fi
-
-unset _aenv_here _aenv_repo _aenv_view _aenv_fc _c _f
+unset _aenv_here _aenv_repo _f
 hash -r 2>/dev/null || true

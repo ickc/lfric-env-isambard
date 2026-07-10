@@ -78,6 +78,16 @@ example} × {`cray`, `spack`}. This is the one outcome that must stay green. The
   deliberately **no** build-stage filesystem probing, no `SPACK_ENV` back-derivation,
   no auto-config of the user's home dir. If you're tempted to add inference, prefer a
   required/defaulted variable + a clear error instead.
+- **The examples load the env like an end user — keep them thin.** `module load
+  lfric-env/<version>/<variant>` is the whole contract: it exports the toolchain
+  (`FC`/`CXX`/`LDMPI`, the Cray PE modules, the view's `FFLAGS`/`LDFLAGS`). The
+  examples — minimal-compile's `build.sh` and the science-suites'
+  `site/activate-env.sh` + `u-*/flow.cylc` (which inherit via `FC = $FC`) — must
+  **consume** that and never re-derive it. They are integration tests that a bare
+  `module load` suffices, and they stand in for a real end-user Rose/Cylc suite whose
+  sources we do *not* stage. The toolchain logic lives in `scripts/lfric-env.lua` +
+  `gen-modulefile.sh`; if you change those, the examples are what prove the contract
+  still holds (rerun them — see MAINTAINER.md "Testing").
 - **`PREFIX` = persistent, `WORKING_DIR` = transient.** Persistent output (install
   tree, env+view, modulefiles, caches) → `$PREFIX`. Only Spack's `build_stage` →
   `$WORKING_DIR`. Both variants share one `$PREFIX/opt`, so keep `PREFIX`
