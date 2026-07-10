@@ -84,19 +84,26 @@ prepend_path("PATH", view .. "/bin")
 -- add by hand. For the cray variant HDF5/netCDF are NOT in the view (Cray
 -- externals); the ftn/CC wrappers loaded above supply their flags instead.
 do
+  -- Compose the view's flags BEFORE any inherited value so the environment's own
+  -- headers/libraries take precedence over whatever the caller's shell (or a suite)
+  -- set earlier — matching the removed shell activators and the README contract.
+  -- (Usually the caller has none, so this reduces to just the view's own flags.)
   local ff = "-I" .. view .. "/include"
   local cur_ff = os.getenv("FFLAGS")
-  pushenv("FFLAGS", (cur_ff and cur_ff ~= "" and (cur_ff .. " " .. ff)) or ff)
+  pushenv("FFLAGS", (cur_ff and cur_ff ~= "" and (ff .. " " .. cur_ff)) or ff)
 
   local ld = "-L" .. view .. "/lib -L" .. view .. "/lib64"
     .. " -Wl,-rpath=" .. view .. "/lib -Wl,-rpath=" .. view .. "/lib64"
   local cur_ld = os.getenv("LDFLAGS")
-  pushenv("LDFLAGS", (cur_ld and cur_ld ~= "" and (cur_ld .. " " .. ld)) or ld)
+  pushenv("LDFLAGS", (cur_ld and cur_ld ~= "" and (ld .. " " .. cur_ld)) or ld)
 
-  prepend_path("LIBRARY_PATH", view .. "/lib")
+  -- prepend_path pushes to the FRONT, so add lib64 first then lib to leave the final
+  -- order lib:lib64 — matching the view's -L order above, the removed activators, and
+  -- the d.cray_libs prepend-in-reverse convention below.
   prepend_path("LIBRARY_PATH", view .. "/lib64")
-  prepend_path("LD_LIBRARY_PATH", view .. "/lib")
+  prepend_path("LIBRARY_PATH", view .. "/lib")
   prepend_path("LD_LIBRARY_PATH", view .. "/lib64")
+  prepend_path("LD_LIBRARY_PATH", view .. "/lib")
 end
 
 -- Spack package scripts (e.g. psyclone) shebang the base python, whose sys.path

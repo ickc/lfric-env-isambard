@@ -97,8 +97,11 @@ else
     [ -x "$view/bin/$_c" ] && { mpi_fc="$_c"; break; }
   done
   [ -x "$view/bin/mpic++" ] && mpi_cxx="mpic++"
-  [ -n "$mpi_fc" ]  || warn "no mpif90/mpifort in $view/bin — modulefile will not set FC (spack variant)"
-  [ -n "$mpi_cxx" ] || warn "no mpic++ in $view/bin — modulefile will not set CXX (spack variant)"
+  # Fail fast: without these the generated modulefile cannot set FC/CXX/LDMPI, so a
+  # single `module load` would silently NOT satisfy the toolchain contract. A fully
+  # built spack view always ships them; missing = a broken/incomplete build.
+  [ -n "$mpi_fc" ]  || die "no mpif90/mpifort in $view/bin — the spack view's MPI Fortran wrapper is missing, so the modulefile cannot set FC/LDMPI. Is the '$LFRIC_STACK' env fully built?"
+  [ -n "$mpi_cxx" ] || die "no mpic++ in $view/bin — the spack view's MPI C++ wrapper is missing, so the modulefile cannot set CXX. Is the '$LFRIC_STACK' env fully built?"
 fi
 
 # The view's python site-packages (usually one; glob in case of a version bump).
