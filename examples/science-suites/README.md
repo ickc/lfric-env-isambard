@@ -20,20 +20,37 @@ install — `run-suite.sh` activates the env and the suite tasks use that same
 
 | Suite | Science case | Status on this env |
 |-------|--------------|--------------------|
-| **u-dr932** | GungHo Shallow/Deep Hot Jupiter temperature forcing (C48 multigrid, idealised) | ✅ **builds + runs end-to-end** — self-contained (radiation off, analytic init; no external data). Validated on the **cray** environment (Grace node, 24 ranks single-node; `lfric_atm` ran 72 steps to completion). |
-| **u-dn704** | LFRic Atm NWP GAL9 @ C12 | ✅ **builds + runs end-to-end, multi-node** on the **cray** environment — 24 model ranks + 1 dedicated XIOS server across 2 nodes over **Slingshot (cxi)**; the XIOS server wrote the native-UGRID parallel-HDF5 output (`lfric_gal_diagnostics.nc` ~62 MB). The NWP ancils, start dump and `um_aux` ctldata are **staged on Isambard 3** at the default `BIG_DATA_DIR=/projects/u35v/sw/lfricdata` and read offline at run time (GA9 spectra come from the vendored socrates — no MO `um_aux` clone, no SSO). |
-| **u-dt000** | LFRic Atm Uranus/Neptune temperature forcing | ⚠️ **builds + meshes**; the run is **blocked on a missing upstream LFRic fork**, not config or version. Its cray run config is ported (mirrors dn704: dedicated XIOS server via `srun`, 24-rank placeholder — was 108) and **validates**, but is **not run** pending the fork — when launched earlier (on spack) the model read its namelists then aborted at `Cannot match namelist object name held_suarez_sigma_b` / `STOP 1`. The suite's core science is `theta_forcing='ice_giants_obs_like'` in `namelist:external_forcing`, **absent from both this repo's vendored vn3.1.1 AND the suite's own declared mainline `lfric_apps@vn2.2`** (verified by extracting both: no `ice_giants_obs_like`; `held_suarez_sigma_b` isn't a namelist field in either — `SIGMA_B=0.7` is a hardcoded `parameter`). The upstream suite's extract points only at MetOffice mainline vn2.2, which lacks this science, so the ice-giant forcing lives in an **unidentified fork the suite does not reference**. No namelist forward-port can fix this; running dt000's science needs that fork located + staged. See `PLAN.md`. |
+| **u-dr932** | GungHo Shallow/Deep Hot Jupiter temperature forcing (C48 multigrid, idealised) | ✅ **builds + runs end-to-end** — self-contained (radiation off, analytic init; no external data). Validated on the **cray** environment (Grace node, 24 ranks single-node; `lfric_atm` ran 72 steps to completion), re-validated on the `2026.07.1` / vn3.2 stack. Needs `patches/31-lfric_apps-slow-physics-mphys-field-patch.sh`: vn3.2 stopped creating the UM-physics fields for a forcing-only config while `slow_physics` still fetched `dtheta_mphys`. |
+| **u-dn704** | LFRic Atm NWP GAL9 @ C12 | ✅ **builds + runs end-to-end, multi-node** on the **cray** environment — 24 model ranks + 1 dedicated XIOS server across 2 nodes over **Slingshot (cxi)**; the XIOS server wrote the native-UGRID parallel-HDF5 output (`lfric_gal_diagnostics.nc` ~62 MB); re-validated on the `2026.07.1` / vn3.2 stack (62 MB, S144 to completion). The NWP ancils, start dump and `um_aux` ctldata are **staged on Isambard 3** at the default `BIG_DATA_DIR=/projects/u35v/sw/lfricdata` and read offline at run time (GA9 spectra come from the vendored socrates — no MO `um_aux` clone, no SSO). |
+| **u-dt000** | LFRic Atm Uranus/Neptune temperature forcing | ⚠️ **builds + meshes**; the run is **blocked on a missing upstream LFRic fork**, not config or version. Its cray run config is ported (mirrors dn704: dedicated XIOS server via `srun`, 24-rank placeholder — was 108) and **validates**. Re-confirmed on the `2026.07.1` / vn3.2 stack: extract, both mesh tasks and `build_lfric_atm` all succeed, then the model reads its namelists and aborts at `Cannot match namelist object name held_suarez_sigma_b` / `STOP 1` — the same blocker as before, untouched by the version bump. The suite's core science is `theta_forcing='ice_giants_obs_like'` in `namelist:external_forcing`, **absent from both this repo's vendored `2026.07.1` (vn3.2) AND the suite's own declared mainline `lfric_apps@vn2.2`** (verified by extracting both: no `ice_giants_obs_like`; `held_suarez_sigma_b` isn't a namelist field in either — `SIGMA_B=0.7` is a hardcoded `parameter`). The upstream suite's extract points only at MetOffice mainline vn2.2, which lacks this science, so the ice-giant forcing lives in an **unidentified fork the suite does not reference**. No namelist forward-port can fix this; running dt000's science needs that fork located + staged. See `PLAN.md`. |
 
 ### Version alignment (forward-porting suite configs)
 
-This repo's vendored LFRic is **newer** (vn3.1.1) than the upstream suites pin
-(vn3.0 / vn2.2), and these examples build `lfric_atm` from the vendored source (see
-below). So a suite's namelists must match **vn3.1.1**, not the version it was
-written for. These are mechanical, non-science edits — e.g. u-dr932/u-dn704's
+This repo's vendored LFRic is **newer** (`2026.07.1` = apps vn3.2) than the upstream
+suites pin (vn3.0 / vn2.2), and these examples build `lfric_atm` from the vendored
+source (see below). So a suite's namelists must match **vn3.2**, not the version it
+was written for. These are mechanical, non-science edits — e.g. u-dr932/u-dn704's
 `finite_element` namelist gained `coord_space='Wchi'` and `coord_order_nonprime=1`
 (required by vn3.1.1, absent in vn3.0). This is the legitimate adaptation: a
-scientist running on *this* env writes vn3.1.1 configs. The deeper a suite's
+scientist running on *this* env writes vn3.2 configs. The deeper a suite's
 version lag, the more such edits its run needs.
+
+**How the vn3.1 → vn3.2 port was done (and why not `rose app-upgrade`).** The
+native tool does not work on these configs: its `jules_pftparm` macro dies with
+`AttributeError: 'NoneType' object has no attribute 'split'` because the earlier
+hand-port already migrated that namelist into the indexed per-PFT form the
+vn3.1→vn3.2 macro is itself trying to produce. The change set was therefore
+derived straight from the upstream `version31_32.py` macros — but only those of
+the **16 rose-meta packages in `lfric_atm`'s `import=` chain**. Scanning every
+`version31_32.py` in the tree is wrong: it pulls in settings owned by other apps
+(e.g. `namelist:files=temporal_file_path` from `lfric-io_demo`) that `lfric_atm`
+must not carry. Note rose's `import=` uses continuation lines (`      =next/HEAD`);
+a parser that reads only the first line sees 3 packages instead of 16.
+
+Adding the *new* vn3.2 members matters as much as the renames: LFRic initialises
+them to RMDI and then range-checks them, so a missing one is a hard abort, not a
+default — u-dn704 died on `c_mass_sh, (-0.107E+10), has failed to pass any
+defensive checks, [0.01:0.09]`. Supply the macro's default value.
 
 There is a limit to forward-porting, though: it can only reshape *run config* for
 science the model already implements. When a suite's science needs **code** that the
@@ -41,7 +58,7 @@ model lacks, no namelist edit can bridge the gap — that's a *source* / build-t
 divergence. The clean way to express it is the upstream-native per-suite
 `dependencies.yaml` (each LFRic-source repo with `source:`+`ref:`, which can even merge
 a fork onto a tag); see `PLAN.md` for the offline-extract design. u-dt000 is the hard
-case: its `ice_giants_obs_like` forcing is in **neither** the vendored vn3.1.1 **nor**
+case: its `ice_giants_obs_like` forcing is in **neither** the vendored `2026.07.1` (vn3.2) **nor**
 its own declared mainline vn2.2 — it needs a fork the suite doesn't reference, which
 must be located upstream first. See `PLAN.md`.
 

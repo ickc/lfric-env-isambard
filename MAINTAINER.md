@@ -427,6 +427,13 @@ Beyond the user-facing vars in the README:
 - **Full (compute node) — the invariant:** the four cases must build:
   `sbatch scripts/build.sbatch` (+ `--export=ALL,LFRIC_STACK=spack`) → `BUILD_OK`,
   then `sbatch examples/minimal-compile/build.sbatch` (+ spack) → `LFRIC_ATM_OK`.
+  **Run the two minimal-compile variants SEQUENTIALLY, not in parallel.** Both
+  compile in the same in-tree scratch dir
+  (`vendor/lfric_apps/applications/lfric_atm/working/scratch/`), so concurrent jobs
+  race on the source symlinks it stages and one dies with
+  `FileNotFoundError: ... working/scratch/lfric_core` from `get_git_sources.py`.
+  Chain them instead: `sbatch --dependency=afterany:<cray-jobid> ...`. (The two
+  Stage-1 builds are worth chaining too — they share `$PREFIX/opt`.)
 - **Integration (the examples are the test).** minimal-compile and the science-suites
   double as integration tests that a bare `module load` is a sufficient toolchain —
   they load the env like an end user and add nothing of their own to it. After
