@@ -90,7 +90,7 @@ so building the second one only rebuilds the MPI-dependent part.
 
 Everything installs under a **versioned** prefix `$LFRIC_PREFIX/<version>` (default
 base `$PROJECTDIR/$USER/opt/Linux-aarch64`, version read from the repo's `VERSION`
-file, e.g. `v2026.06.30`), which is **outside the repo** — see
+file, e.g. `v2026.07.21`), which is **outside the repo** — see
 [Configuration](#configuration). The version keeps independent builds in distinct
 trees, so a rebuild never silently overwrites an environment others are loading.
 
@@ -128,7 +128,7 @@ export LFRIC_PREFIX="$PROJECTDIR/$USER/opt/$(uname -sm | tr ' ' -)"
 
 module use "$LFRIC_PREFIX/modulefiles"
 module avail lfric-env              # list every built version × variant
-module load lfric-env/v2026.06.30/cray     # or: .../v2026.06.30/spack
+module load lfric-env/v2026.07.21/cray     # or: .../v2026.07.21/spack
 rose --version; cylc --version; psyclone --version
 ```
 
@@ -139,7 +139,7 @@ pick the version you want. Expected (exact versions track the pinned sources):
 ```
 rose 2.4.2
 cylc 8.4.2
-PSyclone version: 3.2.2
+PSyclone version: 3.3.1
 ```
 
 The modulefile carries absolute paths, so this keeps working even if the repo
@@ -276,7 +276,7 @@ to see/change exactly where things go.
 | Variable | Default | What it controls |
 |----------|---------|------------------|
 | `LFRIC_STACK` | `cray` | Dependency variant: `cray` or `spack`. |
-| `LFRIC_ENV_VERSION` | contents of `./VERSION` (e.g. `v2026.06.30`) | **Environment version** (CalVer). Selects the versioned install prefix `$LFRIC_PREFIX/<version>` and the module name `lfric-env/<version>/<variant>`. Read from the committed `VERSION` file; bump it with `bash scripts/bump-env-version.sh` (`pixi run bump-env-version`). Distinct from any LFRic apps/core version. |
+| `LFRIC_ENV_VERSION` | contents of `./VERSION` (e.g. `v2026.07.21`) | **Environment version** (CalVer). Selects the versioned install prefix `$LFRIC_PREFIX/<version>` and the module name `lfric-env/<version>/<variant>`. Read from the committed `VERSION` file; bump it with `bash scripts/bump-env-version.sh` (`pixi run bump-env-version`). Distinct from any LFRic apps/core version. |
 | `LFRIC_PREFIX` | `$PROJECTDIR/$USER/opt/<arch>` | **Base** install location (the per-arch container, shared across versions). The actual install goes into the **versioned** prefix `$LFRIC_PREFIX/$LFRIC_ENV_VERSION`: the Spack install tree, the per-variant environment + view. The shared modulefiles tree (`$LFRIC_PREFIX/modulefiles`) and the source/misc download caches sit at this base and are version-independent. Outside the repo. |
 | `LFRIC_WORKING_DIR` | `$LFRIC_PREFIX/<version>/stage` | **Transient** Spack build/compile scratch. On a compute node the sbatch points this at node‑local NVMe (`$LOCALDIR/…`) so the build stays off the shared Lustre. Safe to delete anytime. |
 | `SPACK_JOBS` | `$SLURM_CPUS_PER_TASK` | Parallel build jobs (Stage 1). |
