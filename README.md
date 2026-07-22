@@ -55,13 +55,16 @@ example} × {`cray`, `spack`}.
 - **An Isambard 3 account**, and the basics of using it: the difference between a
   **login node** (where you clone + submit jobs) and a **compute node** (where the
   heavy build runs, via `sbatch`).
-- **An SSH key authorised for Met Office SSO.** Several source repositories are
-  private Met Office repos pulled in as *git submodules* (a submodule is just
-  another git repo nested inside this one, pinned to an exact commit). Cloning
-  them needs an SSH key registered with GitHub **and** authorised for the
-  `MetOffice` organisation's SSO (GitHub → Settings → SSH keys → Configure SSO),
-  or an HTTPS credential helper (`gh auth setup-git`). If a `submodule update`
-  fails, this is almost always why.
+- **GitHub access for one private submodule.** The sources are pulled in as *git
+  submodules* (a submodule is just another git repo nested inside this one, pinned
+  to an exact commit). All six LFRic source repos — `lfric_apps`, `lfric_core`,
+  `casim`, `jules`, `socrates`, `ukca` — are **public** and clone anonymously over
+  HTTPS, so no credentials are needed for them. The one exception is
+  `vendor/mo-spack-packages`, which is still a private Met Office repo used by the
+  Stage-1 build: it is on a `git@github.com:` URL and needs an SSH key registered
+  with GitHub **and** authorised for the `MetOffice` organisation's SSO (GitHub →
+  Settings → SSH keys → Configure SSO). If a `submodule update` fails, it is almost
+  always that one.
 
 ---
 
@@ -90,7 +93,7 @@ so building the second one only rebuilds the MPI-dependent part.
 
 Everything installs under a **versioned** prefix `$LFRIC_PREFIX/<version>` (default
 base `$PROJECTDIR/$USER/opt/Linux-aarch64`, version read from the repo's `VERSION`
-file, e.g. `v2026.06.30`), which is **outside the repo** — see
+file, e.g. `v2026.07.21`), which is **outside the repo** — see
 [Configuration](#configuration). The version keeps independent builds in distinct
 trees, so a rebuild never silently overwrites an environment others are loading.
 
@@ -128,7 +131,7 @@ export LFRIC_PREFIX="$PROJECTDIR/$USER/opt/$(uname -sm | tr ' ' -)"
 
 module use "$LFRIC_PREFIX/modulefiles"
 module avail lfric-env              # list every built version × variant
-module load lfric-env/v2026.06.30/cray     # or: .../v2026.06.30/spack
+module load lfric-env/v2026.07.21/cray     # or: .../v2026.07.21/spack
 rose --version; cylc --version; psyclone --version
 ```
 
@@ -139,7 +142,7 @@ pick the version you want. Expected (exact versions track the pinned sources):
 ```
 rose 2.4.2
 cylc 8.4.2
-PSyclone version: 3.2.2
+PSyclone version: 3.3.1
 ```
 
 The modulefile carries absolute paths, so this keeps working even if the repo
@@ -276,7 +279,7 @@ to see/change exactly where things go.
 | Variable | Default | What it controls |
 |----------|---------|------------------|
 | `LFRIC_STACK` | `cray` | Dependency variant: `cray` or `spack`. |
-| `LFRIC_ENV_VERSION` | contents of `./VERSION` (e.g. `v2026.06.30`) | **Environment version** (CalVer). Selects the versioned install prefix `$LFRIC_PREFIX/<version>` and the module name `lfric-env/<version>/<variant>`. Read from the committed `VERSION` file; bump it with `bash scripts/bump-env-version.sh` (`pixi run bump-env-version`). Distinct from any LFRic apps/core version. |
+| `LFRIC_ENV_VERSION` | contents of `./VERSION` (e.g. `v2026.07.21`) | **Environment version** (CalVer). Selects the versioned install prefix `$LFRIC_PREFIX/<version>` and the module name `lfric-env/<version>/<variant>`. Read from the committed `VERSION` file; bump it with `bash scripts/bump-env-version.sh` (`pixi run bump-env-version`). Distinct from any LFRic apps/core version. |
 | `LFRIC_PREFIX` | `$PROJECTDIR/$USER/opt/<arch>` | **Base** install location (the per-arch container, shared across versions). The actual install goes into the **versioned** prefix `$LFRIC_PREFIX/$LFRIC_ENV_VERSION`: the Spack install tree, the per-variant environment + view. The shared modulefiles tree (`$LFRIC_PREFIX/modulefiles`) and the source/misc download caches sit at this base and are version-independent. Outside the repo. |
 | `LFRIC_WORKING_DIR` | `$LFRIC_PREFIX/<version>/stage` | **Transient** Spack build/compile scratch. On a compute node the sbatch points this at node‑local NVMe (`$LOCALDIR/…`) so the build stays off the shared Lustre. Safe to delete anytime. |
 | `SPACK_JOBS` | `$SLURM_CPUS_PER_TASK` | Parallel build jobs (Stage 1). |
@@ -305,8 +308,10 @@ generally cleared with the node; delete it directly if you want it gone sooner.
 
 ## Troubleshooting
 
-- **`submodule update` fails / "Permission denied (publickey)".** Your SSH key is
-  not authorised for Met Office SSO (see [Prerequisites](#prerequisites)).
+- **`submodule update` fails / "Permission denied (publickey)".** This is
+  `vendor/mo-spack-packages`, the one remaining private submodule: your SSH key is
+  not authorised for Met Office SSO (see [Prerequisites](#prerequisites)). The six
+  LFRic source submodules are public and clone anonymously over HTTPS.
 - **`fork: Resource temporarily unavailable` during a build.** You are building on
   a login node — submit `scripts/build.sbatch` to a compute node instead.
 - **`Killed signal terminated program cc1plus` (out of memory).** Give the job

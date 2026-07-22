@@ -304,15 +304,30 @@ sources, in priority order:
    **blitz 1.0.2**; **rose-picker 2.0.0**; **Rose 2.3.1 / Cylc 8+**; **PFUnit
    4.10.0**. These are the versions our `lfric-apps-isambard` package should track.
    The doc is per-release prose and can lag the checked-out tag — cross-check it
-   against the rose-stem site configs below.
+   against the rose-stem site configs below. **It did lag for 2026.07.1** (apps
+   vn3.2): the `.rst` is byte-identical to the `2026.03.2` one and still says
+   PSyclone 3.2.2, but the release actually needs **PSyclone ≥ 3.3** — see 4.
 3. **`vendor/lfric_apps/rose-stem/site/meto/common/suite_config_*.cylc`** — the
    module versions the Met Office actually loads in CI (e.g. `module load
-   xios/2701`, `xios/2701-oasis`). A reality check on the `.rst` prose.
+   xios/2701`, `xios/2701-oasis`). A reality check on the `.rst` prose. Note the
+   MetO `ex1a`/`azspice` entries load opaque site modules (`lfric-gnu/12.2.0/3.2`,
+   `lfric/vn3.2`), so for library versions the *other* sites are more informative —
+   e.g. `site/esnz/common/suite_config_cascade.cylc` moved from
+   `py-psyclone@3.1.0` (vn3.1.1) to `py-psyclone@3.3.1` (2026.07.1).
+4. **The optimisation scripts themselves** (`applications/*/optimisation/*/psykal/`
+   in apps + `infrastructure/build/psyclone/psyclone_tools.py` in core) — the
+   *executable* statement of the PSyclone API version. `psyclone_tools.py` guards
+   the moved imports with `try/except` ("Support for psyclone < 3.3"), but the
+   apps-side scripts do not: at 2026.07.1 `lfric_atm/optimisation/meto-ex1a/psykal/
+   algorithm/casim_alg_mod.py` does a bare `from psyclone.psyir.transformations
+   import OMPParallelTrans`, which only exists from PSyclone 3.3. That is why the
+   pin moved 3.2.2 → 3.3.1 for this release even though the `.rst` still says 3.2.2.
+   Grep the optimisation scripts for `from psyclone` after every apps bump.
 
 Where *we* encode the pins:
 
 - **`spack-repo/lfric-isambard/packages/lfric-apps-isambard/package.py`** — the
-  Spack-drawn pins: `py-psyclone@3.2.2`, `python@3.12`, `xios@2701`,
+  Spack-drawn pins: `py-psyclone@3.3.1`, `python@3.12`, `xios@2701`,
   `py-setuptools@:79`, etc.
 - **`spack-repo/lfric-isambard/packages/xios/package.py`** — the XIOS revision +
   its build patch.
@@ -339,15 +354,21 @@ Pinned commits at time of writing (snapshot — `git submodule status` is author
 
 | Submodule | Commit | Note |
 |-----------|--------|------|
-| `vendor/spack` | `7ae1d68c` | develop, Spack 1.0.x |
-| `vendor/spack-packages` | `7e330489` | builtin packages |
-| `vendor/lfric_apps` | `b5aee0b1` | vn3.1.1-88 |
-| `vendor/lfric_core` | `bf236737` | 2026.03.2-38 |
-| `vendor/mo-spack-packages` | `5e8359e0` | the `metoffice` package repo |
-| `vendor/physics/casim` | `b0a6e38f` | 2026.03.2 |
-| `vendor/physics/jules` | `3647a429` | 2026.03.2-14 |
-| `vendor/physics/socrates` | `fb97f50a` | 2026.03.2 |
-| `vendor/physics/ukca` | `1cdb9c26` | 2026.03.2-5 |
+| `vendor/spack` | `3e19345b` | tag `v1.2.2` |
+| `vendor/spack-packages` | `d4f7c711` | tag `v2026.06.0`, builtin packages |
+| `vendor/lfric_apps` | `bd921320` | `2026.07.1` (= `vn3.2`) |
+| `vendor/lfric_core` | `5d2a8b11` | `2026.07.1` (= `vn3.2`) |
+| `vendor/mo-spack-packages` | `e6457de8` | the `metoffice` package repo |
+| `vendor/physics/casim` | `396cccfe` | `2026.07.1` |
+| `vendor/physics/jules` | `b698279d` | `2026.07.1` (= `vn8.2`) |
+| `vendor/physics/socrates` | `3c9f48b8` | `2026.07.1` |
+| `vendor/physics/ukca` | `612131bc` | `2026.07.1` |
+
+For the `2026.07.1` coordinated release every Met Office repo's `stable` branch is
+exactly its `2026.07.1` tag — there were no post-release patch tags at the time of
+this bump (unlike the `2026.03` cycle, where apps `vn3.1.1` and several `stable`
+heads ran ahead of the coordinated tag). Check `git log origin/stable` per repo
+before assuming the tag is the newest thing.
 
 ## Memory / OOM
 
@@ -406,6 +427,13 @@ Beyond the user-facing vars in the README:
 - **Full (compute node) — the invariant:** the four cases must build:
   `sbatch scripts/build.sbatch` (+ `--export=ALL,LFRIC_STACK=spack`) → `BUILD_OK`,
   then `sbatch examples/minimal-compile/build.sbatch` (+ spack) → `LFRIC_ATM_OK`.
+  **Run the two minimal-compile variants SEQUENTIALLY, not in parallel.** Both
+  compile in the same in-tree scratch dir
+  (`vendor/lfric_apps/applications/lfric_atm/working/scratch/`), so concurrent jobs
+  race on the source symlinks it stages and one dies with
+  `FileNotFoundError: ... working/scratch/lfric_core` from `get_git_sources.py`.
+  Chain them instead: `sbatch --dependency=afterany:<cray-jobid> ...`. (The two
+  Stage-1 builds are worth chaining too — they share `$PREFIX/opt`.)
 - **Integration (the examples are the test).** minimal-compile and the science-suites
   double as integration tests that a bare `module load` is a sufficient toolchain —
   they load the env like an end user and add nothing of their own to it. After

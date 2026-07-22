@@ -35,8 +35,8 @@ the science-suite examples in `../science-suites/`).
   git submodule update --init --jobs 4 -- \
     vendor/physics/casim vendor/physics/jules vendor/physics/socrates vendor/physics/ukca
   ```
-  (or `pixi run init-physics`). These are private Met Office repos — you need an
-  SSH key authorised for Met Office SSO (see the top-level `README.md`).
+  (or `pixi run init-physics`). These are public Met Office repos on HTTPS URLs —
+  no credentials needed.
 
 ## Run it
 
