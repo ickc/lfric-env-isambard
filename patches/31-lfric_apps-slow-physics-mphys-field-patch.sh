@@ -40,6 +40,7 @@ REPO_ROOT="${PIXI_PROJECT_ROOT:-$(cd "$_here/.." && pwd)}"
 WORKING_DIR="${LFRIC_SRC_ROOT:-$REPO_ROOT/vendor}"
 info() { echo "INFO: $*"; }
 warn() { echo "WARN: $*" >&2; }
+fail() { echo "ERROR: $*" >&2; }
 
 patch_slow_physics_mphys_field() {
   local alg="$WORKING_DIR/lfric_apps/science/gungho/source/algorithm/physics/slow_physics_alg_mod.X90"
@@ -51,7 +52,7 @@ patch_slow_physics_mphys_field() {
     return 0
   fi
 
-  ALG="$alg" python3 - <<'PYEOF' || { warn "failed to patch slow_physics_alg_mod.X90"; return 0; }
+  ALG="$alg" python3 - <<'PYEOF' || { fail "failed to patch slow_physics_alg_mod.X90"; return 1; }
 import os
 import re
 import sys
@@ -94,4 +95,4 @@ PYEOF
 }
 
 patch_slow_physics_mphys_field
-exit 0
+exit $?
