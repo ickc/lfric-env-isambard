@@ -63,9 +63,8 @@ example} × {`cray`, `spack`}.
   `vendor/mo-spack-packages`, which is still a private Met Office repo used by the
   Stage-1 build: it is on a `git@github.com:` URL and needs an SSH key registered
   with GitHub **and** authorised for the `MetOffice` organisation's SSO (GitHub →
-  Settings → SSH keys → Configure SSO), or an HTTPS credential helper
-  (`gh auth setup-git`). If a `submodule update` fails, it is almost always that
-  one.
+  Settings → SSH keys → Configure SSO). If a `submodule update` fails, it is almost
+  always that one.
 
 ---
 

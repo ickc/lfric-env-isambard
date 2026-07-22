@@ -33,8 +33,8 @@ scripts = ["scripts/common.sh", "scripts/activate.sh"]
 # One-time: clone the pinned Stage-1 (core) submodules — Spack, the package repos
 # and the LFRic sources. All of these clone anonymously over HTTPS except
 # mo-spack-packages, which is still private: that one needs an SSH key authorized
-# for Met Office SSO (or an HTTPS credential helper); see the README note. The
-# physics submodules (used by the examples, not Stage 1) are SEPARATE — see
+# for Met Office SSO; see the README note. The physics submodules (used by the
+# examples, not Stage 1) are SEPARATE — see
 # `init-physics`.
 submodule-init = "git submodule update --init --recursive --jobs 4 -- vendor/spack vendor/spack-packages vendor/lfric_apps vendor/lfric_core vendor/mo-spack-packages"
 
