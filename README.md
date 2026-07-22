@@ -55,13 +55,17 @@ example} × {`cray`, `spack`}.
 - **An Isambard 3 account**, and the basics of using it: the difference between a
   **login node** (where you clone + submit jobs) and a **compute node** (where the
   heavy build runs, via `sbatch`).
-- **An SSH key authorised for Met Office SSO.** Several source repositories are
-  private Met Office repos pulled in as *git submodules* (a submodule is just
-  another git repo nested inside this one, pinned to an exact commit). Cloning
-  them needs an SSH key registered with GitHub **and** authorised for the
-  `MetOffice` organisation's SSO (GitHub → Settings → SSH keys → Configure SSO),
-  or an HTTPS credential helper (`gh auth setup-git`). If a `submodule update`
-  fails, this is almost always why.
+- **GitHub access for one private submodule.** The sources are pulled in as *git
+  submodules* (a submodule is just another git repo nested inside this one, pinned
+  to an exact commit). All six LFRic source repos — `lfric_apps`, `lfric_core`,
+  `casim`, `jules`, `socrates`, `ukca` — are **public** and clone anonymously over
+  HTTPS, so no credentials are needed for them. The one exception is
+  `vendor/mo-spack-packages`, which is still a private Met Office repo used by the
+  Stage-1 build: it is on a `git@github.com:` URL and needs an SSH key registered
+  with GitHub **and** authorised for the `MetOffice` organisation's SSO (GitHub →
+  Settings → SSH keys → Configure SSO), or an HTTPS credential helper
+  (`gh auth setup-git`). If a `submodule update` fails, it is almost always that
+  one.
 
 ---
 
@@ -305,8 +309,10 @@ generally cleared with the node; delete it directly if you want it gone sooner.
 
 ## Troubleshooting
 
-- **`submodule update` fails / "Permission denied (publickey)".** Your SSH key is
-  not authorised for Met Office SSO (see [Prerequisites](#prerequisites)).
+- **`submodule update` fails / "Permission denied (publickey)".** This is
+  `vendor/mo-spack-packages`, the one remaining private submodule: your SSH key is
+  not authorised for Met Office SSO (see [Prerequisites](#prerequisites)). The six
+  LFRic source submodules are public and clone anonymously over HTTPS.
 - **`fork: Resource temporarily unavailable` during a build.** You are building on
   a login node — submit `scripts/build.sbatch` to a compute node instead.
 - **`Killed signal terminated program cc1plus` (out of memory).** Give the job

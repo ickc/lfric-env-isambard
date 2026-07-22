@@ -129,8 +129,10 @@ example} × {`cray`, `spack`}. This is the one outcome that must stay green. The
 
 - **Spack 1.0 needs CPython in [3.7, 3.12)** (it uses `ast.Str`). `common.sh` points
   `SPACK_PYTHON` at `python3`; the sbatch loads `cray-python/3.11.7`; pixi pins 3.11.
-- **Private submodules need Met Office SSO** on the SSH key. A `submodule update`
-  failure is almost always this.
+- **One private submodule needs Met Office SSO** on the SSH key: `mo-spack-packages`
+  (still `git@github.com:`). The six LFRic source repos (lfric_apps, lfric_core,
+  casim, jules, socrates, ukca) are public and on HTTPS URLs — they clone
+  anonymously. A `submodule update` failure is almost always mo-spack-packages.
 - **The cray HDF5/netCDF module versions must match** the external prefixes in
   `spack-env/cray/spack.yaml` (and the from-source pins in `spack/spack.yaml` mirror
   them). Bumping one means bumping the others.

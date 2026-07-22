@@ -102,7 +102,7 @@ lfric_clone_missing_submodules() {
   if [ "${#missing[@]}" -gt 0 ]; then
     info "Cloning missing Stage-1 submodules (--jobs $jobs): ${missing[*]}"
     git -C "$REPO_ROOT" submodule update --init --recursive --jobs "$jobs" -- "${missing[@]}" \
-      || die "submodule init failed for: ${missing[*]} (private repos need Met Office SSO on your SSH key)"
+      || die "submodule init failed for: ${missing[*]} (the LFRic sources are public over HTTPS; mo-spack-packages is private and needs Met Office SSO on your SSH key)"
   else
     info "Stage-1 submodules already present — skipping clone"
   fi
