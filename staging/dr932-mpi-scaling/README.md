@@ -221,6 +221,54 @@ pins one rank per core without being asked (row 4: `cpus=0-0 (width=1)`).
 `NUMA_REGIONS_PER_NODE = 0` in the `ISAMBARD3GNU` environment block is a related
 mis-setting — a Grace node has 2 — though on this code path `launch-exe` never reads it.
 
+### 4.3b Is the 8 GB/core a real requirement? (no — measured)
+
+The obvious objection to packing the ranks is memory. A Grace node is 225 GB for 144
+cores — 1.6 GB/core — and `--mem-per-cpu=8G` × 108 reserves **864 GB**, nearly four whole
+nodes. If the model genuinely needs that, packing it onto one node does not merely
+perform differently, it OOMs, and the right fix would be to cap *ranks per node* at 28
+rather than to take `--mem=0`.
+
+It does not. `memory-footprint.sh` reads it out of Slurm accounting for the six completed
+cycles (`results/memory-footprint.txt`):
+
+| job | nodes | ranks/node | MaxRSS | → MB/rank | → 108 ranks on 1 node |
+|---|---|---|---|---|---|
+| 5537502 | 32 | 3.4 | 558 MB | 165 | 17.4 GB |
+| 5524896 | 27 | 4.0 | 553 MB | 138 | 14.6 GB |
+| 5516605 | 26 | 4.2 | 525 MB | 126 | 13.3 GB |
+| 5532814 | 14 | 7.7 | 2179 MB | 282 | 29.8 GB |
+| 5520538 | 10 | 10.8 | 3624 MB | 336 | 35.4 GB |
+| 5541962 | 9 | 12.0 | 906 MB | 76 | 8.0 GB |
+
+Two steps make that conversion sound rather than assumed:
+
+- `JobAcctGatherType = jobacct_gather/cgroup`, and under Hydra the only processes Slurm
+  itself launches are one `hydra_pmi_proxy` per node — the accounting reports
+  `NTasks == NNodes` (32, 27, 26, 14, 10, 9), never 108. The ranks are descendants in the
+  same per-node cgroup. So `MaxRSS` is the largest **per-node total**.
+- That reading is falsifiable and survives: the rank count is 108 in *every* job, so a
+  per-rank figure would be constant across the rows. It isn't — it tracks ranks-per-node,
+  which is exactly what a per-node aggregate does.
+
+**So the peak is 8–35 GB for the whole job against 225 GB on one node — 6× to 28× of
+headroom, and the 864 GB request is over-provisioned by roughly 25–100×.** `--mem=0` is
+safe here with room to spare.
+
+Corroboration from the suite itself: the *dial3-gnu* branch pairs the same
+`--mem-per-cpu=8G` with `--ntasks-per-node={{ CORES_PER_NODE }}` = 128, i.e. 1 TB per
+node. That is boilerplate carried between platforms, not a figure anybody derived.
+
+Two caveats, both real:
+
+- `JobAcctGatherFrequency = 30` s, so a short allocation spike between samples is not
+  captured. Sustained use across a 5–9 h job is.
+- **This is C48_MG / L66, a small configuration.** The arithmetic is resolution-dependent
+  and 8 GB/core could become a genuine requirement at C384 or C1152. Re-run
+  `memory-footprint.sh` before assuming this headroom carries over; if it doesn't, keep
+  the placement fix but derive `--ntasks-per-node` from the memory need instead of taking
+  the whole node.
+
 ### 4.4 Not causes
 
 - **GNU vs CCE, and GCC 12.3 vs 14.3.** Not measured here, and not the thing being
@@ -300,6 +348,7 @@ why u-dr932 and u-dn704 run and scale here. Two things came out of this investig
 | `probe-1node.sbatch`, `probe-1node-bound.sbatch`, `probe-2node.sbatch` | the controls |
 | `probe-2node-hsn.sbatch`, `probe-hsn-diag.sbatch` | the open thread of §4.2: can the TCP fallback at least be moved off the management network onto `hsn0` |
 | `model-run.sh`, `model-1node.sbatch`, `model-scatter.sbatch` | the same comparison on the real `lfric_atm` binary |
+| `memory-footprint.sh` | §4.3b — whether packing the ranks starves them of memory, out of Slurm accounting |
 | `denis-u-dr932/` | read-only snapshot of the scaling-relevant parts of his suite |
 | `fix-u-dr932.patch` | the config-only fix, against his repo |
 | `results/` | captured output backing every number above |

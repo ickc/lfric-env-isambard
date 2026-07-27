@@ -18,9 +18,19 @@
 set -uo pipefail
 cd "${SLURM_SUBMIT_DIR:-$(pwd)}" || exit 1
 
-echo "=== interfaces, per node ==="
-srun --ntasks="${SLURM_JOB_NUM_NODES}" --ntasks-per-node=1 \
-     bash -c 'echo "[$(hostname)] $(ip -br addr | tr "\n" "|")"'
+echo "=== interfaces + LINK SPEED, per node ==="
+# The speed is the point: on the login node bond0 is a single 1 GbE slave (eno1) while
+# hsn0 is 200 Gb/s. If that holds on compute nodes, the TCP fallback is not merely
+# "slower", it is saturating a link 200x narrower than the one sitting idle next to it.
+srun --ntasks="${SLURM_JOB_NUM_NODES}" --ntasks-per-node=1 bash -c '
+  for i in /sys/class/net/*/; do n=$(basename "$i"); [ "$n" = lo ] && continue
+    printf "[%s] %-12s speed=%-8s addr=%s\n" "$(hostname)" "$n" \
+      "$(cat "$i/speed" 2>/dev/null || echo -)" \
+      "$(ip -br addr show "$n" | awk "{print \$3}")"
+  done
+  for b in /sys/class/net/bond*/bonding/slaves; do
+    [ -r "$b" ] && echo "[$(hostname)] $(echo "$b" | cut -d/ -f5) slaves=[$(cat "$b")]"
+  done'
 
 echo
 echo "=== hostname resolution, per node ==="

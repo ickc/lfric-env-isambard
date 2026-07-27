@@ -1,0 +1,9 @@
+JOB         NODES  RANKS/NODE     MaxRSS    MB/RANK   108ranks->GB
+5537502        32         3.4       558MB        165           17.4
+5524896        27         4.0       553MB        138           14.6
+5516605        26         4.2       525MB        126           13.3
+5532814        14         7.7      2179MB        282           29.8
+5520538        10        10.8      3624MB        336           35.4
+5541962         9        12.0       906MB         76            8.0
+
+requested: 864G   available on one node: 225 GB
