@@ -1,0 +1,18 @@
+# Are the nodes shared? (backs README.md section 4.1)
+#
+# select/cons_tres + CR_CORE_MEMORY means Slurm allocates CORES, not machines, so a job
+# that takes 13 of a node's 144 cores leaves the rest for anyone else.
+
+$ scontrol show config | grep SelectType
+  SelectType              = select/cons_tres
+  SelectTypeParameters    = CR_CORE_MEMORY
+
+$ scontrol show partition grace   (relevant fields)
+  ExclusiveUser=NO
+  OverSubscribe=NO
+
+# Distinct jobs from OTHER users touching the 32 nodes of Denis' job 5537502
+# during its 08:52:55 window:
+  window: 2026-07-23T23:11:27 -> 2026-07-24T08:04:22
+  distinct jobs: 1493
+  distinct users: 20

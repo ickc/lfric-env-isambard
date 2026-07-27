@@ -376,6 +376,14 @@
             --ntasks={{TOTAL_RANKS_REQ}}
             --ntasks-per-node={{LFRIC_PPN}}
             --mem=0
+            # Whole nodes, not slices of shared ones. SelectType is select/cons_tres
+            # (CR_CORE_MEMORY), so without this the job lands on partially-occupied
+            # nodes and competes for cores and memory bandwidth with whatever else is
+            # there -- the source of the 5h-to-9h spread on identical work documented
+            # in staging/dr932-mpi-scaling. --mem=0 is still needed alongside it:
+            # --exclusive gives all the CPUs but memory still follows DefMemPerCPU
+            # (1024 MB x 144 = 144 GB of a 225 GB node).
+            --exclusive =
             --partition={{RUN_QUEUE}}
         {% else %}
             -l select={{LFRIC_NODES}}

@@ -1,5 +1,5 @@
 diff --git a/src/suites/u-dr932/flow.cylc b/src/suites/u-dr932/flow.cylc
-index 2b971e3..a7aad1f 100644
+index 2b971e3..6c08f92 100644
 --- a/src/suites/u-dr932/flow.cylc
 +++ b/src/suites/u-dr932/flow.cylc
 @@ -74,7 +74,12 @@
@@ -16,7 +16,7 @@ index 2b971e3..a7aad1f 100644
  
  
  {# ============================================================ #}
-@@ -199,9 +204,16 @@
+@@ -199,9 +204,23 @@
              BUILD_ROOT=$CYLC_WORKFLOW_SHARE_DIR/lfric_build
              HYPERTHREADS    = 1
              CORES_PER_NODE  = {{ CORES_PER_NODE }}
@@ -30,11 +30,18 @@ index 2b971e3..a7aad1f 100644
 +            # affinity mask and the kernel migrates them across both Grace sockets.
 +            # SITE_MPI_LAUNCHER_OPTS is the hook launch-exe provides for exactly this;
 +            # it replaces LAUNCHER_OPTS wholesale, so it must carry -n itself.
++            #
++            # NB `-bind-to core` gives each rank exactly ONE core, which is right only
++            # because this app runs OMP_NUM_THREADS=1 (app/lfric_atm/rose-app.conf). The
++            # binary IS OpenMP-linked, so if you ever raise the thread count, three
++            # things have to move together or the run gets SLOWER: OMP_NUM_THREADS=N
++            # there, --cpus-per-task=N below, and this becoming `-bind-to core:N`.
++            # Leave it at `core` and N threads per rank would contend for one core.
 +            SITE_MPI_LAUNCHER_OPTS = -bind-to core -ppn {{ LFRIC_ATM_PPN }} -n {{ TOTAL_RANKS_REQ }}
          [[[directives]]]
  {#            --account=u35v #}
  {#            --partition=devel #}
-@@ -545,9 +557,20 @@
+@@ -545,9 +564,28 @@
  {% else %}
  {% if MACHINE == "isambard3-gnu" %}
          [[[directives]]]
@@ -52,6 +59,14 @@ index 2b971e3..a7aad1f 100644
              --ntasks={{TOTAL_RANKS_REQ}}
 +            --ntasks-per-node={{ LFRIC_ATM_PPN }}
              --cpus-per-task=1
++            # Whole nodes. SelectType is select/cons_tres (CR_CORE_MEMORY), so Slurm
++            # hands out CORES, not machines -- 1493 distinct jobs from 20 users touched
++            # the 32 nodes of one 108-rank run during its 8h53m. Competing for cores and
++            # memory bandwidth with all of that is where the 5h-to-9h spread on identical
++            # work comes from, so this is what makes a timing repeatable, not just fast.
++            --exclusive =
++            # Needed as well as --exclusive: that gives all the CPUs, but memory still
++            # follows DefMemPerCPU (1024 MB x 144 = 144 GB of a 225 GB node).
 +            --mem=0
              --export=NONE
  {% else %}

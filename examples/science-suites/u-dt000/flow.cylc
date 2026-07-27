@@ -359,6 +359,14 @@
             # will scatter the ranks over whatever nodes have room -- see
             # staging/dr932-mpi-scaling/README.md.
             --ntasks-per-node={{LFRIC_PPN}}
+            # Whole nodes, not slices of shared ones. SelectType is select/cons_tres
+            # (CR_CORE_MEMORY), so without this the job lands on partially-occupied
+            # nodes and competes for cores and memory bandwidth with whatever else is
+            # there -- the source of the 5h-to-9h spread on identical work documented
+            # in staging/dr932-mpi-scaling. --mem=0 is still needed alongside it:
+            # --exclusive gives all the CPUs but memory still follows DefMemPerCPU
+            # (1024 MB x 144 = 144 GB of a 225 GB node).
+            --exclusive =
             # Science-suite example (this repo): give the run task the node's full memory; Slurm's
             # ~1G/task default OOM-kills lfric_atm (matches forward-ported u-dr932).
             --mem=0

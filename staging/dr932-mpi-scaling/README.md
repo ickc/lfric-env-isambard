@@ -66,6 +66,13 @@ partial-node allocations also share their nodes with other users' jobs, so the u
 ranks compete for cores with whoever else landed there; that is where the run-to-run
 variance comes from.
 
+**The nodes really are shared, not merely shareable.** `SelectType = select/cons_tres`
+with `CR_CORE_MEMORY`, so Slurm hands out cores rather than machines; `ExclusiveUser=NO`.
+Over the 8 h 53 m window of job 5537502, **1493 distinct jobs from 20 different users**
+touched the 32 nodes it was spread across (`results/node-sharing.txt`). Its unpinned
+ranks (§4.3) were competing for cores and memory bandwidth with all of that. Hence
+`--exclusive` in the fix, not just `--nodes`.
+
 This is also why the problem is easy to miss: a request for 108 ranks with no node
 count is *easier* for Slurm to place than a whole node, so the job starts sooner and
 then runs slowly. Reproducing this, the 12-node scattered arm started within a minute
@@ -181,24 +188,43 @@ Two details worth having, since "it's ch3" invites the wrong follow-up questions
   is a reconfigure and rebuild of MPICH and everything above it (HDF5, netCDF, XIOS,
   LFRic). At which point cray-mpich is already installed and already tuned.
 
-**And the TCP is on the management network, not the fast NIC.** `nemesis:tcp` picks its
-interface by resolving the local hostname, and on Isambard 3 that resolves to the
-`172.23/16` admin address (`bond0`), not to `hsn0` (`10.243/16`), which is the Slingshot
-NIC's IP interface:
+**And the TCP is not merely bypassing RDMA — it is on a 1 GbE management link.**
+`nemesis:tcp` picks its interface by resolving the local hostname. Measured on the
+compute nodes themselves (`results/hsn-diag-*.out`):
 
-```
-x3008c0s5b2n0 -> 172.23.1.99    # bond0, cluster management ethernet
-hsn0             10.243.0.106/16 # Slingshot NIC, IP-over-fabric
-```
+| interface | speed | address | |
+|---|---|---|---|
+| `bond0` (one slave, `eno1`) | **1000 Mb/s** | 172.23.0.72/16 | in-band cluster/provisioning net — **what the hostname resolves to** |
+| `hsn0` | **200000 Mb/s** | 10.243.0.66/16 | Slingshot NIC, IP-over-fabric |
+
+So it is not the BMC/out-of-band network (that is invisible to the OS — no `/dev/ipmi0`),
+but the node's own gigabit housekeeping NIC. Note Lustre does *not* go this way: it
+reaches the fabric through kfabric at kernel level (`43@kfi,111@kfi:…/lfs1i3`).
+
+**The link is saturated, not merely inefficient.** The probe's aggregate counts both
+directions, so 0.23 GB/s over 2 nodes is 0.115 GB/s ≈ **0.92 Gb/s each way against a
+1 Gb/s full-duplex link — 92% of line rate.** The clincher is that it does not depend on
+rank count: 108 ranks give 0.23 GB/s and **4 ranks give 0.21 GB/s**. Per-message overhead
+would scale with the number of ranks; a saturated wire does not. The model is pinned to a
+link **200× narrower** than the one sitting idle beside it.
 
 The obvious no-rebuild mitigation — `MPIR_CVAR_NEMESIS_TCP_NETWORK_IFACE=hsn0`, still
-kernel TCP but over the right wire — **does not work as of this writing**:
-`probe-2node-hsn.sbatch` runs the identical 2×54 probe with the cvar unset and set; the
-unset arm reproduces (229.84 µs / 0.23 GB/s, against 226.42 / 0.23 earlier), and the set
-arm dies immediately with exit 15 and no output at all. `probe-hsn-diag.sbatch` is queued
-to find out why (does `hsn0` exist and carry an address on a compute node; what does
-MPICH say). **Do not recommend this to anyone until that resolves** — it is recorded here
-as an open thread, not as a fix. It is deliberately absent from `fix-u-dr932.patch`.
+kernel TCP but over the right wire — **does not work**. `probe-2node-hsn.sbatch` runs the
+identical 2×54 probe with the cvar unset and set: the unset arm reproduces (229.84 µs /
+0.23 GB/s against 226.42 / 0.23 earlier), the set arm dies immediately with exit 15 and no
+output. `probe-hsn-diag.sbatch` ruled out the easy explanations — `hsn0` is present,
+addressed and up on both compute nodes, and it fails identically at 4 ranks, so it is not
+a scale effect and not a missing interface. It also produces no diagnostic with stderr
+merged.
+
+`probe-hsn-reach.sbatch` tests what is left: whether ordinary IP traffic between nodes
+works over `hsn0` at all. Slingshot's native path is kernel-level kfabric, and an IP
+interface existing does not imply node-to-node TCP is carried over it. If plain ping/TCP
+on 10.243 fails, MPICH's silence is explained — it advertised an address its peers cannot
+reach — and the cvar is a dead end rather than a bug.
+
+**Until that resolves, do not recommend this to anyone.** It is deliberately absent from
+`fix-u-dr932.patch`.
 
 So §4.1 and §4.2 compound: the suite maximises the number of messages that must cross a
 node boundary, and the stack makes each of those messages as slow as it can be.
@@ -346,7 +372,7 @@ why u-dr932 and u-dn704 run and scale here. Two things came out of this investig
 | `run-probe.sh` | builds + launches it against `uoe` / `cray` / `spack` × `mpiexec` / `mpiexec-bound` / `srun` |
 | `probe-as-suite.sbatch` | Denis' `#SBATCH` block verbatim — the reproduction |
 | `probe-1node.sbatch`, `probe-1node-bound.sbatch`, `probe-2node.sbatch` | the controls |
-| `probe-2node-hsn.sbatch`, `probe-hsn-diag.sbatch` | the open thread of §4.2: can the TCP fallback at least be moved off the management network onto `hsn0` |
+| `probe-2node-hsn.sbatch`, `probe-hsn-diag.sbatch`, `probe-hsn-reach.sbatch` | the open thread of §4.2: can the TCP fallback be moved off the 1 GbE management link onto `hsn0` (so far: no) |
 | `model-run.sh`, `model-1node.sbatch`, `model-scatter.sbatch` | the same comparison on the real `lfric_atm` binary |
 | `memory-footprint.sh` | §4.3b — whether packing the ranks starves them of memory, out of Slurm accounting |
 | `denis-u-dr932/` | read-only snapshot of the scaling-relevant parts of his suite |

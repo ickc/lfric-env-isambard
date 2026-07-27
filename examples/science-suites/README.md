@@ -122,6 +122,25 @@ Three rules, all visible in the suites here:
   two rules above travel together.
 - **A Grace node is 144 cores** (2 sockets × 72), not the 128 the upstream suites
   assume. `LPPN`/`CORES_PER_NODE` are set to 144 here.
+- **Ask for whole nodes (`--exclusive`).** `SelectType` is `select/cons_tres`
+  (`CR_CORE_MEMORY`), so Slurm hands out *cores*, not machines: a task that takes 13 of
+  a node's 144 cores leaves the other 131 for anyone. Over one 9-hour run, 1493 distinct
+  jobs from other users touched the 32 nodes the scattered example was spread across.
+  That co-tenancy is where the 5 h → 9 h spread on identical work came from, so
+  exclusivity is what makes a timing reproducible, not just faster. Keep `--mem=0`
+  alongside it — `--exclusive` gives all the *CPUs*, but memory still follows
+  `DefMemPerCPU` (1024 MB × 144 = 144 GB of a 225 GB node).
+- **Threads: these suites are pure MPI (`OMP_NUM_THREADS=1`, `--cpus-per-task=1`).**
+  The binaries *are* OpenMP-linked (`libgomp`), so this is a live knob, not a rebuild —
+  and worth knowing that at 108 ranks × 1 thread, 36 of a node's 144 cores sit idle.
+  If you do raise it, three things move together or the run gets slower, not faster:
+  `--cpus-per-task=N`, `OMP_NUM_THREADS=N` (it is hardcoded in each suite's
+  `app/lfric_atm/rose-app.conf`, which overrides the task environment), and the
+  binding. Under `srun` that means `--cpus-per-task=N` plus `OMP_PROC_BIND=close` /
+  `OMP_PLACES=cores`; under Hydra, `-bind-to core:N` — plain `-bind-to core` pins the
+  whole rank to *one* core and its N threads then fight over it. Rank/thread balance on
+  LFRic is not something this repo has measured; treat it as an experiment to run, not
+  a recommendation to follow.
 
 The measured cost of getting this wrong, 108 ranks throughout (full table in the
 staging README):
