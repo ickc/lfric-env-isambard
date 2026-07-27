@@ -98,6 +98,43 @@ runs offline against *our* env on Isambard 3:
    (`job runner = slurm`, on `localhost`) and a roomy `cylc-run` dir into
    `~/.cylc/flow/` (idempotent; the same setup `pixi run setup-cylc` does).
 
+### Placement and MPI transport — the contract
+
+A ported suite must **state where its ranks go**. This is not a tuning nicety; get it
+wrong and the model is several times slower, which is how a suite ported to Isambard 3
+outside this repo ended up 3–4× slower than Monsoon (investigated in full, with
+measurements, in [`staging/dr932-mpi-scaling/`](../../staging/dr932-mpi-scaling/)).
+Three rules, all visible in the suites here:
+
+- **`RUN_METHOD = srun`, never `mpiexec`.** `srun` is what binds cray-mpich to
+  Slingshot's `cxi` provider through the Cray PMI, and it pins one rank per core
+  without being asked. `site/bin/launch-exe` implements the `srun` path (including the
+  dedicated-XIOS-server MPMD, which the Met Office `launch-exe` only wires up under
+  Hydra). Note the `cray` environment does not even ship an `mpiexec`.
+- **The `lfric_atm` `[[[directives]]]` must carry `--nodes` *and*
+  `--ntasks-per-node`, with `--mem=0`.** Given only `--ntasks` plus a per-CPU memory
+  request, Slurm satisfies it out of whatever nodes have room: a 108-rank job that fits
+  on one 144-core Grace node was observed spread over **9 to 32** nodes, with 1–13 ranks
+  each. `--mem=0` takes the node's whole memory so a memory request can never cap
+  ranks-per-node and fan the job out. On cray-mpich that scatter is survivable (measured
+  at ~1.1× on the model, inside run-to-run noise) — it is when it combines with an MPI
+  that falls back to TCP that it costs a factor of several, which is precisely why the
+  two rules above travel together.
+- **A Grace node is 144 cores** (2 sockets × 72), not the 128 the upstream suites
+  assume. `LPPN`/`CORES_PER_NODE` are set to 144 here.
+
+The measured cost of getting this wrong, 108 ranks throughout (full table in the
+staging README):
+
+| | 8 B allreduce | 1 MiB pairwise | 64 KiB ring |
+|---|---|---|---|
+| scattered over 11 nodes, unpinned, from-source MPICH over TCP | 2494 µs | 0.70 GB/s | 1312 µs |
+| one node, pinned, cray-mpich under `srun` | **5.2 µs** | **1682 GB/s** | **15.6 µs** |
+
+Rank counts are worth a thought too: a cubed-sphere partition wants `6 × n²` ranks for
+square subdomains — **24, 54, 96** all fit one node; 108 works but gives each rank a
+16×8 patch instead of a square one.
+
 ## Prerequisites
 
 - **Stage 1 built** for the variant you want (`scripts/build.sbatch`). Run the

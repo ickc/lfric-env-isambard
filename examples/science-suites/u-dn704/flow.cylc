@@ -127,7 +127,10 @@
             BIG_DATA_DIR = {{ BIG_DATA_DIR }}
             BUILD_ROOT = ${TMPDIR}
             HYPERTHREADS    = 1
-            CORES_PER_NODE  = 128
+            # A Grace node is 2 sockets x 72 = 144 cores (128 is the Monsoon number).
+            # site/bin/launch-exe does not read this -- srun takes the placement from
+            # the directives below -- but leave the truth here, not a foreign platform's.
+            CORES_PER_NODE  = 144
             NUMA_REGIONS_PER_NODE = 2
             RUN_METHOD = srun
 
