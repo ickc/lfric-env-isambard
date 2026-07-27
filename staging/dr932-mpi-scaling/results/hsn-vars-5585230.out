@@ -1,0 +1,39 @@
+nodes: x3003c0s3b2n0 x3003c0s3b3n0   (b hsn0=10.243.0.3)
+
+=== TCP (not just ICMP) over hsn0, python ===
+connector: TCP to 10.243.0.3:9999 OK
+listener: accepted from ('10.243.0.1', 53580)
+  connect rc=0
+
+############ BASELINE ############
+PROBE ranks=4
+PROBE nodes=2
+PROBE node x3003c0s3b2n0        ranks=2
+PROBE node x3003c0s3b3n0        ranks=2
+PROBE binding: 0/4 ranks pinned to exactly 1 CPU (UNBOUND -- ranks can migrate)
+PROBE allreduce_8B_usec 92.90
+PROBE pairwise_1MiB_aggregate_GBps 0.23  (4 ranks exchanging, 3.68s)
+PROBE ring_64KiB_usec 558.41
+PROBE done
+  rc=0
+
+############ MPIR_CVAR_NEMESIS_TCP_NETWORK_IFACE ############
+  rc=1
+
+############ MPICH_NEMESIS_TCP_NETWORK_IFACE ############
+  rc=1
+
+############ MPIR_CVAR_NETWORK_IFACE ############
+  rc=1
+
+############ MPIR_CVAR_CH3_NETWORK_IFACE ############
+PROBE ranks=4
+PROBE nodes=2
+PROBE node x3003c0s3b2n0        ranks=2
+PROBE node x3003c0s3b3n0        ranks=2
+PROBE binding: 0/4 ranks pinned to exactly 1 CPU (UNBOUND -- ranks can migrate)
+PROBE allreduce_8B_usec 93.52
+PROBE pairwise_1MiB_aggregate_GBps 0.23  (4 ranks exchanging, 3.71s)
+PROBE ring_64KiB_usec 558.79
+PROBE done
+  rc=0

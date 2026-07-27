@@ -217,14 +217,47 @@ addressed and up on both compute nodes, and it fails identically at 4 ranks, so 
 a scale effect and not a missing interface. It also produces no diagnostic with stderr
 merged.
 
-`probe-hsn-reach.sbatch` tests what is left: whether ordinary IP traffic between nodes
-works over `hsn0` at all. Slingshot's native path is kernel-level kfabric, and an IP
-interface existing does not imply node-to-node TCP is carried over it. If plain ping/TCP
-on 10.243 fails, MPICH's silence is explained — it advertised an address its peers cannot
-reach — and the cvar is a dead end rather than a bug.
+Two hypotheses for the failure have since been tested and **both are dead**:
 
-**Until that resolves, do not recommend this to anyone.** It is deliberately absent from
-`fix-u-dr932.patch`.
+- *"`hsn0` is absent or down on compute nodes."* No — it is up, addressed and reports
+  200000 Mb/s on both (`results/hsn-diag-*.out`).
+- *"Node-to-node IP is not actually carried over `hsn0`"* — plausible, because
+  Slingshot's native path is kernel kfabric and an IP interface existing does not imply
+  IP is routed over it. **Disproved:** ping between two nodes' 10.243 addresses succeeds
+  at 0.04–0.11 ms, *faster* than the same pair over `bond0` at 0.086–0.098 ms
+  (`results/hsn-reach-*.out`). So the fast path is reachable and MPICH simply is not
+  taking it. (The `nc` line in that job failed only because `nc` is not installed — a bug
+  in the test, not a finding.)
+
+TCP, not just ICMP, also works over `hsn0` — `probe-hsn-vars.sbatch` opens a real socket
+between the two nodes' 10.243 addresses first, and it connects. So the fast path is
+reachable at L3 *and* L4, and MPICH is simply not taking it.
+
+That leaves how the knob is spelled. This `libmpi` carries several names for it, and its
+*error* text names a different one than its cvar description does. Every spelling, tried
+against a baseline on 4 ranks over 2 nodes:
+
+| variable | rc | result |
+|---|---|---|
+| *(baseline, unset)* | 0 | 0.23 GB/s, ring 558.4 µs |
+| `MPIR_CVAR_NEMESIS_TCP_NETWORK_IFACE=hsn0` | 1 | **no output at all** |
+| `MPICH_NEMESIS_TCP_NETWORK_IFACE=hsn0` | 1 | **no output at all** |
+| `MPIR_CVAR_NETWORK_IFACE=hsn0` | 1 | **no output at all** |
+| `MPIR_CVAR_CH3_NETWORK_IFACE=hsn0` | 0 | 0.23 GB/s, ring 558.8 µs — **identical to baseline** |
+
+The last row is the trap: it exits 0 and looks like it worked, but the numbers are
+baseline to within noise, i.e. the variable is **silently ignored** — that is the name
+MPICH's error strings mention, not a name it honours. Anyone who sets it will believe
+they have moved onto the fast NIC and will not have. The three names it *does* recognise
+all kill the job before it prints anything, with stderr merged.
+
+**Unresolved, and closed here.** Three hypotheses eliminated (interface missing; IP not
+carried; wrong spelling), no working variant found, and further reverse-engineering of a
+misconfigured third-party MPICH is worth less than the recommendation it would compete
+with — §5.2, an MPI that reaches Slingshot properly rather than over IP. Recorded so
+nobody repeats it, and deliberately absent from `fix-u-dr932.patch`. The prize was real
+(~200× of link speed on a stack nobody has to rebuild), which is why it was worth three
+jobs to find out.
 
 So §4.1 and §4.2 compound: the suite maximises the number of messages that must cross a
 node boundary, and the stack makes each of those messages as slow as it can be.
@@ -372,7 +405,7 @@ why u-dr932 and u-dn704 run and scale here. Two things came out of this investig
 | `run-probe.sh` | builds + launches it against `uoe` / `cray` / `spack` × `mpiexec` / `mpiexec-bound` / `srun` |
 | `probe-as-suite.sbatch` | Denis' `#SBATCH` block verbatim — the reproduction |
 | `probe-1node.sbatch`, `probe-1node-bound.sbatch`, `probe-2node.sbatch` | the controls |
-| `probe-2node-hsn.sbatch`, `probe-hsn-diag.sbatch`, `probe-hsn-reach.sbatch` | the open thread of §4.2: can the TCP fallback be moved off the 1 GbE management link onto `hsn0` (so far: no) |
+| `probe-2node-hsn.sbatch`, `probe-hsn-diag.sbatch`, `probe-hsn-reach.sbatch`, `probe-hsn-vars.sbatch` | §4.2's closed thread: can the TCP fallback be moved off the 1 GbE management link onto `hsn0`? No — three hypotheses eliminated, no working variant |
 | `model-run.sh`, `model-1node.sbatch`, `model-scatter.sbatch` | the same comparison on the real `lfric_atm` binary |
 | `memory-footprint.sh` | §4.3b — whether packing the ranks starves them of memory, out of Slurm accounting |
 | `denis-u-dr932/` | read-only snapshot of the scaling-relevant parts of his suite |
