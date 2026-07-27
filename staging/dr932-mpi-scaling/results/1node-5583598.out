@@ -1,0 +1,82 @@
+SLURM_JOB_NUM_NODES=1 NODELIST=x3007c0s19b4n0
+
+############ uoe / mpiexec ############
+=== stack=uoe launcher=mpiexec ranks=108
+--- mpicc -> /projects/u35v/sw/KKsGCC1230LFRicSWstackConfMakeBuild/usr/bin/mpicc
+--- MPICH Version:      4.2.3
+--- MPICH Release date: Wed Oct  2 09:35:21 AM CDT 2024
+--- MPICH ABI:          16:3:4
+--- MPICH Device:       ch3:nemesis
+--- MPICH configure:    --prefix=/projects/u35v/sw/KKsGCC1230LFRicSWstackConfMakeBuild/usr --enable-fortran=all --enable-cxx --enable-threads=multiple --enable-shared --enable-romio --with-device=ch3
+--- MPICH CC:           gcc    -O2
+--- MPICH CXX:          g++   -O2
+--- MPICH F77:          gfortran -w -fallow-argument-mismatch -O2  -O2
+--- MPICH FC:           gfortran -w -fallow-argument-mismatch -O2  -O2
+--- MPICH features:     
+--- 
+--- linked against:
+---   	libmpi.so.12 => /projects/u35v/sw/KKsGCC1230LFRicSWstackConfMakeBuild/usr/lib/libmpi.so.12 (0x0000400013680000)
+--- exec: mpiexec -n 108 /lfs1i3/scratch/u35v/khcheung.u35v/git/lfric-env-isambard/staging/dr932-mpi-scaling/build/mpi-probe.uoe
+PROBE ranks=108
+PROBE nodes=1
+PROBE node x3007c0s19b4n0       ranks=108
+PROBE binding: 0/108 ranks pinned to exactly 1 CPU (UNBOUND -- ranks can migrate)
+PROBE   rank 0    x3007c0s19b4n0       cpus=0-125 (width=108)
+PROBE   rank 1    x3007c0s19b4n0       cpus=0-125 (width=108)
+PROBE   rank 2    x3007c0s19b4n0       cpus=0-125 (width=108)
+PROBE   rank 3    x3007c0s19b4n0       cpus=0-125 (width=108)
+PROBE   rank 4    x3007c0s19b4n0       cpus=0-125 (width=108)
+PROBE   rank 5    x3007c0s19b4n0       cpus=0-125 (width=108)
+PROBE   rank 6    x3007c0s19b4n0       cpus=0-125 (width=108)
+PROBE   rank 7    x3007c0s19b4n0       cpus=0-125 (width=108)
+PROBE allreduce_8B_usec 13.23
+PROBE pairwise_1MiB_aggregate_GBps 402.41  (108 ranks exchanging, 0.06s)
+PROBE ring_64KiB_usec 25.65
+PROBE done
+exit=0
+
+############ cray / srun ############
+=== stack=cray launcher=srun ranks=108
+--- cc -> /opt/cray/pe/craype/2.7.36/bin/cc
+--- MPI VERSION    : CRAY MPICH version 9.1.0.794 (ANL base 4.3.0a1)
+--- MPI BUILD INFO : Fri Jan 16 12:11 2026 (git hash ef29dc0-dirty)
+--- 
+--- linked against:
+---   	libmpi_gnu.so.12 => /opt/cray/pe/mpich/9.1.0/ofi/gnu/12.3/lib/libmpi_gnu.so.12 (0x0000400039d50000)
+---   	libfabric.so.1 => /opt/cray/libfabric/2.3.1/lib64/libfabric.so.1 (0x000040003c4c0000)
+---   	libpmi.so.0 => /opt/cray/pe/lib64/libpmi.so.0 (0x000040003c630000)
+---   	libpmi2.so.0 => /opt/cray/pe/lib64/libpmi2.so.0 (0x000040003c680000)
+--- exec: srun --ntasks=108 /lfs1i3/scratch/u35v/khcheung.u35v/git/lfric-env-isambard/staging/dr932-mpi-scaling/build/mpi-probe.cray
+PROBE ranks=108
+PROBE nodes=1
+PROBE node x3007c0s19b4n0       ranks=108
+PROBE binding: 108/108 ranks pinned to exactly 1 CPU (bound)
+PROBE   rank 0    x3007c0s19b4n0       cpus=0-0 (width=1)
+PROBE   rank 1    x3007c0s19b4n0       cpus=72-72 (width=1)
+PROBE   rank 2    x3007c0s19b4n0       cpus=1-1 (width=1)
+PROBE   rank 3    x3007c0s19b4n0       cpus=73-73 (width=1)
+PROBE   rank 4    x3007c0s19b4n0       cpus=2-2 (width=1)
+PROBE   rank 5    x3007c0s19b4n0       cpus=74-74 (width=1)
+PROBE   rank 6    x3007c0s19b4n0       cpus=3-3 (width=1)
+PROBE   rank 7    x3007c0s19b4n0       cpus=75-75 (width=1)
+PROBE allreduce_8B_usec 5.20
+PROBE pairwise_1MiB_aggregate_GBps 1681.62  (108 ranks exchanging, 0.01s)
+PROBE ring_64KiB_usec 15.55
+PROBE done
+exit=0
+
+############ cray / mpiexec ############
+=== stack=cray launcher=mpiexec ranks=108
+--- cc -> /opt/cray/pe/craype/2.7.36/bin/cc
+--- MPI VERSION    : CRAY MPICH version 9.1.0.794 (ANL base 4.3.0a1)
+--- MPI BUILD INFO : Fri Jan 16 12:11 2026 (git hash ef29dc0-dirty)
+--- 
+--- linked against:
+---   	libmpi_gnu.so.12 => /opt/cray/pe/mpich/9.1.0/ofi/gnu/12.3/lib/libmpi_gnu.so.12 (0x00004000102a0000)
+---   	libfabric.so.1 => /opt/cray/libfabric/2.3.1/lib64/libfabric.so.1 (0x0000400012a10000)
+---   	libpmi.so.0 => /opt/cray/pe/lib64/libpmi.so.0 (0x0000400012b80000)
+---   	libpmi2.so.0 => /opt/cray/pe/lib64/libpmi2.so.0 (0x0000400012bd0000)
+--- exec: mpiexec -n 108 /lfs1i3/scratch/u35v/khcheung.u35v/git/lfric-env-isambard/staging/dr932-mpi-scaling/build/mpi-probe.cray
+staging/dr932-mpi-scaling/run-probe.sh: line 64: mpiexec: command not found
+exit=127
+

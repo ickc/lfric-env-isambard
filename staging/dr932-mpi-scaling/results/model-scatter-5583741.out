@@ -1,0 +1,26 @@
+--- write_conservation_diag=.false.,
+--- write_diag=.false.,
+--- write_initial=.false.,
+--- run_log_level='warning',
+--- timestep_end='200',
+--- timestep_start='1',
+--- tag=scattered-12node steps=200 rundir=/projects/u35v/khcheung.u35v/dr932-model/scattered-12node-5583741
+--- SLURM_JOB_NUM_NODES=12 SLURM_NTASKS=24 SLURM_TASKS_PER_NODE=2(x12)
+--- nodes: x3007c0s9b1n0,x3007c0s9b2n0,x3007c0s9b3n0,x3010c0s15b3n0,x3010c0s15b4n0,x3010c0s17b1n0,x3010c0s17b2n0,x3010c0s17b3n0,x3010c0s17b4n0,x3010c0s19b1n0,x3010c0s19b2n0,x3010c0s19b3n0
+--- last 15 lines of /projects/u35v/khcheung.u35v/dr932-model/scattered-12node-5583741/model.log
+--- 20260727143107.675+0000:INFO : lfric_atm application completed.
+--- 20260727143114.095+0000:INFO : lfric_atm application completed.
+--- 20260727143115.156+0000:INFO : lfric_atm application completed.
+--- 20260727143122.604+0000:INFO : lfric_atm application completed.
+--- 20260727143122.900+0000:INFO : lfric_atm application completed.
+--- 20260727143123.018+0000:INFO : lfric_atm application completed.
+--- 20260727143123.621+0000:INFO : lfric_atm application completed.
+--- 20260727143128.317+0000:INFO : lfric_atm application completed.
+--- 20260727143128.568+0000:INFO : lfric_atm application completed.
+--- 20260727143134.657+0000:INFO : lfric_atm application completed.
+--- 20260727143135.861+0000:INFO : lfric_atm application completed.
+--- 20260727143153.938+0000:INFO : lfric_atm application completed.
+--- 20260727143157.942+0000:INFO : lfric_atm application completed.
+--- 20260727143228.289+0000:INFO : lfric_atm application completed.
+--- 20260727143307.841+0000:INFO : lfric_atm application completed.
+RESULT tag=scattered-12node nodes=12 ranks=24 steps=200 elapsed_s=288 rc=0

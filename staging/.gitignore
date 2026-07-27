@@ -1,0 +1,7 @@
+# An investigation's results/ IS its evidence — the numbers its README cites have to
+# be reproducible and inspectable, so re-include the sbatch `*.out` that the root
+# .gitignore drops as batch noise. (A deeper .gitignore wins over a shallower one.)
+!*/results/*.out
+
+# Compiled probes are not evidence; run-probe.sh rebuilds them.
+*/build/

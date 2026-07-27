@@ -1,0 +1,9 @@
+# What launch-exe emits for TARGET_PLATFORM=uoe-isambard3, checked with its own
+# TEST_LAUNCH_EXE_EXEC mode (it prints the command it WOULD run when the expected
+# string does not match). Source: vendor/lfric_apps bd921320.
+
+## before the fix -- identical to the 'Execute command is:' line in Denis' job.out
+mpiexec -n 108 /bin/lfric_atm configuration.nml 
+
+## after the fix -- SITE_MPI_LAUNCHER_OPTS='-bind-to core -ppn 108 -n 108'
+mpiexec -bind-to core -ppn 108 -n 108 /bin/lfric_atm configuration.nml 

@@ -1,0 +1,88 @@
+{# ### Set MACHINE automatically depending on the host name ### #}
+{% set hostname = getfqdn() %}
+{% if "epic.astro" in hostname %}
+    {% set MACHINE = "uoe-epic-gnu" %}
+{% elif "collab.sc" in hostname %}
+    {% set MACHINE = "ex1a-monsoon" %}
+{% elif "d3-login" in hostname %}
+    {% set MACHINE = "dial3-gnu" %}
+{% elif "i3.isambard" in hostname %}
+    {% set MACHINE = "isambard3-gnu" %}
+{% else %}
+    {% set MACHINE = "Could it be Met Office EX1?" %}
+{% endif %}
+{% do LOG.info("MACHINE: " + MACHINE) %}
+
+{# ####### Set CORES_PER_NODE and derive LFRIC_ATM_NODES ###### #}
+{% if MACHINE == "ex1a-monsoon" %}
+    {% set CORES_PER_NODE = 128 %}
+{% elif MACHINE == "dial3-gnu" %}
+    {% set CORES_PER_NODE = 128 %}
+{% elif MACHINE == "isambard3-gnu" %}
+    {% set CORES_PER_NODE = 144 %}
+{% elif MACHINE == "uoe-epic-gnu" %}
+    {% set CORES_PER_NODE = 1 %}
+{% else %}
+    {% set CORES_PER_NODE = 128 %}
+{% endif %}
+{% set LFRIC_ATM_NODES = (TOTAL_RANKS_REQ / CORES_PER_NODE) | round(0, 'ceil') | int %}
+{% do LOG.info("CORES_PER_NODE: " ~ CORES_PER_NODE ~ ", LFRIC_ATM_NODES: " ~ LFRIC_ATM_NODES) %}
+
+
+{# ============================================================ #}
+
+
+{% if MACHINE == "isambard3-gnu" %}
+    [[ISAMBARD3GNU]]
+        pre-script = """
+            module purge
+            umask 0022
+            source /projects/u35v/sw/UoEGCC1120SWstackBuild/RoseStemSource.sh
+            ulimit -s unlimited
+            module list 2>&1
+            """
+        platform = uoe-isambard3
+        [[[environment]]]
+            BIG_DATA_DIR = '/projects/u35v/sw/lfricdata'
+            BUILD_ROOT=$CYLC_WORKFLOW_SHARE_DIR/lfric_build
+            HYPERTHREADS    = 1
+            CORES_PER_NODE  = {{ CORES_PER_NODE }}
+            NUMA_REGIONS_PER_NODE = 0
+            RUN_METHOD = mpiexec
+            TOTAL_RANKS_REQ = {{TOTAL_RANKS_REQ}}
+        [[[directives]]]
+{#            --account=u35v #}
+{#            --partition=devel #}
+{% endif %}
+
+
+            RESTART_START = $(bc <<< $STARTTIME/$DT+1)
+            RESTART_STOP = $(bc <<< $STOPTIME/$DT)
+            LFRIC_ATM_NODES = {{ LFRIC_ATM_NODES }}
+            ROSE_APP_OPT_CONF_KEYS = {{CASE_SETUP}} {{PHYSICS_CONF}} {{LFRIC_LEVS}}
+            TASK_OUTPUT_DIR = $OUTPUT_ROOT/lfric_atm
+{% if MACHINE == "uoe-epic-gnu" %}
+        [[[directives]]]
+{% else %}
+{% if MACHINE == "dial3-gnu" %}
+        [[[directives]]]
+            --mem-per-cpu=8G
+            --ntasks={{TOTAL_RANKS_REQ}}
+            --cpus-per-task=1
+            --export=NONE
+            --nodes={{ LFRIC_ATM_NODES }}
+            --ntasks-per-node={{ CORES_PER_NODE }}
+{% else %}
+{% if MACHINE == "isambard3-gnu" %}
+        [[[directives]]]
+            --mem-per-cpu=8G
+            --ntasks={{TOTAL_RANKS_REQ}}
+            --cpus-per-task=1
+            --export=NONE
+{% else %}
+        [[[directives]]]
+            -l select={{LFRIC_ATM_NODES}}
+            -q={{RUN_QUEUE}}
+{% endif %}
+{% endif %}
+{% endif %}
