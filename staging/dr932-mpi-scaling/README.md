@@ -99,6 +99,7 @@ Captured output is in `results/`. Summary:
 | 1 | **uoe / `mpiexec`** — *the suite as written* | **11 nodes** (1–13 ranks each) | **1 / 108** | **2494 µs** | **0.70 GB/s** | **1312 µs** |
 | 2 | uoe / `mpiexec` | 2 nodes × 54 | 0 / 108 | 226 µs | 0.23 GB/s | 580 µs |
 | 3 | uoe / `mpiexec` | 1 node × 108 | 0 / 108 | 13.2 µs | 402 GB/s | 25.7 µs |
+| 3b | uoe / `mpiexec -bind-to core -ppn 108` | 1 node × 108 | **108 / 108** | **8.95 µs** | 309 GB/s | **17.3 µs** |
 | 4 | **cray / `srun`** — *this repo's env* | 1 node × 108 | **108 / 108** | **5.2 µs** | **1682 GB/s** | **15.6 µs** |
 | 5 | cray / `srun` | 2 nodes × 54 | 108 / 108 | 6.7 µs | 7.12 GB/s | 24.4 µs |
 
@@ -116,8 +117,42 @@ Reading the rows against each other separates the causes:
   cray-mpich under `srun` (every rank on its own core) beats unpinned Hydra 2.5× on
   allreduce and 4× on bandwidth.
 
-`probe-1node-bound.sbatch` (pinned Hydra, one node) is provided but was still queued
-behind `(Priority)` when this was written — no row for it yet.
+**Row 3b at first looks like a mixed result, and chasing it produced the most useful
+detail in this section.** Pinning Hydra (`-bind-to core -ppn 108`) does what it says —
+108/108 ranks on their own core, where the unbound run had all of them sharing a 108-CPU
+mask — and buys **1.5×** on both latency measures (13.2 → 8.95 µs allreduce,
+25.7 → 17.3 µs ring). But it appeared to *lose* 23% of pairwise bandwidth: 402 → 309 GB/s.
+
+Hydra fills cores linearly (the affinity dump confirms rank *i* → cpu *i*), so 108 ranks
+on a 2 × 72 Grace node put **72 on socket 0 and 36 on socket 1**. `probe-1node-mapby.sbatch`
+tests that against the mapping alternatives:
+
+| mapping | rank→cpu | allreduce 8 B | pairwise 1 MiB | **ring 64 KiB** |
+|---|---|---|---|---|
+| `-bind-to core` (linear fill) | 0→0, 1→1, 2→2 | **8.90 µs** | 309.6 GB/s | **18.6 µs** |
+| `-map-by numa` | 0→0, 1→72, 2→1 | 9.93 µs | **613.1 GB/s** | 28.7 µs |
+| `-map-by socket` | 0→0, 1→72, 2→1 | 9.77 µs | 599.9 GB/s | 30.4 µs |
+| `-map-by hwthread` | 0→0, 1→1, 2→2 | 10.97 µs | 308.6 GB/s | 18.1 µs |
+
+The socket-imbalance mechanism is confirmed — `-map-by numa` alternates sockets exactly
+as `srun` does and **doubles** the pairwise figure. But it is not a free win either: the
+ring gets **54% worse** (18.6 → 28.7 µs), and the ring is the more honest proxy here.
+The two mappings simply favour different neighbours. Linear fill puts ranks *i* and *i+1*
+on the same socket, so nearest-neighbour exchange stays local; round-robin puts them on
+opposite sockets and every neighbour hop crosses the chip-to-chip link. The pairwise test
+pairs *i* with *i+54*, and 54 is even, so round-robin makes those same-socket — which is
+what doubles it.
+
+**LFRic's halo exchange is nearest-neighbour in the partition graph, so the ring is the
+representative number and plain `-bind-to core` is the right choice.** The apparent
+bandwidth regression is an artefact of this probe's *i*↔*i+54* pairing, not a defect in
+the recommendation — `fix-u-dr932.patch` stands as written, and deliberately does not add
+`-map-by`. Anyone tuning this for a different communication pattern should re-measure
+rather than copy either row.
+
+Worth noting where this lands against row 4: cray-mpich under `srun` beats *both* Hydra
+mappings on *both* axes at once (5.2 µs, 1682 GB/s, 15.6 µs). There is no Hydra mapping
+that trades its way to that — which is §5.2's argument in one line.
 
 ### 3b. The same comparison on the real model
 
@@ -405,6 +440,7 @@ why u-dr932 and u-dn704 run and scale here. Two things came out of this investig
 | `run-probe.sh` | builds + launches it against `uoe` / `cray` / `spack` × `mpiexec` / `mpiexec-bound` / `srun` |
 | `probe-as-suite.sbatch` | Denis' `#SBATCH` block verbatim — the reproduction |
 | `probe-1node.sbatch`, `probe-1node-bound.sbatch`, `probe-2node.sbatch` | the controls |
+| `probe-1node-mapby.sbatch` | Hydra rank→core mapping: why `-bind-to core` is right for LFRic and `-map-by numa` is not |
 | `probe-2node-hsn.sbatch`, `probe-hsn-diag.sbatch`, `probe-hsn-reach.sbatch`, `probe-hsn-vars.sbatch` | §4.2's closed thread: can the TCP fallback be moved off the 1 GbE management link onto `hsn0`? No — three hypotheses eliminated, no working variant |
 | `model-run.sh`, `model-1node.sbatch`, `model-scatter.sbatch` | the same comparison on the real `lfric_atm` binary |
 | `memory-footprint.sh` | §4.3b — whether packing the ranks starves them of memory, out of Slurm accounting |

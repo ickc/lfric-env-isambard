@@ -75,8 +75,14 @@ case "$launcher" in
     ;;
   mpiexec-bound)
     ppn="${PROBE_PPN:-$ranks}"
-    echo "--- exec: mpiexec -bind-to core -ppn $ppn -n $ranks $exe"
-    mpiexec -bind-to core -ppn "$ppn" -n "$ranks" "$exe"
+    # PROBE_MPIEXEC_EXTRA carries e.g. `-map-by numa`. `-bind-to core` alone fills the
+    # cores linearly, so 108 ranks land 72 on socket 0 and 36 on socket 1 of a 2x72 Grace
+    # node -- fine for latency, bad for a bandwidth test. srun balances by default.
+    extra="${PROBE_MPIEXEC_EXTRA:-}"
+    # shellcheck disable=SC2086  # $extra is a deliberate multi-word flag list
+    echo "--- exec: mpiexec -bind-to core $extra -ppn $ppn -n $ranks $exe"
+    # shellcheck disable=SC2086
+    mpiexec -bind-to core $extra -ppn "$ppn" -n "$ranks" "$exe"
     ;;
   srun)
     echo "--- exec: srun --ntasks=$ranks $exe"
