@@ -168,6 +168,38 @@ provider — the whole point of a Cray EX — is unreachable. cray-mpich by cont
 It also explains `RUN_METHOD = mpiexec`: built without Slurm PMI, this MPICH cannot be
 launched by `srun` and needs Hydra.
 
+Two details worth having, since "it's ch3" invites the wrong follow-up questions:
+
+- **Nothing at runtime can rescue it.** `--with-device=` is a `./configure` option
+  (MPICH is Autotools, not CMake), so the device is a compile-time choice of which
+  source subtree lands in `libmpi.so`. `MPIR_CVAR_NEMESIS_NETMOD` exists but the only
+  netmod sources compiled into this library are `nemesis/netmod/tcp/*.c` and
+  `netmod/none/none.c`.
+- **It is not a one-flag fix either.** `ch4` alone buys nothing; it has to be
+  `--with-device=ch4:ofi` *against a libfabric carrying the `cxi` provider* — Cray's,
+  at `/opt/cray/libfabric/{1.22.0,2.3.1}`. This build links no libfabric at all, so it
+  is a reconfigure and rebuild of MPICH and everything above it (HDF5, netCDF, XIOS,
+  LFRic). At which point cray-mpich is already installed and already tuned.
+
+**And the TCP is on the management network, not the fast NIC.** `nemesis:tcp` picks its
+interface by resolving the local hostname, and on Isambard 3 that resolves to the
+`172.23/16` admin address (`bond0`), not to `hsn0` (`10.243/16`), which is the Slingshot
+NIC's IP interface:
+
+```
+x3008c0s5b2n0 -> 172.23.1.99    # bond0, cluster management ethernet
+hsn0             10.243.0.106/16 # Slingshot NIC, IP-over-fabric
+```
+
+The obvious no-rebuild mitigation — `MPIR_CVAR_NEMESIS_TCP_NETWORK_IFACE=hsn0`, still
+kernel TCP but over the right wire — **does not work as of this writing**:
+`probe-2node-hsn.sbatch` runs the identical 2×54 probe with the cvar unset and set; the
+unset arm reproduces (229.84 µs / 0.23 GB/s, against 226.42 / 0.23 earlier), and the set
+arm dies immediately with exit 15 and no output at all. `probe-hsn-diag.sbatch` is queued
+to find out why (does `hsn0` exist and carry an address on a compute node; what does
+MPICH say). **Do not recommend this to anyone until that resolves** — it is recorded here
+as an open thread, not as a fix. It is deliberately absent from `fix-u-dr932.patch`.
+
 So §4.1 and §4.2 compound: the suite maximises the number of messages that must cross a
 node boundary, and the stack makes each of those messages as slow as it can be.
 
@@ -211,22 +243,31 @@ mis-setting — a Grace node has 2 — though on this code path `launch-exe` nev
 
 ### 5.1 For Denis' suite as it stands (keeping the UoE stack)
 
-`fix-u-dr932.patch` applies to `dennissergeev/lfric_egp_bench@82f4a49`. It does two things
+`fix-u-dr932.patch` applies to `dennissergeev/lfric_egp_bench@82f4a49`, and is proposed
+upstream as **[dennissergeev/lfric_egp_bench#1](https://github.com/dennissergeev/lfric_egp_bench/pull/1)**
+(draft, from `ickc/lfric_egp_bench:fix/isambard3-rank-placement`). It does two things
 to `src/suites/u-dr932/flow.cylc`:
 
 1. Give the `isambard3-gnu` `lfric_atm` directives the `--nodes` / `--ntasks-per-node`
    that the dial3 branch of the same file already has, and replace `--mem-per-cpu=8G`
    with `--mem=0` (the whole node's memory, which is what a packed node wants anyway).
-   108 ranks then land on one node and **no MPI traffic leaves it**, which is the only way
-   this stack performs.
+   At 108 ranks that lands them all on one node and **no MPI traffic leaves it**, which
+   is the only way this stack performs.
 2. Set `SITE_MPI_LAUNCHER_OPTS` so `launch-exe` emits
    `mpiexec -bind-to core -ppn <ranks-per-node> -n <ranks>`, pinning the ranks.
 
-This is a config-only change; it needs no rebuild.
+This is a config-only change; it needs no rebuild. `cylc validate` passes on the patched
+suite (this login node's FQDN contains `i3.isambard`, so a bare `cylc validate` here
+exercises the `isambard3-gnu` branch — the one being changed).
 
-Its limit is the node: with `ch3:nemesis` there is no configuration that makes a
-**multi-node** run of this stack fast, so 144 ranks is the ceiling. For anything larger the
-stack has to change.
+**Its ceiling is one node — and the committed `rose-suite.conf` is already above it.**
+The repo has `TOTAL_RANKS_REQ=216` (Denis' message quotes 108, presumably his working
+copy). 216 renders as `--nodes=2 --ntasks-per-node=108`, so the patch collapses the
+node count from up to 32 down to 2 but cannot take inter-node traffic to zero. With
+`ch3:nemesis` there is no configuration that makes a genuinely multi-node run of this
+stack fast, so **144 ranks is the hard limit**; above it the stack has to change.
+(216 = 6 × 6² is otherwise a *better* rank count than 108 — it gives square
+per-panel subdomains. See §4.4.)
 
 ### 5.2 The durable fix — build against a Slingshot-capable MPI
 
@@ -257,6 +298,7 @@ why u-dr932 and u-dn704 run and scale here. Two things came out of this investig
 | `run-probe.sh` | builds + launches it against `uoe` / `cray` / `spack` × `mpiexec` / `mpiexec-bound` / `srun` |
 | `probe-as-suite.sbatch` | Denis' `#SBATCH` block verbatim — the reproduction |
 | `probe-1node.sbatch`, `probe-1node-bound.sbatch`, `probe-2node.sbatch` | the controls |
+| `probe-2node-hsn.sbatch`, `probe-hsn-diag.sbatch` | the open thread of §4.2: can the TCP fallback at least be moved off the management network onto `hsn0` |
 | `model-run.sh`, `model-1node.sbatch`, `model-scatter.sbatch` | the same comparison on the real `lfric_atm` binary |
 | `denis-u-dr932/` | read-only snapshot of the scaling-relevant parts of his suite |
 | `fix-u-dr932.patch` | the config-only fix, against his repo |

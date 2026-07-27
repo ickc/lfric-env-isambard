@@ -1,0 +1,58 @@
+SLURM_JOB_NUM_NODES=2 NODELIST=x3003c0s7b1n0,x3003c0s7b2n0
+hostname -> 172.23.0.76     x3003c0s7b1n0.head.cm.i3.isambard.ac.uk   (the address nemesis:tcp defaults to)
+
+############ uoe / mpiexec / default iface (management) ############
+=== stack=uoe launcher=mpiexec ranks=108
+--- mpicc -> /projects/u35v/sw/KKsGCC1230LFRicSWstackConfMakeBuild/usr/bin/mpicc
+--- MPICH Version:      4.2.3
+--- MPICH Release date: Wed Oct  2 09:35:21 AM CDT 2024
+--- MPICH ABI:          16:3:4
+--- MPICH Device:       ch3:nemesis
+--- MPICH configure:    --prefix=/projects/u35v/sw/KKsGCC1230LFRicSWstackConfMakeBuild/usr --enable-fortran=all --enable-cxx --enable-threads=multiple --enable-shared --enable-romio --with-device=ch3
+--- MPICH CC:           gcc    -O2
+--- MPICH CXX:          g++   -O2
+--- MPICH F77:          gfortran -w -fallow-argument-mismatch -O2  -O2
+--- MPICH FC:           gfortran -w -fallow-argument-mismatch -O2  -O2
+--- MPICH features:     
+--- 
+--- linked against:
+---   	libmpi.so.12 => /projects/u35v/sw/KKsGCC1230LFRicSWstackConfMakeBuild/usr/lib/libmpi.so.12 (0x000040001afa0000)
+--- exec: mpiexec -n 108 /lfs1i3/scratch/u35v/khcheung.u35v/git/lfric-env-isambard/staging/dr932-mpi-scaling/build/mpi-probe.uoe
+PROBE ranks=108
+PROBE nodes=2
+PROBE node x3003c0s7b1n0        ranks=54
+PROBE node x3003c0s7b2n0        ranks=54
+PROBE binding: 0/108 ranks pinned to exactly 1 CPU (UNBOUND -- ranks can migrate)
+PROBE   rank 0    x3003c0s7b1n0        cpus=0-88 (width=54)
+PROBE   rank 1    x3003c0s7b1n0        cpus=0-88 (width=54)
+PROBE   rank 2    x3003c0s7b1n0        cpus=0-88 (width=54)
+PROBE   rank 3    x3003c0s7b1n0        cpus=0-88 (width=54)
+PROBE   rank 4    x3003c0s7b1n0        cpus=0-88 (width=54)
+PROBE   rank 5    x3003c0s7b1n0        cpus=0-88 (width=54)
+PROBE   rank 6    x3003c0s7b1n0        cpus=0-88 (width=54)
+PROBE   rank 7    x3003c0s7b1n0        cpus=0-88 (width=54)
+PROBE allreduce_8B_usec 229.84
+PROBE pairwise_1MiB_aggregate_GBps 0.23  (108 ranks exchanging, 98.04s)
+PROBE ring_64KiB_usec 576.01
+PROBE done
+exit=0
+
+############ uoe / mpiexec / MPIR_CVAR_NEMESIS_TCP_NETWORK_IFACE=hsn0 ############
+--- MPIR_CVAR_NEMESIS_TCP_NETWORK_IFACE=hsn0
+=== stack=uoe launcher=mpiexec ranks=108
+--- mpicc -> /projects/u35v/sw/KKsGCC1230LFRicSWstackConfMakeBuild/usr/bin/mpicc
+--- MPICH Version:      4.2.3
+--- MPICH Release date: Wed Oct  2 09:35:21 AM CDT 2024
+--- MPICH ABI:          16:3:4
+--- MPICH Device:       ch3:nemesis
+--- MPICH configure:    --prefix=/projects/u35v/sw/KKsGCC1230LFRicSWstackConfMakeBuild/usr --enable-fortran=all --enable-cxx --enable-threads=multiple --enable-shared --enable-romio --with-device=ch3
+--- MPICH CC:           gcc    -O2
+--- MPICH CXX:          g++   -O2
+--- MPICH F77:          gfortran -w -fallow-argument-mismatch -O2  -O2
+--- MPICH FC:           gfortran -w -fallow-argument-mismatch -O2  -O2
+--- MPICH features:     
+--- 
+--- linked against:
+---   	libmpi.so.12 => /projects/u35v/sw/KKsGCC1230LFRicSWstackConfMakeBuild/usr/lib/libmpi.so.12 (0x0000400019010000)
+--- exec: mpiexec -n 108 /lfs1i3/scratch/u35v/khcheung.u35v/git/lfric-env-isambard/staging/dr932-mpi-scaling/build/mpi-probe.uoe
+exit=15

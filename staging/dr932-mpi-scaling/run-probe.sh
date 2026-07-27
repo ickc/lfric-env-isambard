@@ -38,6 +38,14 @@ case "$stack" in
     # shellcheck source=/dev/null
     source /projects/u35v/sw/UoEGCC1120SWstackBuild/RoseStemSource.sh >/dev/null
     CC_MPI=mpicc
+    # This MPICH's only inter-node netmod is nemesis:tcp, which picks its interface by
+    # resolving the local hostname -- and a compute node's name resolves to its 172.23/16
+    # MANAGEMENT address (bond0), not to hsn0, the Slingshot NIC's IP interface. Setting
+    # PROBE_TCP_IFACE=hsn0 moves that TCP onto the fast NIC without rebuilding anything.
+    if [ -n "${PROBE_TCP_IFACE:-}" ]; then
+      export MPIR_CVAR_NEMESIS_TCP_NETWORK_IFACE="$PROBE_TCP_IFACE"
+      echo "--- MPIR_CVAR_NEMESIS_TCP_NETWORK_IFACE=$MPIR_CVAR_NEMESIS_TCP_NETWORK_IFACE"
+    fi
     ;;
   cray|spack)
     # shellcheck source=/dev/null
