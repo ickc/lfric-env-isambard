@@ -1,0 +1,49 @@
+=== allocation granted for the suite's own directives
+SLURM_JOB_NUM_NODES = 11   <-- 108 ranks fit on ONE 144-core node
+SLURM_JOB_NODELIST  = x3004c0s9b4n0,x3010c0s15b2n0,x3010c0s15b3n0,x3010c0s15b4n0,x3010c0s17b1n0,x3010c0s17b2n0,x3010c0s17b3n0,x3010c0s17b4n0,x3010c0s19b1n0,x3010c0s19b2n0,x3010c0s19b3n0
+SLURM_TASKS_PER_NODE= 1,11,5,3,13(x4),12(x3)
+SLURM_MEM_PER_CPU   = 8192 MB
+
+=== stack=uoe launcher=mpiexec ranks=108
+--- mpicc -> /projects/u35v/sw/KKsGCC1230LFRicSWstackConfMakeBuild/usr/bin/mpicc
+--- MPICH Version:      4.2.3
+--- MPICH Release date: Wed Oct  2 09:35:21 AM CDT 2024
+--- MPICH ABI:          16:3:4
+--- MPICH Device:       ch3:nemesis
+--- MPICH configure:    --prefix=/projects/u35v/sw/KKsGCC1230LFRicSWstackConfMakeBuild/usr --enable-fortran=all --enable-cxx --enable-threads=multiple --enable-shared --enable-romio --with-device=ch3
+--- MPICH CC:           gcc    -O2
+--- MPICH CXX:          g++   -O2
+--- MPICH F77:          gfortran -w -fallow-argument-mismatch -O2  -O2
+--- MPICH FC:           gfortran -w -fallow-argument-mismatch -O2  -O2
+--- MPICH features:     
+--- 
+--- linked against:
+---   	libmpi.so.12 => /projects/u35v/sw/KKsGCC1230LFRicSWstackConfMakeBuild/usr/lib/libmpi.so.12 (0x0000400031fc0000)
+--- exec: mpiexec -n 108 /lfs1i3/scratch/u35v/khcheung.u35v/git/lfric-env-isambard/staging/dr932-mpi-scaling/build/mpi-probe.uoe
+PROBE ranks=108
+PROBE nodes=11
+PROBE node x3004c0s9b4n0        ranks=1
+PROBE node x3010c0s15b2n0       ranks=11
+PROBE node x3010c0s15b3n0       ranks=5
+PROBE node x3010c0s15b4n0       ranks=3
+PROBE node x3010c0s17b1n0       ranks=13
+PROBE node x3010c0s17b2n0       ranks=13
+PROBE node x3010c0s17b3n0       ranks=13
+PROBE node x3010c0s17b4n0       ranks=13
+PROBE node x3010c0s19b1n0       ranks=12
+PROBE node x3010c0s19b2n0       ranks=12
+PROBE node x3010c0s19b3n0       ranks=12
+PROBE binding: 1/108 ranks pinned to exactly 1 CPU (UNBOUND -- ranks can migrate)
+PROBE   rank 0    x3004c0s9b4n0        cpus=53-53 (width=1)
+PROBE   rank 1    x3010c0s15b2n0       cpus=128-139 (width=11)
+PROBE   rank 2    x3010c0s15b2n0       cpus=128-139 (width=11)
+PROBE   rank 3    x3010c0s15b2n0       cpus=128-139 (width=11)
+PROBE   rank 4    x3010c0s15b2n0       cpus=128-139 (width=11)
+PROBE   rank 5    x3010c0s15b2n0       cpus=128-139 (width=11)
+PROBE   rank 6    x3010c0s15b2n0       cpus=128-139 (width=11)
+PROBE   rank 7    x3010c0s15b2n0       cpus=128-139 (width=11)
+PROBE allreduce_8B_usec 2494.53
+PROBE pairwise_1MiB_aggregate_GBps 0.70  (108 ranks exchanging, 32.41s)
+PROBE ring_64KiB_usec 1312.36
+PROBE done
+exit=0

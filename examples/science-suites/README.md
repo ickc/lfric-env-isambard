@@ -98,6 +98,62 @@ runs offline against *our* env on Isambard 3:
    (`job runner = slurm`, on `localhost`) and a roomy `cylc-run` dir into
    `~/.cylc/flow/` (idempotent; the same setup `pixi run setup-cylc` does).
 
+### Placement and MPI transport — the contract
+
+A ported suite must **state where its ranks go**. This is not a tuning nicety; get it
+wrong and the model is several times slower, which is how a suite ported to Isambard 3
+outside this repo ended up 3–4× slower than Monsoon (investigated in full, with
+measurements, in [`staging/dr932-mpi-scaling/`](../../staging/dr932-mpi-scaling/)).
+Three rules, all visible in the suites here:
+
+- **`RUN_METHOD = srun`, never `mpiexec`.** `srun` is what binds cray-mpich to
+  Slingshot's `cxi` provider through the Cray PMI, and it pins one rank per core
+  without being asked. `site/bin/launch-exe` implements the `srun` path (including the
+  dedicated-XIOS-server MPMD, which the Met Office `launch-exe` only wires up under
+  Hydra). Note the `cray` environment does not even ship an `mpiexec`.
+- **The `lfric_atm` `[[[directives]]]` must carry `--nodes` *and*
+  `--ntasks-per-node`, with `--mem=0`.** Given only `--ntasks` plus a per-CPU memory
+  request, Slurm satisfies it out of whatever nodes have room: a 108-rank job that fits
+  on one 144-core Grace node was observed spread over **9 to 32** nodes, with 1–13 ranks
+  each. `--mem=0` takes the node's whole memory so a memory request can never cap
+  ranks-per-node and fan the job out. On cray-mpich that scatter is survivable (measured
+  at ~1.1× on the model, inside run-to-run noise) — it is when it combines with an MPI
+  that falls back to TCP that it costs a factor of several, which is precisely why the
+  two rules above travel together.
+- **A Grace node is 144 cores** (2 sockets × 72), not the 128 the upstream suites
+  assume. `LPPN`/`CORES_PER_NODE` are set to 144 here.
+- **Ask for whole nodes (`--exclusive`).** `SelectType` is `select/cons_tres`
+  (`CR_CORE_MEMORY`), so Slurm hands out *cores*, not machines: a task that takes 13 of
+  a node's 144 cores leaves the other 131 for anyone. Over one 9-hour run, 1493 distinct
+  jobs from other users touched the 32 nodes the scattered example was spread across.
+  That co-tenancy is where the 5 h → 9 h spread on identical work came from, so
+  exclusivity is what makes a timing reproducible, not just faster. Keep `--mem=0`
+  alongside it — `--exclusive` gives all the *CPUs*, but memory still follows
+  `DefMemPerCPU` (1024 MB × 144 = 144 GB of a 225 GB node).
+- **Threads: these suites are pure MPI (`OMP_NUM_THREADS=1`, `--cpus-per-task=1`).**
+  The binaries *are* OpenMP-linked (`libgomp`), so this is a live knob, not a rebuild —
+  and worth knowing that at 108 ranks × 1 thread, 36 of a node's 144 cores sit idle.
+  If you do raise it, three things move together or the run gets slower, not faster:
+  `--cpus-per-task=N`, `OMP_NUM_THREADS=N` (it is hardcoded in each suite's
+  `app/lfric_atm/rose-app.conf`, which overrides the task environment), and the
+  binding. Under `srun` that means `--cpus-per-task=N` plus `OMP_PROC_BIND=close` /
+  `OMP_PLACES=cores`; under Hydra, `-bind-to core:N` — plain `-bind-to core` pins the
+  whole rank to *one* core and its N threads then fight over it. Rank/thread balance on
+  LFRic is not something this repo has measured; treat it as an experiment to run, not
+  a recommendation to follow.
+
+The measured cost of getting this wrong, 108 ranks throughout (full table in the
+staging README):
+
+| | 8 B allreduce | 1 MiB pairwise | 64 KiB ring |
+|---|---|---|---|
+| scattered over 11 nodes, unpinned, from-source MPICH over TCP | 2494 µs | 0.70 GB/s | 1312 µs |
+| one node, pinned, cray-mpich under `srun` | **5.2 µs** | **1682 GB/s** | **15.6 µs** |
+
+Rank counts are worth a thought too: a cubed-sphere partition wants `6 × n²` ranks for
+square subdomains — **24, 54, 96** all fit one node; 108 works but gives each rank a
+16×8 patch instead of a square one.
+
 ## Prerequisites
 
 - **Stage 1 built** for the variant you want (`scripts/build.sbatch`). Run the

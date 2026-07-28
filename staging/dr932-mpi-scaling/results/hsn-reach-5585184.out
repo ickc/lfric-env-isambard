@@ -1,0 +1,38 @@
+nodes: x3003c0s3b2n0 x3003c0s3b3n0
+  x3003c0s3b2n0 hsn0=10.243.0.1/16
+  x3003c0s3b3n0 hsn0=10.243.0.3/16
+
+=== ICMP over hsn0: x3003c0s3b2n0 -> 10.243.0.3 ===
+  srun: warning: can't run 1 processes on 2 nodes, setting nnodes to 1
+  PING 10.243.0.3 (10.243.0.3) 56(84) bytes of data.
+  64 bytes from 10.243.0.3: icmp_seq=1 ttl=64 time=0.107 ms
+  64 bytes from 10.243.0.3: icmp_seq=2 ttl=64 time=0.048 ms
+  64 bytes from 10.243.0.3: icmp_seq=3 ttl=64 time=0.040 ms
+  
+  --- 10.243.0.3 ping statistics ---
+  3 packets transmitted, 3 received, 0% packet loss, time 2025ms
+  rtt min/avg/max/mdev = 0.040/0.065/0.107/0.029 ms
+  rc=0
+
+=== ICMP over bond0 (the interface MPICH actually uses), for contrast ===
+  srun: warning: can't run 1 processes on 2 nodes, setting nnodes to 1
+  PING x3003c0s3b3n0.head.cm.i3.isambard.ac.uk (172.23.0.9) 56(84) bytes of data.
+  64 bytes from x3003c0s3b3n0.head.cm.i3.isambard.ac.uk (172.23.0.9): icmp_seq=1 ttl=64 time=0.095 ms
+  64 bytes from x3003c0s3b3n0.head.cm.i3.isambard.ac.uk (172.23.0.9): icmp_seq=2 ttl=64 time=0.098 ms
+  64 bytes from x3003c0s3b3n0.head.cm.i3.isambard.ac.uk (172.23.0.9): icmp_seq=3 ttl=64 time=0.086 ms
+  
+  --- x3003c0s3b3n0.head.cm.i3.isambard.ac.uk ping statistics ---
+  3 packets transmitted, 3 received, 0% packet loss, time 2061ms
+  rtt min/avg/max/mdev = 0.086/0.093/0.098/0.005 ms
+  rc=0
+
+=== TCP over hsn0: listener on x3003c0s3b3n0:9999, connect from x3003c0s3b2n0 ===
+srun: warning: can't run 1 processes on 2 nodes, setting nnodes to 1
+srun: error: x3003c0s3b3n0: task 0: Exited with exit code 127
+srun: Terminating StepId=5585184.4
+timeout: failed to run command ‘nc’: No such file or directory
+  srun: warning: can't run 1 processes on 2 nodes, setting nnodes to 1
+  srun: error: x3003c0s3b2n0: task 0: Exited with exit code 127
+  srun: Terminating StepId=5585184.5
+  timeout: failed to run command ‘nc’: No such file or directory
+  connect rc=127

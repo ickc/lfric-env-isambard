@@ -1,0 +1,67 @@
+=== interfaces + LINK SPEED, per node ===
+[x3003c0s7b2n0] bond0        speed=1000     addr=172.23.0.72/16
+[x3003c0s7b3n0] bond0        speed=1000     addr=172.23.0.73/16
+[x3003c0s7b3n0] eno1         speed=1000     addr=
+[x3003c0s7b3n0] eno2         speed=-        addr=
+[x3003c0s7b3n0] hsn0         speed=200000   addr=10.243.0.66/16
+[x3003c0s7b3n0] bond0 slaves=[eno1]
+[x3003c0s7b2n0] eno1         speed=1000     addr=
+[x3003c0s7b2n0] eno2         speed=-        addr=
+[x3003c0s7b2n0] hsn0         speed=200000   addr=10.243.0.67/16
+[x3003c0s7b2n0] bond0 slaves=[eno1]
+
+=== hostname resolution, per node ===
+[x3003c0s7b2n0] resolves to 172.23.0.72
+[x3003c0s7b3n0] resolves to 172.23.0.73
+
+=== MPICH with the cvar set (stderr merged, 4 ranks) ===
+--- MPIR_CVAR_NEMESIS_TCP_NETWORK_IFACE=hsn0
+=== stack=uoe launcher=mpiexec ranks=4
+--- mpicc -> /projects/u35v/sw/KKsGCC1230LFRicSWstackConfMakeBuild/usr/bin/mpicc
+--- MPICH Version:      4.2.3
+--- MPICH Release date: Wed Oct  2 09:35:21 AM CDT 2024
+--- MPICH ABI:          16:3:4
+--- MPICH Device:       ch3:nemesis
+--- MPICH configure:    --prefix=/projects/u35v/sw/KKsGCC1230LFRicSWstackConfMakeBuild/usr --enable-fortran=all --enable-cxx --enable-threads=multiple --enable-shared --enable-romio --with-device=ch3
+--- MPICH CC:           gcc    -O2
+--- MPICH CXX:          g++   -O2
+--- MPICH F77:          gfortran -w -fallow-argument-mismatch -O2  -O2
+--- MPICH FC:           gfortran -w -fallow-argument-mismatch -O2  -O2
+--- MPICH features:     
+--- 
+--- linked against:
+---   	libmpi.so.12 => /projects/u35v/sw/KKsGCC1230LFRicSWstackConfMakeBuild/usr/lib/libmpi.so.12 (0x00004000395a0000)
+--- exec: mpiexec -n 4 /lfs1i3/scratch/u35v/khcheung.u35v/git/lfric-env-isambard/staging/dr932-mpi-scaling/build/mpi-probe.uoe
+exit=15
+
+=== same, cvar unset, as the control ===
+=== stack=uoe launcher=mpiexec ranks=4
+--- mpicc -> /projects/u35v/sw/KKsGCC1230LFRicSWstackConfMakeBuild/usr/bin/mpicc
+--- MPICH Version:      4.2.3
+--- MPICH Release date: Wed Oct  2 09:35:21 AM CDT 2024
+--- MPICH ABI:          16:3:4
+--- MPICH Device:       ch3:nemesis
+--- MPICH configure:    --prefix=/projects/u35v/sw/KKsGCC1230LFRicSWstackConfMakeBuild/usr --enable-fortran=all --enable-cxx --enable-threads=multiple --enable-shared --enable-romio --with-device=ch3
+--- MPICH CC:           gcc    -O2
+--- MPICH CXX:          g++   -O2
+--- MPICH F77:          gfortran -w -fallow-argument-mismatch -O2  -O2
+--- MPICH FC:           gfortran -w -fallow-argument-mismatch -O2  -O2
+--- MPICH features:     
+--- 
+--- linked against:
+---   	libmpi.so.12 => /projects/u35v/sw/KKsGCC1230LFRicSWstackConfMakeBuild/usr/lib/libmpi.so.12 (0x0000400022db0000)
+--- exec: mpiexec -n 4 /lfs1i3/scratch/u35v/khcheung.u35v/git/lfric-env-isambard/staging/dr932-mpi-scaling/build/mpi-probe.uoe
+PROBE ranks=4
+PROBE nodes=2
+PROBE node x3003c0s7b2n0        ranks=2
+PROBE node x3003c0s7b3n0        ranks=2
+PROBE binding: 0/4 ranks pinned to exactly 1 CPU (UNBOUND -- ranks can migrate)
+PROBE   rank 0    x3003c0s7b2n0        cpus=1-2 (width=2)
+PROBE   rank 1    x3003c0s7b2n0        cpus=1-2 (width=2)
+PROBE   rank 2    x3003c0s7b3n0        cpus=2-3 (width=2)
+PROBE   rank 3    x3003c0s7b3n0        cpus=2-3 (width=2)
+PROBE allreduce_8B_usec 93.68
+PROBE pairwise_1MiB_aggregate_GBps 0.21  (4 ranks exchanging, 4.03s)
+PROBE ring_64KiB_usec 558.43
+PROBE done
+exit=0

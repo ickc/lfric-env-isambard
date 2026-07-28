@@ -69,6 +69,9 @@ example} × {`cray`, `spack`}. This is the one outcome that must stay green. The
   `dependencies.yaml` set; the science-suites treat them as local mirrors to extract a
   declared ref from (see `examples/science-suites/site/extract-sources.sh`).
 - `patches/*-patch.sh` — applied in sorted order by `patch-all.sh`.
+- `staging/<investigation>/` — reproductions of reported problems, with their evidence
+  and conclusion. Off the invariant; nothing in `scripts/`/`spack-env/`/`examples/`
+  may depend on it. See `staging/README.md`.
 
 ## Conventions (the design rules of this repo)
 

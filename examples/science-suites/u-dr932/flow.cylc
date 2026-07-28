@@ -17,8 +17,16 @@
 {# ==================================== #}
 {# Set lfric_atm compute resources      #}
 {# ==================================== #}
-{% set LPPN = 128 %}
+{# Cores per node on the run platform. An Isambard 3 Grace node is 2 sockets x 72 =
+   144 cores (the upstream 128 is a Monsoon number). It only feeds LFRIC_NODES, but
+   under-counting it splits a job across the fabric for no reason: at 128, any rank
+   count in (128, 144] asked for 2 nodes. See staging/dr932-mpi-scaling/README.md. #}
+{% set LPPN = 144 %}
 {% set LFRIC_NODES = (TOTAL_RANKS_REQ/LPPN) | round(0, 'ceil') | int %}
+{# Ranks per node, spread evenly over the nodes asked for. Slurm needs this stated:
+   given only --ntasks it will happily take a handful of ranks from each of a dozen
+   partially-free nodes. #}
+{% set LFRIC_PPN = (TOTAL_RANKS_REQ/LFRIC_NODES) | round(0, 'ceil') | int %}
 
 # Machine specific settings
 {% if EX_HOST == 'isambard3' %}
@@ -359,9 +367,23 @@
             TASK_OUTPUT_DIR = $OUTPUT_ROOT/lfric_atm
         [[[directives]]]
         {% if EX_HOST == 'isambard3' %}
+            # State the placement; never leave it to Slurm. --nodes + --ntasks-per-node
+            # pack the ranks onto as few nodes as possible, and --mem=0 claims the whole
+            # node so a memory request cannot silently cap ranks-per-node and fan the job
+            # out. (A suite that asks only for --ntasks --mem-per-cpu=8G got 108 ranks
+            # spread over 9-32 nodes -- see staging/dr932-mpi-scaling/README.md.)
             --nodes={{LFRIC_NODES}}
             --ntasks={{TOTAL_RANKS_REQ}}
+            --ntasks-per-node={{LFRIC_PPN}}
             --mem=0
+            # Whole nodes, not slices of shared ones. SelectType is select/cons_tres
+            # (CR_CORE_MEMORY), so without this the job lands on partially-occupied
+            # nodes and competes for cores and memory bandwidth with whatever else is
+            # there -- the source of the 5h-to-9h spread on identical work documented
+            # in staging/dr932-mpi-scaling. --mem=0 is still needed alongside it:
+            # --exclusive gives all the CPUs but memory still follows DefMemPerCPU
+            # (1024 MB x 144 = 144 GB of a 225 GB node).
+            --exclusive =
             --partition={{RUN_QUEUE}}
         {% else %}
             -l select={{LFRIC_NODES}}

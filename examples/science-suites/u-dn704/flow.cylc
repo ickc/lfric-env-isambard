@@ -127,7 +127,10 @@
             BIG_DATA_DIR = {{ BIG_DATA_DIR }}
             BUILD_ROOT = ${TMPDIR}
             HYPERTHREADS    = 1
-            CORES_PER_NODE  = 128
+            # A Grace node is 2 sockets x 72 = 144 cores (128 is the Monsoon number).
+            # site/bin/launch-exe does not read this -- srun takes the placement from
+            # the directives below -- but leave the truth here, not a foreign platform's.
+            CORES_PER_NODE  = 144
             NUMA_REGIONS_PER_NODE = 2
             RUN_METHOD = srun
 
@@ -262,6 +265,12 @@
             --nodes=2
             --ntasks=25
             --ntasks-per-node=13
+            # Whole nodes, not slices of shared ones. SelectType is select/cons_tres
+            # (CR_CORE_MEMORY), so 13 tasks on a 144-core node otherwise leaves 131 cores
+            # for other jobs to occupy -- and this run's whole point is to measure the
+            # interconnect, which co-tenants would make unrepeatable. See
+            # staging/dr932-mpi-scaling.
+            --exclusive =
             # ~230G/Grace node; a rank reads the N320L70 start dump. 64G/node is ample.
             --mem=64G
             --partition={{ RUN_QUEUE }}

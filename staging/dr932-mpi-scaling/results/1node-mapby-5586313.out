@@ -1,0 +1,56 @@
+############ -bind-to core (linear fill) ############
+--- exec: mpiexec -bind-to core  -ppn 108 -n 108 /lfs1i3/scratch/u35v/khcheung.u35v/git/lfric-env-isambard/staging/dr932-mpi-scaling/build/mpi-probe.uoe
+PROBE ranks=108
+PROBE nodes=1
+PROBE binding: 108/108 ranks pinned to exactly 1 CPU (bound)
+PROBE   rank 0    x3010c0s9b4n0        cpus=0-0 (width=1)
+PROBE   rank 1    x3010c0s9b4n0        cpus=1-1 (width=1)
+PROBE   rank 2    x3010c0s9b4n0        cpus=2-2 (width=1)
+PROBE   rank 3    x3010c0s9b4n0        cpus=3-3 (width=1)
+PROBE allreduce_8B_usec 8.90
+PROBE pairwise_1MiB_aggregate_GBps 309.60  (108 ranks exchanging, 0.07s)
+PROBE ring_64KiB_usec 18.59
+  rc=0
+
+############ -bind-to core -map-by numa ############
+--- exec: mpiexec -bind-to core -map-by numa -ppn 108 -n 108 /lfs1i3/scratch/u35v/khcheung.u35v/git/lfric-env-isambard/staging/dr932-mpi-scaling/build/mpi-probe.uoe
+PROBE ranks=108
+PROBE nodes=1
+PROBE binding: 108/108 ranks pinned to exactly 1 CPU (bound)
+PROBE   rank 0    x3010c0s9b4n0        cpus=0-0 (width=1)
+PROBE   rank 1    x3010c0s9b4n0        cpus=72-72 (width=1)
+PROBE   rank 2    x3010c0s9b4n0        cpus=1-1 (width=1)
+PROBE   rank 3    x3010c0s9b4n0        cpus=73-73 (width=1)
+PROBE allreduce_8B_usec 9.93
+PROBE pairwise_1MiB_aggregate_GBps 613.11  (108 ranks exchanging, 0.04s)
+PROBE ring_64KiB_usec 28.69
+  rc=0
+
+############ -bind-to core -map-by socket ############
+--- exec: mpiexec -bind-to core -map-by socket -ppn 108 -n 108 /lfs1i3/scratch/u35v/khcheung.u35v/git/lfric-env-isambard/staging/dr932-mpi-scaling/build/mpi-probe.uoe
+PROBE ranks=108
+PROBE nodes=1
+PROBE binding: 108/108 ranks pinned to exactly 1 CPU (bound)
+PROBE   rank 0    x3010c0s9b4n0        cpus=0-0 (width=1)
+PROBE   rank 1    x3010c0s9b4n0        cpus=72-72 (width=1)
+PROBE   rank 2    x3010c0s9b4n0        cpus=1-1 (width=1)
+PROBE   rank 3    x3010c0s9b4n0        cpus=73-73 (width=1)
+PROBE allreduce_8B_usec 9.77
+PROBE pairwise_1MiB_aggregate_GBps 599.86  (108 ranks exchanging, 0.04s)
+PROBE ring_64KiB_usec 30.35
+  rc=0
+
+############ -bind-to core -map-by hwthread ############
+--- exec: mpiexec -bind-to core -map-by hwthread -ppn 108 -n 108 /lfs1i3/scratch/u35v/khcheung.u35v/git/lfric-env-isambard/staging/dr932-mpi-scaling/build/mpi-probe.uoe
+PROBE ranks=108
+PROBE nodes=1
+PROBE binding: 108/108 ranks pinned to exactly 1 CPU (bound)
+PROBE   rank 0    x3010c0s9b4n0        cpus=0-0 (width=1)
+PROBE   rank 1    x3010c0s9b4n0        cpus=1-1 (width=1)
+PROBE   rank 2    x3010c0s9b4n0        cpus=2-2 (width=1)
+PROBE   rank 3    x3010c0s9b4n0        cpus=3-3 (width=1)
+PROBE allreduce_8B_usec 10.97
+PROBE pairwise_1MiB_aggregate_GBps 308.61  (108 ranks exchanging, 0.07s)
+PROBE ring_64KiB_usec 18.11
+  rc=0
+
