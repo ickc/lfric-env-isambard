@@ -66,13 +66,18 @@ example} × {`cray`, `spack`}. This is the one outcome that must stay green. The
   (generated per-build data table + version-controlled logic).
 - `spack-env/{common,cray/spack,spack/spack}.yaml` — env templates (instantiated under PREFIX).
 - `spack-repo/lfric-isambard/` — local Spack packages.
-- `vendor/` — pinned submodules, two classes. **Env/build tooling (Stage 1):** spack,
-  spack-packages, mo-spack-packages. **LFRic source (the examples build from these):**
+- `vendor/` — pinned submodules, three classes. **Env/build tooling (Stage 1):** spack,
+  spack-packages, mo-spack-packages. **Science suites:** lfric_egp_bench (Denis
+  Sergeev's repo — u-dr932 lives there and is staged by
+  `patches/40-lfric_egp_bench-u-dr932-patch.sh`, NOT copied into this repo).
+  **LFRic source (the examples build from these):**
   lfric_apps, lfric_core, physics/{casim,jules,socrates,ukca} — these are the
   `dependencies.yaml` set; the science-suites treat them as local mirrors to extract a
   declared ref from — `vendor/mirrors/` presents them in the Met Office
   `MetOffice/<repo>.git` layout so the upstream extract can use them offline.
-- `patches/*-patch.sh` — applied in sorted order by `patch-all.sh`.
+- `patches/*-patch.sh` — applied in sorted order by `patch-all.sh`. `40-lfric_egp_bench-*`
+  stages the u-dr932 suite (`rose app-upgrade` + a `git apply` of the site diff); it is
+  inert without `rose`, so `run-suite.sh` re-runs it with the env activated.
 - `staging/<investigation>/` — reproductions of reported problems, with their evidence
   and conclusion. Off the invariant; nothing in `scripts/`/`spack-env/`/`examples/`
   may depend on it. See `staging/README.md`.

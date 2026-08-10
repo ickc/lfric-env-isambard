@@ -40,7 +40,9 @@ examples/science-suites/ # SCIENCE-SUITE EXAMPLES: run real Rose/Cylc LFRic suit
   site/patch-sources.sh  #   apply the LFRic patch stack to a suite's extracted tree
   site/extract-sources.sh #  offline per-suite source extract (u-dn704/u-dt000 only;
                           #  u-dr932 uses the upstream merge_sources.py extract)
-  u-dn704/ u-dr932/ u-dt000/  # adapted suites (dependencies.yaml + flow.cylc) + README
+  u-dn704/ u-dt000/       #   adapted suites, copied in (dependencies.yaml + flow.cylc)
+  u-dr932/                #   only README + known-issues: the SUITE is the submodule
+                          #   vendor/lfric_egp_bench, staged by patches/40-*
 spack-env/              # Spack env TEMPLATES (tracked); build.sh instantiates under PREFIX
   common.yaml           #   shared config: repos, gcc@14.3.0 external, python
   cray/spack.yaml       #   variant: system cray-mpich + Cray HDF5/netCDF (default)
@@ -49,6 +51,7 @@ spack-repo/lfric-isambard/  # local package repo: lfric-apps-isambard bundle, xi
 vendor/                 # pinned submodules
   spack/  spack-packages/                     # Spack + its builtin packages
   lfric_apps/  lfric_core/  mo-spack-packages/ #   LFRic sources (mirrors) + MO package repo
+  lfric_egp_bench/                            #   upstream science suite (u-dr932), patched
   physics/{casim,jules,socrates,ukca}/         #   LFRic physics sources (examples only)
 patches/                # one *-patch.sh per upstream patch (applied in sorted order)
 logs/                   # sbatch stdout (.gitkeep tracked; *.out ignored)

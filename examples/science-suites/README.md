@@ -129,8 +129,18 @@ must be located upstream first. See `PLAN.md`.
 
 ## How it works here (what was adapted)
 
-Each suite is the upstream Rose/Cylc suite with three site-specific changes, so it
-runs against *our* env on Isambard 3:
+**u-dr932 is not copied into this repo at all.** It is a pinned submodule of its
+upstream repository (`vendor/lfric_egp_bench`), staged by
+`patches/40-lfric_egp_bench-u-dr932-patch.sh` — the same treatment Stage 1 gives its
+LFRic sources. The script runs `rose app-upgrade` to the version this env builds, then
+`git apply`s `patches/40-lfric_egp_bench-u-dr932-isambard3.patch`. So the difference
+between what a scientist runs and what runs here is a **real diff**: `git apply -R`
+gives the upstream suite back, and the patch file is directly the pull request to send
+upstream. u-dn704 and u-dt000 are still copies, and move to this when they are next
+re-validated.
+
+Beyond that, each suite is the upstream Rose/Cylc suite with three site-specific
+changes, so it runs against *our* env on Isambard 3:
 
 1. **Sources → the upstream extract, plus this repo's patch stack.** Each suite
    declares the LFRic-source refs it builds in a **`dependencies.yaml`** (the
@@ -240,6 +250,9 @@ square subdomains — **24, 54, 96** all fit one node; 108 works but gives each 
 - **Physics submodules initialised** (as for the minimal-compile example):
   `git submodule update --init --jobs 4 -- vendor/physics/{casim,jules,socrates,ukca}`
   (or `pixi run init-physics`).
+- **For u-dr932, its suite submodule too:**
+  `git submodule update --init vendor/lfric_egp_bench`. `run-suite.sh` stages and
+  patches it for you; it fails with that command in the message if it is missing.
 
 ## Run it
 
@@ -308,9 +321,15 @@ takes the install down with it (`difft` on this machine crashes with
 
 ## Adapting this for your own suite
 
-Drop your Rose/Cylc suite in a new directory here. Start from **what upstream already
-does** and change only what the platform forces you to; u-dr932 is the worked example
-and its [`README.md`](u-dr932/README.md) is the itemised diff.
+Prefer **pinning the upstream suite as a submodule under `vendor/` and carrying a
+patch**, as u-dr932 does, over copying it in — a copy drifts silently, which is exactly
+how the two u-dr932s came to differ. Wire it up in `run-suite.sh`'s `case` block and add
+a `patches/NN-<repo>-<suite>-patch.sh`. Where the suite is not in git (a MOSRS/rosie
+suite, say), a copy is the only option and the rest of this section still applies.
+
+Then start from **what upstream already does** and change only what the platform forces
+you to; u-dr932 is the worked example and its [`README.md`](u-dr932/README.md) is the
+itemised diff.
 
 1. **Sources.** Keep your `dependencies.yaml` and the upstream `merge_sources.py`
    extract; append `site/patch-sources.sh "$SOURCE_ROOT"` to its command so this

@@ -90,7 +90,10 @@ confirmed unavailable/inaccessible (documented in PR #8 with whom was asked).
 (clone a tag, then merge a fork branch on top — like fcm_extract). `extract-sources.sh`
 takes only the FIRST entry.
 
-**Superseded where it matters.** u-dr932 now runs the *upstream* extract
+**Superseded where it matters.** u-dr932 is now the upstream suite itself -- a pinned
+submodule (`vendor/lfric_egp_bench`) plus `patches/40-lfric_egp_bench-*`, so the delta
+against what Denis runs is a real diff and directly the PR to send him. It runs the
+*upstream* extract
 (`merge_sources.py` from SimSys_Scripts), which implements fork-merge natively — so on
 that suite the feature is simply present, and reimplementing it here would be
 duplicating a Met Office tool. The remaining work is to move u-dn704 and u-dt000 onto
