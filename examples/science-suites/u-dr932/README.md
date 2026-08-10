@@ -146,11 +146,23 @@ node, 108 ranks, `--exclusive`:
 | `extract` | 73 s — six repos cloned from github over https on the compute node, then the patch stack |
 | `build_mesh` / `build_lfric_atm` | 1 min 46 s / 14 min 56 s (both from the same `extract`) |
 | `generate_mesh` | 3 s — with `equatorial_latitude=36.87` (from `STRETCH_FACTOR=0.5`) and `target_north_pole=-90,0`, i.e. Denis' stretched, rotated mesh |
-| `lfric_atm` | see the timing note below |
+| `lfric_atm` | **1 h 36 m 43 s** for the full 17 280-timestep cycle (dt = 50 s, P10D), `COMPLETED` |
 
 The stock Met Office launcher emitted exactly `srun <exe> configuration.nml`, and XIOS
 wrote its output attached (no dedicated server), as this suite's `XIOS_SERVER_MODE=False`
-asks.
+asks: `lfric_diag_latlon` (27.6 MB), `lfric_diag_main` (30.1 MB), `lfric_diag_cnsrv`
+(8.5 MB) and `lfric_initial` (23.9 MB). Dry mass drifts by 4.7 × 10⁻⁷ relative over the
+cycle, and the winds plateau (`u_in_w3` reaches −8.5 / +5.8 km s⁻¹ and stops growing) —
+spin-up from rest, not divergence.
+
+**Against Denis' own `sacct` for the same 17 280-timestep cycle at the same 108 ranks —
+5 h 07 m to 8 h 59 m — this is 3.2× to 5.6× faster.** Worth being precise about what
+that does and does not compare: it is the same suite and the same work, but it is not a
+controlled A/B. Three things differ at once — placement (1 node, pinned, exclusive vs 9
+to 32 nodes unpinned), MPI (cray-mpich over Slingshot vs a from-source `ch3:nemesis`
+MPICH falling back to TCP on a 1 GbE link), and the stack itself (gfortran 14.3 on
+vn3.2 vs 12.3 on vn3.1). `staging/dr932-mpi-scaling/` separates the first two by direct
+measurement; the third is unquantified here.
 
 ### Two things worth reporting back
 
