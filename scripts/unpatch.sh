@@ -12,8 +12,10 @@ _here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
 
 # Only the submodules that patches touch. vendor/spack and the package repo
 # mo-spack-packages are not patched. (lfric_apps is patched by
-# patches/30-lfric_apps-local-sources-patch.sh.)
-for sub in lfric_core lfric_apps spack-packages; do
+# patches/30-lfric_apps-local-sources-patch.sh; lfric_egp_bench carries the
+# u-dr932 science suite and is staged by patches/40-lfric_egp_bench-*, so
+# resetting it is also how you get Denis' suite back verbatim.)
+for sub in lfric_core lfric_apps spack-packages lfric_egp_bench; do
   d="$REPO_ROOT/vendor/$sub"
   if git -C "$d" rev-parse --git-dir >/dev/null 2>&1; then
     echo ">>> resetting vendor/$sub to pinned commit"
@@ -23,4 +25,4 @@ for sub in lfric_core lfric_apps spack-packages; do
     echo "skip vendor/$sub (not initialized)"
   fi
 done
-echo "unpatch complete: lfric_core, lfric_apps, spack-packages restored."
+echo "unpatch complete: lfric_core, lfric_apps, spack-packages, lfric_egp_bench restored."
