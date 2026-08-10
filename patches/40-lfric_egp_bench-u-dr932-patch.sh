@@ -15,7 +15,7 @@
 #      enough to read.
 #
 #   2. SITE ADAPTATION. `git apply` of 40-lfric_egp_bench-u-dr932-isambard3.patch,
-#      ~450 lines touching five files (flow.cylc, rose-suite.conf,
+#      419 lines touching five files (flow.cylc, rose-suite.conf,
 #      dependencies.yaml, app/extract, app/mesh). That patch is the reviewable
 #      artefact: it is what would be sent upstream as a pull request, and every
 #      hunk carries an `[isambard3]` comment saying what it replaced and why.

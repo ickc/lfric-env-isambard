@@ -24,7 +24,7 @@ Example: minimal-compile  —  USE the env to compile a target   (lightweight)
                                    └▶ compile lfric_atm (examples/minimal-compile/)
 
 Example: science-suites   —  RUN a real suite   (cylc on the login node ─▶ Slurm)
-  cylc vip a Rose/Cylc LFRic suite (examples/science-suites/u-*/) on the built env
+  cylc vip a Rose/Cylc LFRic suite on the built env (examples/science-suites/)
 ```
 
 - **Stage 1** is the reproducible core of this repo — the one true prerequisite. It
@@ -39,6 +39,8 @@ Example: science-suites   —  RUN a real suite   (cylc on the login node ─▶
   on the built env the way scientists do — `cylc` schedules the suite and submits to
   Slurm; each suite declares its LFRic source refs in `dependencies.yaml` and compiles
   its own `lfric_atm` (e.g. `pixi run run-suite u-dr932`, on the default `cray` env).
+  u-dr932 is the upstream suite itself — a pinned submodule plus a patch, so what we
+  changed for Isambard 3 is a reviewable diff; it needs `pixi run init-suites` first.
 
 There are **two dependency variants**, chosen with `LFRIC_STACK`:
 

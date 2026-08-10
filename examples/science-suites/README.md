@@ -133,7 +133,9 @@ must be located upstream first. See `PLAN.md`.
 upstream repository (`vendor/lfric_egp_bench`), staged by
 `patches/40-lfric_egp_bench-u-dr932-patch.sh` — the same treatment Stage 1 gives its
 LFRic sources. The script runs `rose app-upgrade` to the version this env builds, then
-`git apply`s `patches/40-lfric_egp_bench-u-dr932-isambard3.patch`. So the difference
+`git apply`s `patches/40-lfric_egp_bench-u-dr932-isambard3.patch`. Anything upstream
+absorbs drops out of that patch — it shrank by 40 lines the day Denis merged our
+placement fix. So the difference
 between what a scientist runs and what runs here is a **real diff**: `git apply -R`
 gives the upstream suite back, and the patch file is directly the pull request to send
 upstream. u-dn704 and u-dt000 are still copies, and move to this when they are next
@@ -284,8 +286,10 @@ cylc vip examples/science-suites/u-dr932 --workflow-name u-dr932 \
 ```
 
 Anything you pass to `run-suite.sh` after the suite name goes straight to `cylc vip`,
-so suite settings are overridden the usual way — `-S EXPT_RUNLEN=P1200D`,
-`-S TOTAL_RANKS_REQ=54`, `--pause`, and so on.
+so suite settings are overridden the usual way — `-S "EXPT_RUNLEN='P1200D'"`,
+`-S TOTAL_RANKS_REQ=54`, `--pause`, and so on. String values must be quoted for `-S`
+(`-S EXPT_RUNLEN=P1200D` is rejected as `Invalid template variable`); numbers and
+booleans need no quotes.
 
 Watch and drive it with plain Cylc:
 

@@ -141,11 +141,13 @@ In rough order of what a fix needs:
 
 The reproduction is cheap: the overflow is visible at **timestep 1**, so a 72-step
 cycle is enough. Roughly ten minutes once the environment is built, plus the compile.
+String template variables must be quoted for `-S`, or cylc rejects them with
+`Invalid template variable`.
 
 ```bash
 # the failing arm — as committed
 bash examples/science-suites/run-suite.sh u-dr932 \
-     -S EXPT_RESUB=PT1H -S EXPT_RUNLEN=PT1H -S TOTAL_RANKS_REQ=24
+     -S "EXPT_RESUB='PT1H'" -S "EXPT_RUNLEN='PT1H'" -S TOTAL_RANKS_REQ=24
 ```
 
 For the 64-bit control, launch paused, override the build precision by broadcast, then
@@ -158,7 +160,7 @@ cylc vip vendor/lfric_egp_bench/src/suites/u-dr932 --workflow-name u-dr932-r64 -
   -S "REPO_ROOT='$PWD'" -S "LFRIC_STACK='cray'" \
   -S "LFRIC_PREFIX='<unversioned PREFIX>'" -S "LFRIC_ENV_VERSION='<./VERSION>'" \
   -S "ACTIVATE_ENV='$PWD/examples/science-suites/site/activate-env.sh'" \
-  -S EXPT_RESUB=PT1H -S EXPT_RUNLEN=PT1H -S TOTAL_RANKS_REQ=24
+  -S "EXPT_RESUB='PT1H'" -S "EXPT_RUNLEN='PT1H'" -S TOTAL_RANKS_REQ=24
 cylc broadcast u-dr932-r64 -n build_lfric_atm \
   -s '[environment]RDEF_PRECISION=64' -s '[environment]R_TRAN_PRECISION=64' \
   -s '[environment]R_BL_PRECISION=64'  -s '[environment]R_PHYS_PRECISION=64'

@@ -245,5 +245,5 @@ To go back to something closer to upstream behaviour:
 bash examples/science-suites/run-suite.sh u-dr932 \
   -S USE_MIRRORS=true -S "MIRROR_LOC='$PWD/vendor/mirrors'"
 # Denis' full 120-cycle campaign
-bash examples/science-suites/run-suite.sh u-dr932 -S EXPT_RUNLEN=P1200D
+bash examples/science-suites/run-suite.sh u-dr932 -S "EXPT_RUNLEN='P1200D'"
 ```
