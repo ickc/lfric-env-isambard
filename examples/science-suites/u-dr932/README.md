@@ -1,12 +1,25 @@
 # u-dr932 — GungHo Shallow/Deep Hot Jupiter Temperature Forcing, on Isambard 3
 
 This is **Denis Sergeev's suite**, run against this repo's environment. Not a port,
-not a rewrite: the files here are
-[`dennissergeev/lfric_egp_bench@ffe611e`](https://github.com/dennissergeev/lfric_egp_bench/tree/main/src/suites/u-dr932)
-`src/suites/u-dr932`, with his own working configuration in `rose-suite.conf`, and a
-short list of changes confined to the `isambard3-gnu` branch. Every change is marked
-`[isambard3]` in a comment at the point it applies, saying what it replaced and why.
-This file is the index of them.
+not a rewrite, and **not a copy**: the suite is a pinned submodule of his repository,
+[`dennissergeev/lfric_egp_bench@ffe611e`](https://github.com/dennissergeev/lfric_egp_bench/tree/main/src/suites/u-dr932),
+and this repo carries only a **patch** against it — the same treatment Stage 1 gives
+its LFRic sources.
+
+```
+vendor/lfric_egp_bench/src/suites/u-dr932            the suite (submodule, pinned)
+patches/40-lfric_egp_bench-u-dr932-patch.sh          stages it: rose app-upgrade, then...
+patches/40-lfric_egp_bench-u-dr932-isambard3.patch   ...this — the site diff, ~450 lines
+examples/science-suites/u-dr932/                     only what this repo owns: this
+                                                     file, and known-issues notes
+```
+
+So the difference between what a scientist runs and what runs here is a **real diff**,
+not a described one: `git apply -R` gives you his suite back, `git diff` in the
+submodule shows exactly what we changed, and the patch file is directly the pull
+request to send upstream. His working configuration in `rose-suite.conf` is used
+as-is. Every hunk carries an `[isambard3]` comment saying what it replaced and why;
+this file is the index of them.
 
 The suite is the one from [`staging/dr932-mpi-scaling/`](../../../staging/dr932-mpi-scaling/):
 it ran 3–4× slower on Isambard 3 than on Monsoon, and that investigation found why.
@@ -82,8 +95,13 @@ Two other Slurm fixes, in tasks that are not the model:
 ### Version — vn3.1 → vn3.2
 
 This repo's environment is built against LFRic `2026.07.1` (apps vn3.2); the suite was
-written for `2026.03.1` (vn3.1). The app configs were upgraded with the **native tool**,
-`rose app-upgrade -C <app> vn3.2`, which ran clean on both:
+written for `2026.03.1` (vn3.1). **This is not in the patch file** — the staging script
+*runs* the native tool, `rose app-upgrade -C <app> vn3.2`, over the submodule. Carrying
+its ~2000-line mechanical diff would have drowned the reviewable part, and it is not
+upstreamable anyway: Denis is on vn3.1 and does not want a vn3.2 config. Bump
+`SUITE_META_VN` in the patch script when the `vendor/lfric_apps` pin moves.
+
+The upgrade ran clean on both apps:
 
 - `app/lfric_atm`: renames (`pc2ini`→`pc2_init_method`, `i_bm_ez_opt`→`bm_ez_opt`,
   `i_update_precfrac`→`update_precfrac_opt`, …), the new vn3.2 members at their macro
@@ -195,6 +213,29 @@ cylc tui u-dr932            # watch
 
 See [`../README.md`](../README.md) for what `run-suite.sh` does, the equivalent bare
 `cylc` commands, and how to drive the run afterwards.
+
+### Regenerating the patch
+
+When Denis moves the submodule pin, or the environment's LFRic version changes:
+
+```bash
+. examples/science-suites/site/activate-env.sh
+export ROSE_META_PATH=$(find vendor/lfric_{apps,core} -type d -name rose-meta | tr '\n' ':')
+
+# a/ = upstream at the new pin, upgraded; b/ = a/ plus the five site-edited files
+git -C vendor/lfric_egp_bench stash            # park the current patch
+mkdir -p /tmp/pg/{a,b}/src/suites
+cp -r vendor/lfric_egp_bench/src/suites/u-dr932 /tmp/pg/a/src/suites/
+(cd /tmp/pg/a/src/suites/u-dr932/app && rose app-upgrade -y -C lfric_atm vn3.2 \
+                                     && rose app-upgrade -y -C mesh vn3.2)
+cp -r /tmp/pg/a/src/suites/u-dr932 /tmp/pg/b/src/suites/
+#   ... re-apply the five site edits to /tmp/pg/b (flow.cylc, rose-suite.conf,
+#       dependencies.yaml, app/extract/rose-app.conf, app/mesh/rose-app.conf) ...
+(cd /tmp/pg && diff -ruN a b) > patches/40-lfric_egp_bench-u-dr932-isambard3.patch
+```
+
+Keep the patch to those five files: anything mechanical belongs in the upgrade step,
+not here.
 
 To go back to something closer to upstream behaviour:
 
