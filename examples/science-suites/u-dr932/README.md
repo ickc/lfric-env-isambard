@@ -184,20 +184,18 @@ measurement; the third is unquantified here.
 
 ### Two things worth reporting back
 
-**1. The energy-conservation diagnostics read `Infinity`, from timestep 1.** This is a
-32-bit overflow, not a model blow-up. `conservation_algorithm_mod` accumulates the
-totals in `r_def`, and this suite builds `RDEF_PRECISION=32`; the kinetic-energy sum
-over a 9.44 × 10⁷ m planet exceeds the single-precision ceiling of 3.4 × 10³⁸. Verified
-by rebuilding the same suite at `RDEF_PRECISION=64` and running 72 steps: horizontal
-kinetic energy comes out finite at 3.03 × 10¹⁹ J and total energy at 2.48 × 10³² J.
-Nothing else is affected — the solver converges every step, the prognostic fields stay
-finite, and `Min/max u ≈ 10¹⁴` is the raw W2 flux dof (`u_in_w3`, the physical wind, is
-O(1–10³) m/s), which is identical in both builds. The precision is Denis' own build
-setting and is left as he has it; raising it is the fix if those diagnostics are wanted.
+**1. The energy-conservation diagnostics read `Infinity`, from timestep 1.** A 32-bit
+overflow in one kernel's intermediates, not a model blow-up: the solver converges every
+step, mass is conserved to 4.7 × 10⁻⁷ over the cycle, and a 64-bit control build gives
+finite values. It is an upstream bug, not a misconfiguration, and this suite reproduces
+it in ~10 minutes. Written up in full, with the open questions and how to verify a fix,
+in [`known-issues/energy-diagnostics-overflow-at-32-bit.md`](known-issues/energy-diagnostics-overflow-at-32-bit.md).
+`RDEF_PRECISION` is left at Denis' 32.
 
 **2. The first-step winds are round-off dominated at 32-bit.** Starting from rest,
-`u_in_w3` after one 50 s step is ±1.5 m/s at `RDEF_PRECISION=32` and ±0.13 m/s at 64 —
-about 10×, in a field whose true value is near zero. Both then spin up.
+`u_in_w3` after one 50 s step is ±1.5 m s⁻¹ at `RDEF_PRECISION=32` and ±0.13 m s⁻¹ at
+64 — about 10×, in a field whose true value is near zero. Both then spin up. Possibly
+the same root cause as (1), possibly not; see that file's open questions.
 
 No comparison against Denis' own output was possible: his `cylc-run` had been cleaned.
 
