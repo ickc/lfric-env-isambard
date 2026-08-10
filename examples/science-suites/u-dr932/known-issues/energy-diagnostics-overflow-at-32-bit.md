@@ -196,7 +196,7 @@ motivated upstream pull request, and this suite is the regression test for it.
 
 - Observed 2026-08-10 on Isambard 3, `lfric-env/v2026.07.21/cray`,
   LFRic `2026.07.1` (apps vn3.2), gfortran 14.3 behind `ftn`.
-- Suite: `dennissergeev/lfric_egp_bench@ffe611e` `src/suites/u-dr932`, as staged by
+- Suite: `dennissergeev/lfric_egp_bench@e6ee57a` `src/suites/u-dr932`, as staged by
   `patches/40-lfric_egp_bench-u-dr932-patch.sh`; `CASE_SETUP=''` (deep hot Jupiter),
   `LFRIC_RES=C48_MG`, `LFRIC_LEVS=''` (l66/4000 km), `STRETCH_FACTOR=0.5`,
   `TARGET_LONLAT=-90,0`, `EXPT_DT=50`.

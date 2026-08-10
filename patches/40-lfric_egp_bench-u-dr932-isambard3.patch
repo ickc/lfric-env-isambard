@@ -1,6 +1,6 @@
 diff -ruN a/src/suites/u-dr932/app/extract/rose-app.conf b/src/suites/u-dr932/app/extract/rose-app.conf
---- a/src/suites/u-dr932/app/extract/rose-app.conf	2026-08-10 14:13:35.000000000 +0000
-+++ b/src/suites/u-dr932/app/extract/rose-app.conf	2026-08-10 14:14:19.000000000 +0000
+--- a/src/suites/u-dr932/app/extract/rose-app.conf	2026-08-10 23:15:25.000000000 +0000
++++ b/src/suites/u-dr932/app/extract/rose-app.conf	2026-08-10 23:15:34.000000000 +0000
 @@ -1,4 +1,25 @@
 +# [isambard3] The Met Office extract, unchanged in mechanism: merge_sources.py
 +# reads this suite's dependencies.yaml and clones each declared repo@ref into
@@ -31,8 +31,8 @@ diff -ruN a/src/suites/u-dr932/app/extract/rose-app.conf b/src/suites/u-dr932/ap
 +tokens=merge_sources.py -d $CYLC_WORKFLOW_RUN_DIR --tokens ; \
 +       =bash "$REPO_ROOT/examples/science-suites/site/patch-sources.sh" "$SOURCE_ROOT"
 diff -ruN a/src/suites/u-dr932/app/mesh/rose-app.conf b/src/suites/u-dr932/app/mesh/rose-app.conf
---- a/src/suites/u-dr932/app/mesh/rose-app.conf	2026-08-10 14:13:43.000000000 +0000
-+++ b/src/suites/u-dr932/app/mesh/rose-app.conf	2026-08-10 14:14:19.000000000 +0000
+--- a/src/suites/u-dr932/app/mesh/rose-app.conf	2026-08-10 23:15:33.000000000 +0000
++++ b/src/suites/u-dr932/app/mesh/rose-app.conf	2026-08-10 23:15:34.000000000 +0000
 @@ -1,7 +1,12 @@
 +# [isambard3] meta vn3.1 -> vn3.2 via `rose app-upgrade`, to match the source this
 +# env builds (2026.07.1). Only mechanical: planar_mesh apply_stretch_transform ->
@@ -48,8 +48,8 @@ diff -ruN a/src/suites/u-dr932/app/mesh/rose-app.conf b/src/suites/u-dr932/app/m
  [env]
  OMP_NUM_THREADS=1
 diff -ruN a/src/suites/u-dr932/dependencies.yaml b/src/suites/u-dr932/dependencies.yaml
---- a/src/suites/u-dr932/dependencies.yaml	2026-08-10 14:13:35.000000000 +0000
-+++ b/src/suites/u-dr932/dependencies.yaml	2026-08-10 14:14:19.000000000 +0000
+--- a/src/suites/u-dr932/dependencies.yaml	2026-08-10 23:15:25.000000000 +0000
++++ b/src/suites/u-dr932/dependencies.yaml	2026-08-10 23:15:34.000000000 +0000
 @@ -23,27 +23,45 @@
  #
  # It is up to the user to ensure these merge cleanly
@@ -105,8 +105,8 @@ diff -ruN a/src/suites/u-dr932/dependencies.yaml b/src/suites/u-dr932/dependenci
 -    ref: 2026.03.1
 +    ref: 2026.07.1
 diff -ruN a/src/suites/u-dr932/flow.cylc b/src/suites/u-dr932/flow.cylc
---- a/src/suites/u-dr932/flow.cylc	2026-08-10 14:13:35.000000000 +0000
-+++ b/src/suites/u-dr932/flow.cylc	2026-08-10 14:14:19.000000000 +0000
+--- a/src/suites/u-dr932/flow.cylc	2026-08-10 23:15:25.000000000 +0000
++++ b/src/suites/u-dr932/flow.cylc	2026-08-10 23:15:33.000000000 +0000
 @@ -1,5 +1,26 @@
  #!jinja2
  
@@ -134,21 +134,7 @@ diff -ruN a/src/suites/u-dr932/flow.cylc b/src/suites/u-dr932/flow.cylc
  {% from "socket" import getfqdn %}
  {% from "cylc.flow" import LOG %}
  
-@@ -74,7 +95,12 @@
-     {% set CORES_PER_NODE = 128 %}
- {% endif %}
- {% set LFRIC_ATM_NODES = (TOTAL_RANKS_REQ / CORES_PER_NODE) | round(0, 'ceil') | int %}
--{% do LOG.info("CORES_PER_NODE: " ~ CORES_PER_NODE ~ ", LFRIC_ATM_NODES: " ~ LFRIC_ATM_NODES) %}
-+{# [isambard3] ADDED: ranks per node, spread evenly over the nodes asked for.
-+   Slurm needs this stated EXPLICITLY -- given only --ntasks it is free to take a
-+   handful of ranks from each of a dozen partially-free nodes, which is what made
-+   this suite 3-4x slower than Monsoon (staging/dr932-mpi-scaling/README.md). #}
-+{% set LFRIC_ATM_PPN = (TOTAL_RANKS_REQ / LFRIC_ATM_NODES) | round(0, 'ceil') | int %}
-+{% do LOG.info("CORES_PER_NODE: " ~ CORES_PER_NODE ~ ", LFRIC_ATM_NODES: " ~ LFRIC_ATM_NODES ~ ", LFRIC_ATM_PPN: " ~ LFRIC_ATM_PPN) %}
- 
- 
- {# ============================================================ #}
-@@ -82,6 +108,26 @@
+@@ -87,6 +108,26 @@
  {# ============================================================ #}
  [runtime]
      [[root]]
@@ -175,7 +161,7 @@ diff -ruN a/src/suites/u-dr932/flow.cylc b/src/suites/u-dr932/flow.cylc
          env-script = eval $(rose task-env)
          script = "rose task-run --verbose"
          [[[events]]]
-@@ -101,6 +147,11 @@
+@@ -106,6 +147,11 @@
              CORE_ROOT_DIR = $SOURCE_ROOT/lfric_core
              LAUNCH_SCRIPT = $APPS_ROOT_DIR/rose-stem/site/meto/common/bin
              VN = {{ VN }}
@@ -187,7 +173,7 @@ diff -ruN a/src/suites/u-dr932/flow.cylc b/src/suites/u-dr932/flow.cylc
              TARGET_LONLAT = {{TARGET_LONLAT[0]}},{{TARGET_LONLAT[1]}}
              STRETCH_FACTOR = {{STRETCH_FACTOR}}
              EQ_LAT = $(bc -l <<< "x=(1-$STRETCH_FACTOR^2)/(1+$STRETCH_FACTOR^2); a(x/sqrt(1-x^2))*45/a(1)")
-@@ -186,21 +237,50 @@
+@@ -191,14 +237,37 @@
  
  {% if MACHINE == "isambard3-gnu" %}
      [[ISAMBARD3GNU]]
@@ -229,12 +215,11 @@ diff -ruN a/src/suites/u-dr932/flow.cylc b/src/suites/u-dr932/flow.cylc
          [[[environment]]]
              BIG_DATA_DIR = '/projects/u35v/sw/lfricdata'
              BUILD_ROOT=$CYLC_WORKFLOW_SHARE_DIR/lfric_build
-             HYPERTHREADS    = 1
+@@ -206,7 +275,12 @@
              CORES_PER_NODE  = {{ CORES_PER_NODE }}
--            NUMA_REGIONS_PER_NODE = 0
+             # A Grace node is 2 sockets x 72 cores, not 0 NUMA regions.
+             NUMA_REGIONS_PER_NODE = 2
 -            RUN_METHOD = mpiexec
-+            {# [isambard3] CHANGED: 0 -> 2. A Grace node is 2 sockets x 72 cores. #}
-+            NUMA_REGIONS_PER_NODE = 2
 +            {# [isambard3] CHANGED: mpiexec -> srun. srun is what binds cray-mpich to
 +               Slingshot's cxi provider through the Cray PMI, and it pins one rank per
 +               core without being asked; the cray environment ships no mpiexec at all.
@@ -242,9 +227,9 @@ diff -ruN a/src/suites/u-dr932/flow.cylc b/src/suites/u-dr932/flow.cylc
 +               run with XIOS attached, so LAUNCH_SCRIPT stays upstream's. #}
 +            RUN_METHOD = srun
              TOTAL_RANKS_REQ = {{TOTAL_RANKS_REQ}}
-         [[[directives]]]
- {#            --account=u35v #}
-@@ -266,6 +346,14 @@
+             # launch-exe's non-meto branch otherwise emits a bare `mpiexec -n N`, and
+             # Hydra does not bind by default -- all N ranks then share one N-CPU
+@@ -292,6 +366,14 @@
  {#            PSYCLONE_TRANSFORMATION = uoe-isambard3 #}
              UM_FCM_TARGET_PLATFORM = uoe-isambard3
              LFRIC_TARGET_PLATFORM = uoe-isambard3
@@ -259,7 +244,7 @@ diff -ruN a/src/suites/u-dr932/flow.cylc b/src/suites/u-dr932/flow.cylc
              MAKE_THREADS = 6
              RDEF_PRECISION = 32
              R_TRAN_PRECISION = 32
-@@ -274,10 +362,17 @@
+@@ -300,10 +382,17 @@
              R_PHYS_PRECISION = 64
              PRE_PROCESS_MACROS = ""
          [[[directives]]]
@@ -281,7 +266,7 @@ diff -ruN a/src/suites/u-dr932/flow.cylc b/src/suites/u-dr932/flow.cylc
  {% else %}
          inherit = EX1A
          script = "rose task-run --app-key=build"
-@@ -341,6 +436,14 @@
+@@ -367,6 +456,14 @@
          inherit = ISAMBARD3GNU
          script = "rose task-run --app-key=extract"
          [[[environment]]]
@@ -296,7 +281,7 @@ diff -ruN a/src/suites/u-dr932/flow.cylc b/src/suites/u-dr932/flow.cylc
              MIRROR_LOC = {{ MIRROR_LOC }}
              {% if USE_MIRRORS %}
                  ROSE_APP_COMMAND_KEY = mirrors
-@@ -348,10 +451,13 @@
+@@ -374,10 +471,13 @@
                  ROSE_APP_COMMAND_KEY = tokens
              {% endif %}
          [[[directives]]]
@@ -311,7 +296,7 @@ diff -ruN a/src/suites/u-dr932/flow.cylc b/src/suites/u-dr932/flow.cylc
  
  {% else %}
          inherit = EX1A
-@@ -437,11 +543,18 @@
+@@ -463,11 +563,18 @@
              BIN_DIR = $OUTPUT_ROOT/bin/mesh
              ROSE_APP_OPT_CONF_KEYS = {{LFRIC_RES}}
              OUTPUT_FILE_PREFIX = $MESH_DIR/mesh_{{LFRIC_RES}}
@@ -332,7 +317,7 @@ diff -ruN a/src/suites/u-dr932/flow.cylc b/src/suites/u-dr932/flow.cylc
  
  {% else %}
          inherit = EX1A
-@@ -520,6 +633,13 @@
+@@ -546,6 +653,13 @@
              {% endif %}
              METADATA = $APPS_ROOT_DIR/applications/lfric_atm/metadata
              BIN_DIR = $OUTPUT_ROOT/bin/lfric_atm
@@ -346,48 +331,23 @@ diff -ruN a/src/suites/u-dr932/flow.cylc b/src/suites/u-dr932/flow.cylc
              STARTDATE = $({{ISODATETIME}} -f "%F %T" {{EXPT_START}})
              STARTTIME = $({{ISODATETIME}} --as-total=s {{EXPT_START}} ref)
              STOPTIME = $({{ISODATETIME}} --as-total=s --offset2={{EXPT_RESUB}} {{EXPT_START}} ref)
-@@ -545,9 +665,37 @@
- {% else %}
- {% if MACHINE == "isambard3-gnu" %}
-         [[[directives]]]
--            --mem-per-cpu=8G
-+            {# [isambard3] CHANGED, and this is the change that mattered: state the
-+               placement, never leave it to Slurm. Was:
-+                   --mem-per-cpu=8G --ntasks=N --cpus-per-task=1 --export=NONE
-+               With no node count asked for, and 8G/core capping a 230400 MB Grace
-+               node at 28 of these ranks, Slurm satisfied a 108-rank job out of
-+               whatever had room -- 9 to 32 nodes, 1-13 ranks each, and 5h-to-9h on
-+               identical work. Measured in full in staging/dr932-mpi-scaling/.
-+               - --nodes + --ntasks-per-node pack the ranks onto as few nodes as
-+                 possible (108 fit on one).
-+               - --mem=0 takes the node's whole memory, so a memory request can never
-+                 cap ranks-per-node and fan the job out again. Safe: Slurm accounting
-+                 puts this configuration's peak at 8-35 GB for the WHOLE job against
-+                 225 GB on a node, i.e. the 8G/core was over-provisioned ~25-100x.
-+                 Re-measure before assuming that holds at C384 or above.
-+               - --exclusive because SelectType is select/cons_tres (CR_CORE_MEMORY):
-+                 Slurm hands out cores, not machines, and 1493 jobs from 20 other
-+                 users touched the 32 nodes of one scattered run. Exclusivity is what
-+                 makes the timing repeatable, not merely faster. --mem=0 is still
-+                 needed alongside it: --exclusive gives all the CPUs but memory
-+                 follows DefMemPerCPU (1024 MB x 144 = 144 GB of a 225 GB node).
-+               - --export=NONE KEPT, as upstream has it: it is what makes the job
-+                 stateless with respect to the shell it was submitted from. It does
-+                 need `export SLURM_EXPORT_ENV=ALL` in the family pre-script above,
-+                 or the srun step inherits SLURM_EXPORT_ENV=NONE and starts with no
-+                 environment at all. #}
-+            --nodes={{ LFRIC_ATM_NODES }}
+@@ -580,6 +694,13 @@
+             # that crosses a node boundary falls back to TCP, ~30x slower than the
+             # fabric. --mem=0 takes the node's whole memory, which is what a packed
+             # node wants anyway.
++            {# [isambard3] The block below is upstream's, unchanged. One thing it
++               cannot know: --export=NONE also sets SLURM_EXPORT_ENV=NONE inside the
++               job, which every `srun` STEP inherits -- so under RUN_METHOD=srun the
++               step starts with no environment at all (measured: it cannot even find
++               `bash`). Inert under Hydra, which copies its own environment to the
++               ranks. `export SLURM_EXPORT_ENV=ALL` in the family pre-script above is
++               what makes --export=NONE safe here. #}
+             --nodes={{ LFRIC_ATM_NODES }}
              --ntasks={{TOTAL_RANKS_REQ}}
-+            --ntasks-per-node={{ LFRIC_ATM_PPN }}
-             --cpus-per-task=1
-+            --exclusive =
-+            --mem=0
-             --export=NONE
- {% else %}
-         [[[directives]]]
+             --ntasks-per-node={{ LFRIC_ATM_PPN }}
 diff -ruN a/src/suites/u-dr932/rose-suite.conf b/src/suites/u-dr932/rose-suite.conf
---- a/src/suites/u-dr932/rose-suite.conf	2026-08-10 14:13:35.000000000 +0000
-+++ b/src/suites/u-dr932/rose-suite.conf	2026-08-10 14:14:19.000000000 +0000
+--- a/src/suites/u-dr932/rose-suite.conf	2026-08-10 23:15:25.000000000 +0000
++++ b/src/suites/u-dr932/rose-suite.conf	2026-08-10 23:15:34.000000000 +0000
 @@ -1,31 +1,54 @@
 +# u-dr932 — GungHo Shallow/Deep Hot Jupiter Temperature Forcing.
 +#

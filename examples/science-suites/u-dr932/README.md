@@ -2,14 +2,14 @@
 
 This is **Denis Sergeev's suite**, run against this repo's environment. Not a port,
 not a rewrite, and **not a copy**: the suite is a pinned submodule of his repository,
-[`dennissergeev/lfric_egp_bench@ffe611e`](https://github.com/dennissergeev/lfric_egp_bench/tree/main/src/suites/u-dr932),
+[`dennissergeev/lfric_egp_bench@e6ee57a`](https://github.com/dennissergeev/lfric_egp_bench/tree/main/src/suites/u-dr932),
 and this repo carries only a **patch** against it — the same treatment Stage 1 gives
 its LFRic sources.
 
 ```
 vendor/lfric_egp_bench/src/suites/u-dr932            the suite (submodule, pinned)
 patches/40-lfric_egp_bench-u-dr932-patch.sh          stages it: rose app-upgrade, then...
-patches/40-lfric_egp_bench-u-dr932-isambard3.patch   ...this — the site diff, ~450 lines
+patches/40-lfric_egp_bench-u-dr932-isambard3.patch   ...this — the site diff, 419 lines
 examples/science-suites/u-dr932/                     only what this repo owns: this
                                                      file, and known-issues notes
 ```
@@ -56,34 +56,31 @@ Worth stating first, because it is most of the suite:
 | `[[BUILD]]` | **added** `FC = $FC`, `LDMPI = $LDMPI`, `FPP = $FPP` — inherit the compiler from the loaded module instead of hardcoding one, so `LFRIC_STACK=cray|spack` needs no edit here. |
 | `platform` | `uoe-isambard3` → `isambard3`, the Slurm platform `scripts/setup-cylc.sh` writes. |
 
-### Placement — the fix from `staging/dr932-mpi-scaling/`
+### Placement — now upstream's, not ours
 
-The `lfric_atm` directives were `--mem-per-cpu=8G --ntasks=N --cpus-per-task=1
---export=NONE`, with **no node count**. On a busy machine Slurm satisfied 108 ranks
-out of whatever had room — 9 to 32 nodes, 1–13 ranks each, 5 h to 9 h on identical
-work. Now:
+This used to be the largest part of the patch. It is gone from it, because the fix
+went upstream and came back: `staging/dr932-mpi-scaling/fix-u-dr932.patch` was
+proposed as [lfric_egp_bench#1](https://github.com/dennissergeev/lfric_egp_bench/pull/1)
+and Denis merged it, so `e6ee57a` already carries `--nodes` + `--ntasks-per-node` +
+`--exclusive` + `--mem=0`, `NUMA_REGIONS_PER_NODE = 2`, and the `LFRIC_ATM_PPN`
+derivation. **We now inherit the placement rather than imposing it** — which is the
+whole point of carrying a patch instead of a copy: the delta shrinks as upstream
+absorbs what was site-specific.
 
-- `--nodes` + `--ntasks-per-node` (108 ranks fit on one 144-core Grace node);
-- `--mem=0`, so a memory request can never cap ranks-per-node and fan the job out
-  (measured peak for this configuration is 8–35 GB for the *whole* job, against
-  225 GB on a node);
-- `--exclusive`, because `SelectType=select/cons_tres` hands out cores, not machines;
-- `RUN_METHOD = srun` instead of `mpiexec` — srun binds cray-mpich to Slingshot's
-  `cxi` provider through the Cray PMI and pins one rank per core. The cray
-  environment ships no `mpiexec` at all;
-- `NUMA_REGIONS_PER_NODE` 0 → 2, and `CORES_PER_NODE` was already 144 here.
+What upstream cannot know, and the patch still adds, is one line's worth: under
+`RUN_METHOD=srun`, `--export=NONE` needs `export SLURM_EXPORT_ENV=ALL` in the family
+pre-script, or every `srun` step starts with no environment at all (measured: the step
+cannot even find `bash`). That is inert under Hydra, which is what upstream runs.
 
-**`--export=NONE` kept, `SLURM_EXPORT_ENV=ALL` added.** This one is a trap. Upstream
-sets `--export=NONE` on these tasks so the job is stateless with respect to the shell
-it was submitted from — the job script (`#!/bin/bash -l`) rebuilds its own environment,
-which is the right design and is kept. But `sbatch --export=NONE` *also* sets
-`SLURM_EXPORT_ENV=NONE` **inside** the job, and every `srun` step inherits that: the
-step then starts with essentially nothing. Measured on a Grace node — under
-`--export=NONE` an `srun bash -c ...` fails with `execve(): bash: No such file or
-directory`, i.e. not even a `PATH`; with `export SLURM_EXPORT_ENV=ALL` first, the step
-sees the view on `PATH`, the 11 `LD_LIBRARY_PATH` entries and `FC=ftn`. Invisible under
-Hydra, which copies its own environment to the ranks; fatal under `srun`. So the fix is
-one line in the family `pre-script`, not a change to the directives.
+Upstream's merge also brought `SITE_MPI_LAUNCHER_OPTS = -bind-to core -ppn … -n …`.
+It is **inert here** and left untouched: `launch-exe` only reads it inside its
+`RUN_METHOD = mpiexec` branch. Verified with the launcher's own `TEST_LAUNCH_EXE_EXEC`
+mode — with the variable set and `RUN_METHOD=srun`, the emitted command is still
+exactly `srun <exe> configuration.nml`.
+
+Still ours on the placement axis: `RUN_METHOD = srun` instead of `mpiexec`, because
+srun is what binds cray-mpich to Slingshot's `cxi` provider through the Cray PMI and
+pins one rank per core — and the cray environment ships no `mpiexec` at all.
 
 Two other Slurm fixes, in tasks that are not the model:
 
