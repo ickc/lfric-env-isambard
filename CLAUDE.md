@@ -57,8 +57,11 @@ example} × {`cray`, `spack`}. This is the one outcome that must stay green. The
   `scripts/concretize.sh` — solve only (the cheap login-node check). `scripts/fetch.sh`
   — login-node source pre-fetch. `scripts/build.sbatch` — submits build to a compute node.
 - `examples/minimal-compile/{build.sh,build.sbatch}` — the minimal-compile example.
-- `examples/science-suites/{run-suite.sh,site/extract-sources.sh,u-*/}` — the
-  science-suite examples (Cylc-driven; per-suite source via `dependencies.yaml`).
+- `examples/science-suites/{run-suite.sh,site/,u-*/}` — the science-suite examples
+  (Cylc-driven; per-suite source via `dependencies.yaml`). `site/patch-sources.sh`
+  applies the LFRic patch stack to a suite's extracted tree;
+  `site/extract-sources.sh` is the offline `git archive` extract still used by
+  u-dn704/u-dt000 (u-dr932 uses the upstream `merge_sources.py`).
 - `scripts/gen-modulefile.sh` + `scripts/lfric-env.lua` — the two-part modulefile
   (generated per-build data table + version-controlled logic).
 - `spack-env/{common,cray/spack,spack/spack}.yaml` — env templates (instantiated under PREFIX).
@@ -67,7 +70,8 @@ example} × {`cray`, `spack`}. This is the one outcome that must stay green. The
   spack-packages, mo-spack-packages. **LFRic source (the examples build from these):**
   lfric_apps, lfric_core, physics/{casim,jules,socrates,ukca} — these are the
   `dependencies.yaml` set; the science-suites treat them as local mirrors to extract a
-  declared ref from (see `examples/science-suites/site/extract-sources.sh`).
+  declared ref from — `vendor/mirrors/` presents them in the Met Office
+  `MetOffice/<repo>.git` layout so the upstream extract can use them offline.
 - `patches/*-patch.sh` — applied in sorted order by `patch-all.sh`.
 - `staging/<investigation>/` — reproductions of reported problems, with their evidence
   and conclusion. Off the invariant; nothing in `scripts/`/`spack-env/`/`examples/`
@@ -106,8 +110,19 @@ example} × {`cray`, `spack`}. This is the one outcome that must stay green. The
   sources in `dependencies.yaml`, don't replace Cylc's scheduler with `sbatch` or
   hand-roll a `rose-app.conf` parser. (The env build and the minimal-compile example stay
   `sbatch`-driven; only the science-suites are Cylc-driven, because that is the
-  user-facing workflow we must support. The `extract` step still honours the offline
-  invariant — `git archive` from the vendored local mirrors, no MO clones.)
+  user-facing workflow we must support.)
+- **Stage 1's `module load` is the contract; inside a suite, business as usual.** The
+  modulefile exports the whole toolchain and a suite only consumes it (`FC = $FC`).
+  On the *other* side of that line, keep the Met Office mechanisms a scientist
+  already uses — `dependencies.yaml` + `merge_sources.py` for source, the MO
+  `launch-exe`, the suite's own machine detection, tasks running where the suite says
+  they run. Change only what the platform requires (srun, the `isambard3` platform),
+  what is measurably wrong here (Slurm placement), or what version alignment forces
+  (`rose app-upgrade`) — and mark each change `[isambard3]` in place, with the reason.
+  **Stage 1's offline invariant does not propagate into the suites**: compute nodes
+  here have outbound network, and pre-fetching on a user's behalf is exactly the kind
+  of unfamiliar machinery that gets the environment rejected. Offline extraction stays
+  *available* (`USE_MIRRORS=true` → `vendor/mirrors/`), not imposed.
 - **pixi is optional.** Every `pixi` task in `pixi.toml` is a thin wrapper around a
   `scripts/` (or `examples/`) script; keep that 1:1 mapping and keep docs no-pixi-first.
 - **Reproducible/offline.** The lfric_atm compile must not fetch sources at build

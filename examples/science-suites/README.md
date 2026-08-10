@@ -16,6 +16,54 @@ its view (dependencies of `lfric-apps-isambard`), so there is nothing extra to
 install — `run-suite.sh` activates the env and the suite tasks use that same
 `cylc`/`rose`.
 
+## The contract: the module is the interface, the rest is business as usual
+
+**Stage 1 and its `module load` are the whole contract.** `module load
+lfric-env/<version>/<variant>` exports the toolchain — `FC`/`CXX`/`LDMPI`/`FPP`, the
+Cray PE modules, the view's `FFLAGS`/`LDFLAGS` for XIOS/HDF5/netCDF/shumlib, and
+`rose`/`cylc`/`psyclone` on `PATH`. A suite **consumes** that and re-derives none of
+it: `FC = $FC` in `[[BUILD]]` is the whole integration. That is the line these
+examples defend — if a suite has to know anything else about how the environment was
+built, the modulefile is wrong, not the suite.
+
+**On the other side of that line, a scientist should be able to work exactly as they
+already do.** These are Met Office Rose/Cylc suites and their users have Met Office
+habits; every habit we break is friction that gets this environment rejected. So the
+examples keep the upstream mechanisms even where a bespoke one would be tidier for
+us:
+
+- **Sources stay `dependencies.yaml` + `merge_sources.py`.** Changing what gets
+  built — a different tag, your own fork, a fork merged onto a tag — is the same edit
+  you would make at the Met Office, and the extract clones it from github at run time
+  like it does there. It is *offered* offline (`USE_MIRRORS=true` against this repo's
+  vendored submodules, `vendor/mirrors/`), not imposed.
+- **The launcher stays the Met Office `launch-exe`** out of the extracted source
+  tree, wherever its own `RUN_METHOD=srun` path already does the right thing.
+- **The suite still detects its own machine**, still carries its other platforms'
+  branches, and still runs unmodified on them.
+- **Tasks still run where the suite says they run** — the extract is a Slurm job on a
+  compute node, as upstream has it, not something pre-fetched on the login node on
+  the suite's behalf. Isambard 3's compute nodes have outbound network; there is no
+  reason to invent a staging dance around a restriction that does not exist. (The
+  *environment build* is a different matter — Stage 1 is reproducible and offline by
+  design. That invariant is Stage 1's, and it does not propagate into the suites.)
+
+What we do change, we change for a stated reason, and mark in place:
+
+- **things the platform requires** — `srun` instead of `mpiexec` (there is no
+  `mpiexec` in the cray environment), the `isambard3` Cylc platform, sourcing the
+  module instead of another site's software stack;
+- **things that are wrong here and would silently cost you** — above all the Slurm
+  placement directives (see below), which is what made a suite 3–4× slower than
+  Monsoon;
+- **version alignment** — a suite written for vn3.1 needs its namelists upgraded to
+  the vn3.2 the environment builds, done with `rose app-upgrade`, the native tool.
+
+Each suite's own `README.md` is the itemised list of its changes, and each change is
+commented `[isambard3]` at the point it applies. If you are reviewing whether this
+environment is worth adopting, those two things are the diff you are being asked to
+accept.
+
 ## The suites
 
 | Suite | Science case | Status on this env |
@@ -35,17 +83,32 @@ was written for. These are mechanical, non-science edits — e.g. u-dr932/u-dn70
 scientist running on *this* env writes vn3.2 configs. The deeper a suite's
 version lag, the more such edits its run needs.
 
-**How the vn3.1 → vn3.2 port was done (and why not `rose app-upgrade`).** The
-native tool does not work on these configs: its `jules_pftparm` macro dies with
-`AttributeError: 'NoneType' object has no attribute 'split'` because the earlier
-hand-port already migrated that namelist into the indexed per-PFT form the
-vn3.1→vn3.2 macro is itself trying to produce. The change set was therefore
-derived straight from the upstream `version31_32.py` macros — but only those of
-the **16 rose-meta packages in `lfric_atm`'s `import=` chain**. Scanning every
-`version31_32.py` in the tree is wrong: it pulls in settings owned by other apps
-(e.g. `namelist:files=temporal_file_path` from `lfric-io_demo`) that `lfric_atm`
-must not carry. Note rose's `import=` uses continuation lines (`      =next/HEAD`);
-a parser that reads only the first line sees 3 packages instead of 16.
+**Use `rose app-upgrade`, the native tool — on a config that is genuinely at the
+version it claims.**
+
+```bash
+. examples/science-suites/site/activate-env.sh
+export ROSE_META_PATH=$(find vendor/lfric_apps vendor/lfric_core -type d -name rose-meta | tr '\n' ':')
+cd <suite>/app && rose app-upgrade -y -C lfric_atm vn3.2 && rose macro --validate
+```
+
+That is how u-dr932 was taken from vn3.1 to vn3.2: clean, in one command, including
+the `jules_pftparm` migration into its indexed per-PFT form.
+
+It is worth knowing why the earlier attempt concluded the opposite. Run against
+*this repo's older copy* of the same suite, the `jules_pftparm` macro died with
+`AttributeError: 'NoneType' object has no attribute 'split'` — because that copy had
+already been hand-ported through vn3.0→vn3.1, and had `jules_pftparm` in the very
+form the vn3.1→vn3.2 macro was trying to produce. **The tool was fine; the input was
+a config that no longer matched its declared `meta=` version.** The lesson is to
+upgrade from an honest starting point — the upstream suite at its own version —
+rather than to hand-port and then upgrade.
+
+(If you ever do have to reconstruct a change set by hand, the previous method is
+still recorded in the git history of this file: derive it from the upstream
+`version31_32.py` macros of exactly the rose-meta packages in `lfric_atm`'s
+`import=` chain — 16 of them — and note that rose's `import=` uses continuation
+lines, so a parser reading only the first line sees 3.)
 
 Adding the *new* vn3.2 members matters as much as the renames: LFRic initialises
 them to RMDI and then range-checks them, so a missing one is a hard abort, not a
@@ -65,27 +128,32 @@ must be located upstream first. See `PLAN.md`.
 ## How it works here (what was adapted)
 
 Each suite is the upstream Rose/Cylc suite with three site-specific changes, so it
-runs offline against *our* env on Isambard 3:
+runs against *our* env on Isambard 3:
 
-1. **Sources → per-suite offline extract (`dependencies.yaml`).** Each suite
+1. **Sources → the upstream extract, plus this repo's patch stack.** Each suite
    declares the LFRic-source refs it builds in a **`dependencies.yaml`** (the
-   upstream-native shape: `lfric_apps`, `lfric_core`, `casim`, `jules`, `socrates`,
-   `ukca`, each with `source:` + `ref:`). The suite's `extract` /
-   `git_extract_lfric` task runs `site/extract-sources.sh`, which materialises each
-   declared ref **offline** from this repo's vendored **local mirrors** — `git
-   archive` from `vendor/lfric_apps` / `vendor/lfric_core` / `vendor/physics/*`, no
-   network — into the suite's `SOURCE_ROOT`, then applies the LFRic-source **patch
-   stack** (the same `patches/*-lfric_*` used by the env build + minimal-compile, retargeted via
-   `LFRIC_SRC_ROOT`). The build reads that per-suite extracted tree
-   (`APPS_ROOT_DIR`/`CORE_ROOT_DIR`/`PHYSICS_ROOT` → `$SOURCE_ROOT/*`). This is the
-   **per-suite source axis**: a suite can build a *different* ref (its science)
-   just by editing `dependencies.yaml`. **Offline contract:** a ref is extractable
-   iff it is already in the local mirror (the mirrors are full clones, carrying all
-   fetched tags/branches); a missing or *fork* ref must be staged once, online,
-   into the mirror first (`git -C vendor/<repo> remote add <fork> <url> && git
-   fetch <fork>`), after which it is offline. Strict-offline by default: a missing
-   ref is a hard error naming what to stage. (Merging a fork branch *onto* a tag,
-   as upstream `dependencies.yaml` allows, is not yet supported here.)
+   upstream shape: `lfric_apps`, `lfric_core`, `casim`, `jules`, `socrates`, `ukca`,
+   each with `source:` + `ref:`), and the `extract` task runs the Met Office
+   `merge_sources.py` over it exactly as upstream does — cloning each ref into the
+   suite's `SOURCE_ROOT` on the compute node the task runs on. Editing
+   `dependencies.yaml` is how you build different science; it is the same edit you
+   would make anywhere else.
+
+   Two site details. `site/patch-sources.sh` is appended to the extract command: it
+   applies this repo's LFRic-source **patch stack** (`patches/*-lfric_*`, the same
+   ones the env build and minimal-compile use, retargeted via `LFRIC_SRC_ROOT`) to
+   the freshly cloned tree — without it the apps build re-clones its own science
+   sources mid-compile. And `--mirror_loc` points at `vendor/mirrors/`, this repo's
+   vendored submodules arranged in the Met Office `MetOffice/<repo>.git` mirror
+   layout, so `USE_MIRRORS=true` gives a **fully offline** extract from refs already
+   vendored. The default is `USE_TOKENS=true` — https clones from github, which need
+   no token for these public repositories.
+
+   > u-dn704 and u-dt000 have not been moved to this yet; they still use
+   > `site/extract-sources.sh`, which materialises a ref offline from the vendored
+   > submodules with `git archive`. It is a strict-offline equivalent of the
+   > `USE_MIRRORS=true` path above, and will be retired when those two are next
+   > re-validated.
 2. **Env activation → our modulefile.** `site/activate-env.sh` (passed as the
    suite's `ACTIVATE_ENV`) is a **thin activator**: it `module load`s
    `lfric-env/<version>/$LFRIC_STACK`, and that one module supplies the whole
@@ -108,9 +176,13 @@ Three rules, all visible in the suites here:
 
 - **`RUN_METHOD = srun`, never `mpiexec`.** `srun` is what binds cray-mpich to
   Slingshot's `cxi` provider through the Cray PMI, and it pins one rank per core
-  without being asked. `site/bin/launch-exe` implements the `srun` path (including the
-  dedicated-XIOS-server MPMD, which the Met Office `launch-exe` only wires up under
-  Hydra). Note the `cray` environment does not even ship an `mpiexec`.
+  without being asked. Note the `cray` environment does not even ship an `mpiexec`.
+  The **stock Met Office `launch-exe` already handles this** — its `RUN_METHOD=srun`
+  path emits `srun <exe> <namelist>`, which is all a run with XIOS attached needs, so
+  u-dr932 keeps upstream's `LAUNCH_SCRIPT`. `site/bin/launch-exe` is only needed for
+  the **dedicated XIOS server** (u-dn704): the MO launcher wires that MPMD up under
+  Hydra colon syntax only, and under `srun` it wants `--multi-prog` to put client and
+  server in one `MPI_COMM_WORLD`.
 - **The `lfric_atm` `[[[directives]]]` must carry `--nodes` *and*
   `--ntasks-per-node`, with `--mem=0`.** Given only `--ntasks` plus a per-CPU memory
   request, Slurm satisfies it out of whatever nodes have room: a 108-rank job that fits
@@ -169,44 +241,93 @@ square subdomains — **24, 54, 96** all fit one node; 108 works but gives each 
 
 ## Run it
 
-From the repo root, on a **login node** (the Cylc scheduler runs here and submits
-the heavy tasks to Slurm — do **not** wrap this in `sbatch`):
+Everything below happens on a **login node**. The Cylc scheduler is a long-lived
+process that lives there and submits each task to Slurm itself, so **nothing here is
+wrapped in `sbatch`** — `sbatch`-ing the scheduler is the classic mistake.
 
 ```bash
 bash examples/science-suites/run-suite.sh u-dr932   # cray environment (the default)
 ```
 
-(Choose the variant with `LFRIC_STACK=cray|spack`; `cray` is the default and the
-only one that scales across nodes — see Prerequisites.)
-
-Watch it:
+That is the whole launch. `run-suite.sh` is a convenience wrapper, not a new
+mechanism — it does three things you could do by hand:
 
 ```bash
-cylc tui u-dr932                 # interactive
-cylc workflow-state u-dr932      # one-shot task states
+# 1. put the built environment on PATH (rose/cylc/psyclone come from its view)
+. examples/science-suites/site/activate-env.sh
+
+# 2. write the `isambard3` Slurm platform + a roomy cylc-run dir into ~/.cylc/flow
+bash scripts/setup-cylc.sh
+
+# 3. validate, install and play, telling the suite which environment to load
+cylc vip examples/science-suites/u-dr932 --workflow-name u-dr932 \
+  -S "REPO_ROOT='$PWD'" \
+  -S "LFRIC_STACK='cray'" \
+  -S "LFRIC_PREFIX='<the PREFIX Stage 1 installed into, unversioned>'" \
+  -S "LFRIC_ENV_VERSION='<the version from ./VERSION>'" \
+  -S "ACTIVATE_ENV='$PWD/examples/science-suites/site/activate-env.sh'"
 ```
 
-`run-suite.sh` activates the env, installs the Cylc site config, and runs
-`cylc vip` (validate-install-play) with the right template variables. A successful
-run ends with the `lfric_atm` task `succeeded`; output lands under
-`$CYLC_RUN_BASE/<suite>/runN/share/output`.
+Anything you pass to `run-suite.sh` after the suite name goes straight to `cylc vip`,
+so suite settings are overridden the usual way — `-S EXPT_RUNLEN=P1200D`,
+`-S TOTAL_RANKS_REQ=54`, `--pause`, and so on.
 
-To re-run cleanly: `cylc stop --now <suite>; cylc clean <suite> -y`.
+Watch and drive it with plain Cylc:
+
+```bash
+cylc tui u-dr932                       # interactive task tree; `h` for keys
+cylc workflow-state u-dr932            # one-shot list of task states
+cylc log u-dr932                       # scheduler log
+cylc cat-log u-dr932//<cycle>/<task>   # a task's job.out (add -f e for job.err)
+squeue -u $USER                        # the Slurm side of the same thing
+```
+
+Task-level control matters here, because a suite is a graph and not a script — a
+failure late on does not mean rebuilding:
+
+```bash
+cylc trigger u-dr932//20000101T0000Z/lfric_atm   # re-run one task, keep the build
+cylc stop u-dr932                                # let running tasks finish
+cylc stop --now --now u-dr932                    # stop the scheduler immediately
+cylc clean u-dr932 -y                            # delete the run dir entirely
+```
+
+A successful run ends with `lfric_atm` `succeeded`; output is under
+`$CYLC_RUN_BASE/<suite>/runN/share/output`, the extracted source under
+`share/source`, and each task's logs under `log/job/<cycle>/<task>/NN/`.
+
+Choose the variant with `LFRIC_STACK=cray|spack` — `cray` is the default and the only
+one that scales across nodes (see Prerequisites).
+
+**If `cylc install` dies in `cylc.post_install.log_vc_info`:** that plugin runs
+`git diff` over the suite source, so a broken `GIT_EXTERNAL_DIFF` in your environment
+takes the install down with it (`difft` on this machine crashes with
+`<jemalloc>: Unsupported system page size`). Launch with `env -u GIT_EXTERNAL_DIFF`.
 
 ## Adapting this for your own suite
 
-Drop your Rose/Cylc suite in a new directory here and make the same three changes
-described above:
+Drop your Rose/Cylc suite in a new directory here. Start from **what upstream already
+does** and change only what the platform forces you to; u-dr932 is the worked example
+and its [`README.md`](u-dr932/README.md) is the itemised diff.
 
-1. **Sources.** Add a `dependencies.yaml` declaring the LFRic-source refs (each
-   already staged in the vendored mirror), point the suite's `extract` task at
-   `site/extract-sources.sh`, and set `APPS_ROOT_DIR`/`CORE_ROOT_DIR`/`PHYSICS_ROOT`
-   to the **extracted** tree `$SOURCE_ROOT/{lfric_apps,lfric_core,physics}` — *not*
-   `vendor/` directly. The build reads the per-suite extracted tree, not the mirror.
+1. **Sources.** Keep your `dependencies.yaml` and the upstream `merge_sources.py`
+   extract; append `site/patch-sources.sh "$SOURCE_ROOT"` to its command so this
+   repo's LFRic patches land on the cloned tree, and point `--mirror_loc` at
+   `$REPO_ROOT/vendor/mirrors` if you want the offline path. Set
+   `APPS_ROOT_DIR`/`CORE_ROOT_DIR`/`PHYSICS_ROOT` to the **extracted** tree under
+   `$SOURCE_ROOT` — never to `vendor/` directly.
 2. **Env.** Let `run-suite.sh` inject `ACTIVATE_ENV`/`LFRIC_STACK`/`LFRIC_PREFIX`/
-   `REPO_ROOT`; the suite's platform pre-script sources `ACTIVATE_ENV`.
-3. **Platform.** Reuse `scripts/setup-cylc.sh`'s `isambard3` Slurm platform.
+   `LFRIC_ENV_VERSION`/`REPO_ROOT`; source `ACTIVATE_ENV` from both the root
+   `init-script` (early enough for Cylc's own `cylc message`) and the platform
+   `pre-script`. Take the compiler from the module with `FC = $FC` / `LDMPI = $LDMPI`
+   / `FPP = $FPP` — do not hardcode one.
+3. **Platform and placement.** Use `scripts/setup-cylc.sh`'s `isambard3` Slurm
+   platform, set `RUN_METHOD = srun`, and give the model task `--nodes`,
+   `--ntasks-per-node`, `--mem=0` and `--exclusive`. Do not set `--export=NONE`.
+4. **Version.** Upgrade the app configs to the version this env builds with
+   `rose app-upgrade`, then `rose macro --validate`.
 
-The `site/` glue (`activate-env.sh`, `extract-sources.sh`, `bin/launch-exe`) plus
+The `site/` glue (`activate-env.sh`, `patch-sources.sh`, and `bin/launch-exe` for the
+dedicated-XIOS-server case the Met Office launcher does not cover under `srun`) plus
 `scripts/setup-cylc.sh` is reusable as-is — that is the contract between the built
 environment and a science suite.

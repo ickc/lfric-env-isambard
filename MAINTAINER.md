@@ -37,7 +37,9 @@ examples/minimal-compile/  # MINIMAL-COMPILE EXAMPLE: compile lfric_atm + run it
 examples/science-suites/ # SCIENCE-SUITE EXAMPLES: run real Rose/Cylc LFRic suites
   run-suite.sh           #   launcher: cylc vip a suite against the built env
   site/activate-env.sh   #   ACTIVATE_ENV: module-load the env for suite tasks
-  site/extract-sources.sh #  offline per-suite source extract (dependencies.yaml)
+  site/patch-sources.sh  #   apply the LFRic patch stack to a suite's extracted tree
+  site/extract-sources.sh #  offline per-suite source extract (u-dn704/u-dt000 only;
+                          #  u-dr932 uses the upstream merge_sources.py extract)
   u-dn704/ u-dr932/ u-dt000/  # adapted suites (dependencies.yaml + flow.cylc) + README
 spack-env/              # Spack env TEMPLATES (tracked); build.sh instantiates under PREFIX
   common.yaml           #   shared config: repos, gcc@14.3.0 external, python

@@ -432,6 +432,27 @@ why u-dr932 and u-dn704 run and scale here. Two things came out of this investig
   `examples/science-suites/README.md` ("Placement and MPI transport"), with these numbers,
   so the next suite ported here does not rediscover it.
 
+**Since then, the two u-dr932s have been unified.** `examples/science-suites/u-dr932/`
+was a copy of an older snapshot of this suite; it is now **Denis' suite itself**
+(`lfric_egp_bench@ffe611e`) with his own working configuration — deep hot Jupiter,
+C48, l66, stretch 0.5 towards (−90, 0), dt = 50 s, 108 ranks — and a short list of
+`[isambard3]` changes that includes §5.1's fix. That directory's `README.md` is the
+itemised diff. Two things there supersede parts of this document:
+
+- **§5.1's ceiling no longer applies.** The fix here was written for the UoE
+  `ch3:nemesis` stack, where a genuinely multi-node run cannot be made fast, so 144
+  ranks was the hard limit. On the environment this repo builds, the transport cause
+  (§4.2) is gone, and the placement fix is about packing and repeatability rather
+  than about avoiding the fabric.
+- **The fork in `dependencies.yaml` is no longer needed.** Denis pins `lfric_apps` to
+  `tommbendall/lfric_apps@4d8b921` (`TBendall/deep_hot_jupiter_forcing`) because at
+  vn3.1 the deep hot Jupiter forcing lived only there. It is in MetOffice mainline as
+  of `2026.07.1`.
+- **`--export=NONE` has to go under `srun`**, which §5.1's patch keeps (correctly, for
+  Hydra). `sbatch --export=NONE` sets `SLURM_EXPORT_ENV=NONE` in the job, and every
+  `srun` inside inherits it — the model would start with none of the environment its
+  module load set up.
+
 ## 7. Files
 
 | file | what |
