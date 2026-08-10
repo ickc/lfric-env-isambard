@@ -60,16 +60,23 @@ work. Now:
   environment ships no `mpiexec` at all;
 - `NUMA_REGIONS_PER_NODE` 0 → 2, and `CORES_PER_NODE` was already 144 here.
 
-**`--export=NONE` removed** — this one is a trap rather than a tuning choice.
-`sbatch --export=NONE` also sets `SLURM_EXPORT_ENV=NONE` inside the job, which every
-`srun` in that job inherits: the model would start with none of the environment the
-`module load` just set up. Harmless under Hydra, fatal under srun.
+**`--export=NONE` kept, `SLURM_EXPORT_ENV=ALL` added.** This one is a trap. Upstream
+sets `--export=NONE` on these tasks so the job is stateless with respect to the shell
+it was submitted from — the job script (`#!/bin/bash -l`) rebuilds its own environment,
+which is the right design and is kept. But `sbatch --export=NONE` *also* sets
+`SLURM_EXPORT_ENV=NONE` **inside** the job, and every `srun` step inherits that: the
+step then starts with essentially nothing. Measured on a Grace node — under
+`--export=NONE` an `srun bash -c ...` fails with `execve(): bash: No such file or
+directory`, i.e. not even a `PATH`; with `export SLURM_EXPORT_ENV=ALL` first, the step
+sees the view on `PATH`, the 11 `LD_LIBRARY_PATH` entries and `FC=ftn`. Invisible under
+Hydra, which copies its own environment to the ranks; fatal under `srun`. So the fix is
+one line in the family `pre-script`, not a change to the directives.
 
 Two other Slurm fixes, in tasks that are not the model:
 
 - `build`: `--ntasks=6 --mem-per-cpu=10G` → `--nodes=1 --ntasks=1 --cpus-per-task=6
   --mem=40G`. `make -j6` is six *threads in one task*; as six tasks Slurm may scatter
-  them over six nodes and confine each to one core. `--export=NON` (sic) went with it.
+  them over six nodes and confine each to one core. `--export=NON` (sic) → `NONE`.
 - `generate_mesh`: `--ntasks=6` → 1. The command is a single-rank mesh generator.
 
 ### Version — vn3.1 → vn3.2
@@ -113,7 +120,7 @@ lived only there. It is in mainline now: `2026.07.1` carries
 |---|---|
 | `app/mesh/rose-app.conf` | `mpiexec -n 1` → `srun --ntasks=1`. Same one rank. |
 | `rose-suite.conf` `[file:bin/*]` | `git:localmirrors:` → the github https URL. `localmirrors:` needs a Met Office git alias that does not exist here; the repositories are public, so no token is needed. |
-| `app/extract/rose-app.conf` | `patch-sources.sh` appended to each command key — see below. `--mirror_loc` now points at this repo's vendored submodules. |
+| `app/extract/rose-app.conf` | `patch-sources.sh` appended to each command key — see below. The three command keys themselves are upstream's. |
 | `rose-suite.conf` `USE_MIRRORS`/`USE_TOKENS` | `true`/`true` → `false`/`true`. There is no Met Office mirror host here, so the default extract clones from github. |
 | `rose-suite.conf` `EXPT_RUNLEN` | `P1200D` → `P10D`. One cycle rather than 120 — the only change to Denis' configuration itself. Same 17280-timestep job. |
 | `rose-suite.conf` `VN` | `'3.1'` → `'3.2'`, for consistency. Nothing reads it. |
@@ -181,7 +188,8 @@ To go back to something closer to upstream behaviour:
 
 ```bash
 # extract offline from this repo's vendored submodules instead of github
-bash examples/science-suites/run-suite.sh u-dr932 -S USE_MIRRORS=true
+bash examples/science-suites/run-suite.sh u-dr932 \
+  -S USE_MIRRORS=true -S "MIRROR_LOC='$PWD/vendor/mirrors'"
 # Denis' full 120-cycle campaign
 bash examples/science-suites/run-suite.sh u-dr932 -S EXPT_RUNLEN=P1200D
 ```

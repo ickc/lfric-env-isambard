@@ -250,6 +250,17 @@
             if [ -n "$activate_env" ] && [ -f "$activate_env" ]; then
               source "$activate_env"
             fi
+            # [isambard3] ADDED, and required by the --export=NONE below. sbatch
+            # --export=NONE also sets SLURM_EXPORT_ENV=NONE *inside* the job, and
+            # every `srun` step then inherits that -- so the step starts with
+            # essentially no environment at all (measured: the step cannot even
+            # find `bash`, let alone the module's PATH/LD_LIBRARY_PATH,
+            # OMP_NUM_THREADS, MPICH_* or HDF5_USE_FILE_LOCKING). That is invisible
+            # under Hydra, which copies its own environment to the ranks, and fatal
+            # under srun. Resetting it here keeps the job STATELESS with respect to
+            # the submitting shell -- the point of --export=NONE -- while letting
+            # the environment this script just built reach the model.
+            export SLURM_EXPORT_ENV=ALL
             ulimit -s unlimited -c unlimited
             ulimit -a
             module list 2>&1
@@ -355,12 +366,12 @@
             --ntasks=1
             --cpus-per-task=6
             --mem=40G
+            --export=NONE
             {# [isambard3] CHANGED: was `--ntasks=6 --mem-per-cpu=10G --export=NON`.
                Three fixes. (1) `make -j6` is 6 THREADS in one task, so it needs
                --cpus-per-task=6, not --ntasks=6: as 6 tasks Slurm may scatter them
                over 6 nodes and confine each to one core. (2) `--export=NON` is a
-               typo for NONE, and NONE is wrong here anyway -- see the lfric_atm
-               directives below. (3) 40G total rather than 10G/cpu; a psyclone+gfortran
+               typo for NONE. (3) 40G total rather than 10G/cpu; a psyclone+gfortran
                build of lfric_atm peaks well under that. #}
 {% else %}
         inherit = EX1A
@@ -425,12 +436,15 @@
         inherit = ISAMBARD3GNU
         script = "rose task-run --app-key=extract"
         [[[environment]]]
-            {# [isambard3] CHANGED: the Met Office mirror host is not reachable from
-               here, so `--mirrors` points at this repo's vendored submodules in the
-               same MetOffice/<repo>.git layout (vendor/mirrors/). That path is fully
-               offline. The default is USE_TOKENS=true -> https clones from github,
-               which works anonymously for these public repositories. #}
-            MIRROR_LOC = {{ REPO_ROOT }}/vendor/mirrors
+            {# UNCHANGED from upstream. The Met Office mirror host is not reachable
+               from here, so rose-suite.conf defaults to USE_TOKENS=true -> https
+               clones from github, which works anonymously for these public
+               repositories. To extract offline instead, point MIRROR_LOC at this
+               repo's vendored submodules, which vendor/mirrors/ presents in the same
+               MetOffice/<repo>.git layout the mirror path expects:
+                 run-suite.sh u-dr932 -S USE_MIRRORS=true \
+                                      -S "MIRROR_LOC='$PWD/vendor/mirrors'" #}
+            MIRROR_LOC = {{ MIRROR_LOC }}
             {% if USE_MIRRORS %}
                 ROSE_APP_COMMAND_KEY = mirrors
             {% elif USE_TOKENS %}
@@ -441,8 +455,9 @@
             --ntasks=1
             --time=00:29:00
             --mem=8G
+            --export=NONE
             {# [isambard3] CHANGED: --mem-per-cpu=1G -> --mem=8G (six git clones and
-               their checkouts), and --export=NONE dropped -- see lfric_atm below. #}
+               their checkouts). #}
 
 {% else %}
         inherit = EX1A
@@ -536,9 +551,10 @@
             --ntasks=1
             --time=00:29:00
             --mem=6G
+            --export=NONE
             {# [isambard3] CHANGED: --ntasks=6 -> 1. The command is a single-rank
                cubedsphere_mesh_generator; asking for 6 tasks let Slurm place them on
-               6 different nodes. --export=NONE dropped -- see lfric_atm below. #}
+               6 different nodes. #}
 
 {% else %}
         inherit = EX1A
@@ -669,17 +685,18 @@
                  makes the timing repeatable, not merely faster. --mem=0 is still
                  needed alongside it: --exclusive gives all the CPUs but memory
                  follows DefMemPerCPU (1024 MB x 144 = 144 GB of a 225 GB node).
-               - --export=NONE REMOVED. sbatch --export=NONE also sets
-                 SLURM_EXPORT_ENV=NONE in the job, which every `srun` in that job
-                 then inherits -- so the model would start with none of the
-                 environment the module load just set up (PATH, LD_LIBRARY_PATH,
-                 the XIOS/netCDF libs). Harmless under Hydra, fatal under srun. #}
+               - --export=NONE KEPT, as upstream has it: it is what makes the job
+                 stateless with respect to the shell it was submitted from. It does
+                 need `export SLURM_EXPORT_ENV=ALL` in the family pre-script above,
+                 or the srun step inherits SLURM_EXPORT_ENV=NONE and starts with no
+                 environment at all. #}
             --nodes={{ LFRIC_ATM_NODES }}
             --ntasks={{TOTAL_RANKS_REQ}}
             --ntasks-per-node={{ LFRIC_ATM_PPN }}
             --cpus-per-task=1
             --exclusive =
             --mem=0
+            --export=NONE
 {% else %}
         [[[directives]]]
             -l select={{LFRIC_ATM_NODES}}

@@ -323,7 +323,9 @@ and its [`README.md`](u-dr932/README.md) is the itemised diff.
    / `FPP = $FPP` — do not hardcode one.
 3. **Platform and placement.** Use `scripts/setup-cylc.sh`'s `isambard3` Slurm
    platform, set `RUN_METHOD = srun`, and give the model task `--nodes`,
-   `--ntasks-per-node`, `--mem=0` and `--exclusive`. Do not set `--export=NONE`.
+   `--ntasks-per-node`, `--mem=0` and `--exclusive`. If you keep `--export=NONE` (and
+   you should — it is what makes the job stateless), `export SLURM_EXPORT_ENV=ALL` in
+   the platform `pre-script`, or every `srun` step starts with no environment at all.
 4. **Version.** Upgrade the app configs to the version this env builds with
    `rose app-upgrade`, then `rose macro --validate`.
 
