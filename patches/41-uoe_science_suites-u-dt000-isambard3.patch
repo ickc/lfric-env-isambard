@@ -282,15 +282,17 @@ diff --git a/suites/u-dt000/flow.cylc b/suites/u-dt000/flow.cylc
 index 1f8c5ce..af1b9d9 100644
 --- a/suites/u-dt000/flow.cylc
 +++ b/suites/u-dt000/flow.cylc
-@@ -6,13 +6,28 @@
+@@ -6,13 +6,30 @@
  {# ==================================== #}
  {# Set lfric_atm compute resources      #}
  {# ==================================== #}
 -{% set LPPN = 128 %}
-+{# [isambard3] CHANGED: LPPN 128 -> 144. An Isambard 3 Grace node is 2 sockets x 72
-+   cores; 128 is the Met Office EX1A number. Under-counting it makes LFRIC_NODES too
-+   large and splits a job over the fabric for no reason. #}
-+{% set LPPN = 144 %}
++{# [isambard3] CHANGED: LPPN 128 -> 144, on Isambard 3 only. A Grace node is 2 sockets
++   x 72 cores; 128 is the Met Office EX1A number. Under-counting it makes LFRIC_NODES
++   too large and splits a job over the fabric for no reason. Guarded on EX_HOST, since
++   LPPN also feeds CORES_PER_NODE and the PBS `-l select=` in the EX1A branches, where
++   144 would oversubscribe a 128-core node. #}
++{% if EX_HOST == 'isambard3' %}{% set LPPN = 144 %}{% else %}{% set LPPN = 128 %}{% endif %}
  {% set LFRIC_NODES = (TOTAL_RANKS_REQ/LPPN) | round(0, 'ceil') | int %}
 +{# [isambard3] ADDED: ranks per node, spread evenly over the nodes asked for. Slurm
 +   needs this stated: given only --ntasks it is free to take a handful of ranks from
