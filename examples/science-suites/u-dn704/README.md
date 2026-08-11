@@ -176,9 +176,36 @@ science sources mid-compile and undoing the pin `dependencies.yaml` just declare
 
 ## What was observed on this environment
 
-Ran end-to-end on the **cray** environment (`lfric-env/v2026.07.21/cray`):
+Ran end-to-end on the **cray** environment (`lfric-env/v2026.07.21/cray`), `run4`:
 
-<!-- RUN4-RESULTS -->
+| step | |
+|---|---|
+| `extract` | 33 s — six repos cloned from github over https on the login node by `merge_sources.py`, then this repo's patch stack (`PATCH_SOURCES_OK`) |
+| `build_mesh` / `build_lfric_atm` | 1 m 52 s / 10 m 18 s (both from the same `extract`) |
+| `generate_mesh` | 2 s |
+| `lfric_atm` | **52 s**, 2 nodes, `COMPLETED` |
+
+The multi-node arrangement is in the job's own output, not inferred:
+
+```
+launch-exe: srun --ntasks=25 --multi-prog .../lfric_xios_mpmd.conf  (model=24 xios_server=1)
+0-23  .../bin/lfric_atm/lfric_atm configuration.nml
+24-24 .../view/bin/xios_server.exe
+-> info : intercommCreate::server (classical mode) 24 intraCommSize : 1 ... clientLeader 0
+-> info : intercommCreate::client 13 intraCommSize : 24 intraCommRank :13 ... clientLeader 24
+MPICH Slingshot Network Summary: 0 network timeouts
+```
+
+— one XIOS server rank with 24 clients in a single `MPI_COMM_WORLD`, client rank 13 (the
+first rank on node 2) joining the same communicator as rank 0 on node 1, and cray-mpich
+reporting a clean Slingshot run. 29 NetCDF files, 197 MB, including
+`lfric_gal_diagnostics.nc` at **62.5 MB** — the native-UGRID parallel-HDF5 write the
+dedicated server exists to do, and the same size as the previously validated run.
+
+**That last point is the one that matters for this refactor.** The suite this run used is
+the macro-upgraded upstream, where the previous validated run used the hand-ported copy
+this branch deletes. Same diagnostics, same size, same completion — so what changed is
+how the suite is staged, not what it computes.
 
 ## Running it
 
