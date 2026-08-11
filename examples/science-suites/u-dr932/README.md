@@ -163,11 +163,17 @@ node, 108 ranks, `--exclusive`:
 | `generate_mesh` | 3 s — with `equatorial_latitude=36.87` (from `STRETCH_FACTOR=0.5`) and `target_north_pole=-90,0`, i.e. Denis' stretched, rotated mesh |
 | `lfric_atm` | **1 h 37 m** for the full 17 280-timestep cycle (dt = 50 s, P10D), `COMPLETED` |
 
-Run twice: once before the suite became a submodule and `--export=NONE` was restored
-(1 h 36 m 43 s), once after (1 h 37 m 37 s). The two agree **bit for bit** — same final
-dry mass to all 24 printed digits, same final `u_in_w3` to the last decimal, same output
-file sizes to the byte — which is the evidence that the refactor changed how the suite is
-staged and nothing about what it computes.
+Run twice in full: once before the suite became a submodule and `--export=NONE` was
+restored (1 h 36 m 43 s), once after (1 h 37 m 37 s). The two agree **bit for bit** —
+same final dry mass to all 24 printed digits, same final `u_in_w3` to the last decimal,
+same output file sizes to the byte — which is the evidence that the refactor changed how
+the suite is staged and nothing about what it computes.
+
+Re-confirmed after the pin moved to `e6ee57a`: a 72-step arm at the same 108 ranks
+reproduces `u_in_w3 = −1.53915286 / 1.53320420` at timestep 1, identical to the earlier
+pin. The `#SBATCH` block is unchanged, and `launch-exe` emits plain
+`srun <exe> configuration.nml` — the real-run confirmation that upstream's new
+`SITE_MPI_LAUNCHER_OPTS` is ignored under `RUN_METHOD=srun`.
 
 The stock Met Office launcher emitted exactly `srun <exe> configuration.nml`, and XIOS
 wrote its output attached (no dedicated server), as this suite's `XIOS_SERVER_MODE=False`
