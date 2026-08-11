@@ -9,6 +9,8 @@ set -uo pipefail
 _here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
 # shellcheck source=scripts/common.sh
 . "$_here/common.sh"
+# shellcheck source=scripts/lib.sh
+. "$_here/lib.sh"   # for _lfric_submodule_present
 
 # Only the submodules that patches touch. vendor/spack and the package repo
 # mo-spack-packages are not patched. (lfric_apps is patched by
@@ -25,10 +27,10 @@ for sub in lfric_core lfric_apps spack-packages lfric_egp_bench uoe_science_suit
   # An UNINITIALISED submodule is an empty directory, and `git -C <empty dir>
   # rev-parse --git-dir` happily succeeds by walking UP to this repo -- at which
   # point `reset --hard` + `clean -fd` would blow away the caller's uncommitted
-  # work in the whole checkout. (Measured: it does exactly that.) So test that the
-  # directory is a repository ROOT, not merely inside one.
-  top="$(git -C "$d" rev-parse --show-toplevel 2>/dev/null)"
-  if [ -n "$top" ] && [ "$top" = "$(cd -- "$d" 2>/dev/null && pwd -P)" ]; then
+  # work in the whole checkout. (Measured: it does exactly that.) lib.sh's
+  # _lfric_submodule_present is the repo's one test for this: an initialised
+  # submodule has its own .git.
+  if _lfric_submodule_present "$sub"; then
     echo ">>> resetting vendor/$sub to pinned commit"
     git -C "$d" reset --hard
     git -C "$d" clean -fd
