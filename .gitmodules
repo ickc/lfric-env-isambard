@@ -25,3 +25,7 @@
 [submodule "vendor/physics/ukca"]
 	path = vendor/physics/ukca
 	url = https://github.com/MetOffice/ukca.git
+[submodule "vendor/lfric_egp_bench"]
+	path = vendor/lfric_egp_bench
+	url = https://github.com/dennissergeev/lfric_egp_bench.git
+	branch = main

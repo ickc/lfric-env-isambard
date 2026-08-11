@@ -84,22 +84,28 @@ the forcing lives in a **fork the suite never references**.
 **Done when:** u-dt000 runs end-to-end with its real ice-giant forcing, **or** the fork is
 confirmed unavailable/inaccessible (documented in PR #8 with whom was asked).
 
-## Follow-up 2 — Merge-fork-onto-tag support in extract-sources.sh
+## Follow-up 2 — Merge-fork-onto-tag support (SUPERSEDED for u-dr932; open for the rest)
 
-**Why:** upstream `dependencies.yaml` lets a repo list **multiple** sources (clone a
-tag, then merge a fork branch on top — like fcm_extract). `extract-sources.sh` currently
-takes only the FIRST entry (single ref). Follow-up 1 may need a fork merged onto a tag.
+**Why it existed:** upstream `dependencies.yaml` lets a repo list **multiple** sources
+(clone a tag, then merge a fork branch on top — like fcm_extract). `extract-sources.sh`
+takes only the FIRST entry.
 
-**Steps:**
-- Extend the parser to handle a list per repo; after extracting the base ref, apply the
-  additional ref(s) as a merge/overlay into `SOURCE_ROOT/<repo>`. Keep it OFFLINE (all
-  refs must be in the mirror) and deterministic; error clearly on conflicts.
-- Decide the overlay mechanism: a real `git merge` in a throwaway worktree vs a
-  `git archive` of each ref layered in order. A worktree merge matches upstream semantics
-  (conflicts surface) but needs a writable clone, not just `git archive`.
+**Superseded where it matters.** u-dr932 is now the upstream suite itself -- a pinned
+submodule (`vendor/lfric_egp_bench`) plus `patches/40-lfric_egp_bench-*`, so the delta
+against what Denis runs is a real diff and directly the PR to send him. It runs the
+*upstream* extract
+(`merge_sources.py` from SimSys_Scripts), which implements fork-merge natively — so on
+that suite the feature is simply present, and reimplementing it here would be
+duplicating a Met Office tool. The remaining work is to move u-dn704 and u-dt000 onto
+the same extract when they are next re-validated, and then retire
+`extract-sources.sh` altogether. The offline property is not lost: `USE_MIRRORS=true`
+with `--mirror_loc=$REPO_ROOT/vendor/mirrors` clones from the vendored submodules.
 
-**Done when:** a suite can declare `[tag, fork-branch]` for a repo and the extracted tree
-is the merged source, offline.
+**Note on Follow-up 3's "dead upstream extract Jinja — DONE".** That cleanup removed
+`MIRROR_LOC`/`USE_MIRRORS`/`USE_TOKENS`/`ROSE_APP_COMMAND_KEY` from the suites. For
+u-dr932 that has been **deliberately reversed**: they are upstream's controls for
+upstream's extract, and a Met Office user expects them. The reasoning is in
+`examples/science-suites/README.md` ("The contract").
 
 ## Follow-up 3 — Minor cleanups (DONE)
 
