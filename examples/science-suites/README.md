@@ -186,10 +186,10 @@ changes, so it runs against *our* env on Isambard 3:
    metadata it adds is `compulsory=true` and would make every other suite's namelists
    invalid. See [`patches/optional/README.md`](../../patches/optional/README.md).
 
-   > u-dn704 has not been moved to this yet; it still uses
-   > `site/extract-sources.sh`, which materialises a ref offline from the vendored
-   > submodules with `git archive`. It is a strict-offline equivalent of the
-   > `USE_MIRRORS=true` path above, and will be retired when it is next re-validated.
+   All three suites are on this extract now. The bespoke offline extract this repo
+   used to carry for u-dn704 (`site/extract-sources.sh`, a `git archive` out of the
+   vendored submodules) is gone: `USE_MIRRORS=true` with `MIRROR_LOC` pointed at
+   `vendor/mirrors/` is the same property using upstream's own mechanism.
 2. **Env activation → our modulefile.** `site/activate-env.sh` (passed as the
    suite's `ACTIVATE_ENV`) is a **thin activator**: it `module load`s
    `lfric-env/<version>/$LFRIC_STACK`, and that one module supplies the whole

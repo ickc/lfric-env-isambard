@@ -59,9 +59,8 @@ example} × {`cray`, `spack`}. This is the one outcome that must stay green. The
 - `examples/minimal-compile/{build.sh,build.sbatch}` — the minimal-compile example.
 - `examples/science-suites/{run-suite.sh,site/,u-*/}` — the science-suite examples
   (Cylc-driven; per-suite source via `dependencies.yaml`). `site/patch-sources.sh`
-  applies the LFRic patch stack to a suite's extracted tree;
-  `site/extract-sources.sh` is the offline `git archive` extract still used by
-  u-dn704 only (u-dr932 and u-dt000 use the upstream `merge_sources.py`).
+  applies the LFRic patch stack to a suite's extracted tree; all three suites use
+  the upstream `merge_sources.py` extract.
 - `scripts/gen-modulefile.sh` + `scripts/lfric-env.lua` — the two-part modulefile
   (generated per-build data table + version-controlled logic).
 - `spack-env/{common,cray/spack,spack/spack}.yaml` — env templates (instantiated under PREFIX).

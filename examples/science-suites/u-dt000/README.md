@@ -150,8 +150,8 @@ same edit a scientist makes at the Met Office, and `USE_MIRRORS` / `USE_TOKENS` 
 `merge_sources.py`, `get_git_sources.py` and `tweak_iodef` at `cylc install` time; the
 first two are new, the third moved off the `core2.2` tag.
 
-This is [PLAN.md](../../../PLAN.md) follow-up 2, done for this suite: `u-dn704` is now
-the only one still on `site/extract-sources.sh`.
+This is [PLAN.md](../../../PLAN.md) follow-up 2, done for this suite. `u-dn704` has
+since followed, and `site/extract-sources.sh` is retired.
 
 Two `[isambard3]` steps are appended to the clone rather than replacing it:
 `site/patch-sources.sh` (this repo's LFRic-source patch stack), then this suite's

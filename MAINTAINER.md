@@ -38,12 +38,11 @@ examples/science-suites/ # SCIENCE-SUITE EXAMPLES: run real Rose/Cylc LFRic suit
   run-suite.sh           #   launcher: cylc vip a suite against the built env
   site/activate-env.sh   #   ACTIVATE_ENV: module-load the env for suite tasks
   site/patch-sources.sh  #   apply the LFRic patch stack to a suite's extracted tree
-  site/extract-sources.sh #  offline per-suite source extract (u-dn704 only; u-dr932
-                          #  and u-dt000 use the upstream merge_sources.py extract)
-  u-dn704/                #   adapted suite, copied in (dependencies.yaml + flow.cylc)
-  u-dr932/ u-dt000/       #   only README + known-issues: the SUITES are the submodules
-                          #   vendor/lfric_egp_bench + vendor/uoe_science_suites,
-                          #   staged by patches/40-* and patches/41-*
+  site/bin/launch-exe    #   srun launcher (drop-in for the MO one; XIOS-server MPMD)
+  u-dn704/ u-dr932/ u-dt000/  # only README + known-issues: the SUITES are the
+                          #   submodules vendor/lfric_egp_bench (u-dr932) and
+                          #   vendor/uoe_science_suites (u-dn704, u-dt000), staged
+                          #   by patches/40-*, 41-* and 42-*
 spack-env/              # Spack env TEMPLATES (tracked); build.sh instantiates under PREFIX
   common.yaml           #   shared config: repos, gcc@14.3.0 external, python
   cray/spack.yaml       #   variant: system cray-mpich + Cray HDF5/netCDF (default)
