@@ -81,8 +81,13 @@
 #
 # Then
 #
-#   git -C vendor/lfric_apps diff <the 2026.07.1 commit> HEAD \
+#   git -C vendor/lfric_apps diff --no-ext-diff <the 2026.07.1 commit> HEAD \
 #       > patches/optional/32-lfric_apps-ice-giants-forcing.patch
+#
+# --no-ext-diff is not optional: the redirect truncates the patch BEFORE git runs, so
+# a configured external differ (difft aborts on aarch64 here with "<jemalloc>:
+# Unsupported system page size") leaves you with a zero-byte patch and nothing to
+# reapply. It would not emit a valid patch anyway.
 #
 # UPSTREAMING
 #

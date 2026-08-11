@@ -321,11 +321,14 @@ git -C $S checkout -B tmp-upgraded <the pin>
                           && rose app-upgrade -y -C mesh vn3.2)
 git -C $S commit -am 'rose app-upgrade u-dt000 vn2.2 -> vn3.2'
 
-# 2. re-apply the site edits, then diff (dependencies.yaml is new — `add -N` it)
+# 2. re-apply the site edits, then diff (dependencies.yaml is new — `add -N` it).
+#    --no-ext-diff is not optional: the redirect truncates the patch BEFORE git runs,
+#    so a configured external differ (difft aborts on aarch64 here) leaves you with a
+#    zero-byte patch and nothing to reapply. It would not emit a valid patch anyway.
 git -C $S apply patches/41-uoe_science_suites-u-dt000-isambard3.patch
 #   ... adjust ...
 git -C $S add -N suites/u-dt000/dependencies.yaml
-git -C $S diff > patches/41-uoe_science_suites-u-dt000-isambard3.patch
+git -C $S diff --no-ext-diff > patches/41-uoe_science_suites-u-dt000-isambard3.patch
 
 # 3. back to the pin
 git -C $S checkout --detach <the pin> && git -C $S reset --hard <the pin>
