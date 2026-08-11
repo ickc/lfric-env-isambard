@@ -38,18 +38,22 @@ shift || true
 
 # Where each suite's Rose/Cylc tree lives, and what stages it. Two kinds:
 #
-#   u-dr932 is the UPSTREAM suite as a pinned submodule (vendor/lfric_egp_bench),
-#   staged by a patch script exactly as Stage 1 stages its LFRic sources. Nothing
-#   is copied into this repo, so the delta against what a scientist runs is a real
-#   diff -- patches/40-lfric_egp_bench-u-dr932-isambard3.patch -- which is also
-#   the pull request to send upstream.
+#   u-dr932 and u-dt000 are the UPSTREAM suites as pinned submodules
+#   (vendor/lfric_egp_bench, vendor/uoe_science_suites), staged by a patch script
+#   exactly as Stage 1 stages its LFRic sources. Nothing is copied into this repo,
+#   so the delta against what a scientist runs is a real diff --
+#   patches/4x-*-isambard3.patch -- which is also the pull request to send upstream.
 #
-#   u-dn704 and u-dt000 are still copies under examples/science-suites/. They will
-#   move to the same mechanism when they are next re-validated.
+#   u-dn704 is still a copy under examples/science-suites/. It will move to the
+#   same mechanism when it is next re-validated.
 case "$SUITE" in
   u-dr932)
     SUITE_DIR="$REPO_ROOT/vendor/lfric_egp_bench/src/suites/u-dr932"
     SUITE_PATCH="$REPO_ROOT/patches/40-lfric_egp_bench-u-dr932-patch.sh"
+    ;;
+  u-dt000)
+    SUITE_DIR="$REPO_ROOT/vendor/uoe_science_suites/suites/u-dt000"
+    SUITE_PATCH="$REPO_ROOT/patches/41-uoe_science_suites-u-dt000-patch.sh"
     ;;
   *)
     SUITE_DIR="$_here/$SUITE"
@@ -57,9 +61,11 @@ case "$SUITE" in
     ;;
 esac
 if [ ! -d "$SUITE_DIR" ] && [ -n "$SUITE_PATCH" ]; then
+  # SUITE_DIR is <repo>/vendor/<submodule>/... — name that submodule in the error.
+  _sub="${SUITE_DIR#"$REPO_ROOT/vendor/"}"
   die "suite tree missing: $SUITE_DIR
        Initialise the submodule it lives in:
-         git submodule update --init vendor/lfric_egp_bench"
+         git submodule update --init vendor/${_sub%%/*}"
 fi
 [ -d "$SUITE_DIR" ] || die "no such suite: $SUITE_DIR"
 
