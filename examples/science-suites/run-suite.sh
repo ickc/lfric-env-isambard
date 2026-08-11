@@ -100,7 +100,19 @@ bash "$REPO_ROOT/scripts/setup-cylc.sh" || die "setup-cylc.sh failed"
 # then takes the whole install down with it (difft on aarch64 here dies with
 # "<jemalloc>: Unsupported system page size"). Cylc only wants the diff for its own
 # provenance log, so drop the external differ for the launch.
+#
+# Two ways to set one, so two steps. The env var we can just unset. `git config
+# diff.external` -- the commoner difftastic install -- we cannot: there is no env
+# override that means "unset", and setting it empty makes git try to run the empty
+# string and die the same way. So probe instead, and only if the configured differ
+# actually dies (git exits 128; a working one exits 0) point GIT_EXTERNAL_DIFF at
+# `true`, which the env var half then wins with. That costs the provenance diff's
+# content -- but only for a user whose differ was going to abort anyway.
 unset GIT_EXTERNAL_DIFF
+if ! git -C "$SUITE_DIR" diff >/dev/null 2>&1; then
+  info "git diff.external is broken here; neutralising it for the cylc install"
+  export GIT_EXTERNAL_DIFF=true
+fi
 
 # 4. Launch. Inject our env + source selection as Jinja template vars: flow.cylc
 #    builds from $REPO_ROOT/vendor/* (the patched submodules), exports LFRIC_STACK/
