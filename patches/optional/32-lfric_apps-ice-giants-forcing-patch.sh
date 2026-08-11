@@ -24,7 +24,7 @@
 #   1d4b42b8  add temperature forcing parameters to rose meta
 #
 # (`5a2bb7ee` / `96b327b7`, the extract_source error handling, are already in
-# mainline at 2026.07.1 and are not carried.) Five files, ~310 lines:
+# mainline at 2026.07.1 and are not carried.) Five files, ~320 lines:
 #
 #   science/gungho/rose-meta/lfric-gungho/HEAD/rose-meta.conf
 #       + the `ice_giants_obs_like` value of namelist:external_forcing=theta_forcing
@@ -48,18 +48,38 @@
 # namelists. u-dr932 and u-dn704 do not set them. So this cannot live in
 # patches/ proper — see patches/optional/README.md.
 #
-# REGENERATING IT (the one manual step is small and worth re-checking on a bump)
+# REGENERATING IT (two manual steps, both small and worth re-checking on a bump)
 #
 #   git -C vendor/lfric_apps remote add dennis https://github.com/dennissergeev/lfric_apps.git
 #   git -C vendor/lfric_apps fetch dennis ice_giants_tf:refs/remotes/dennis/ice_giants_tf
 #   git -C vendor/lfric_apps checkout -B ice-giants-vn3.2 <the 2026.07.1 commit>
 #   git -C vendor/lfric_apps merge dennis/ice_giants_tf
 #
-# One conflict, in rose-meta.conf, both hunks a collision between mainline's newer
-# 'nudging' option and Denis' 'ice_giants_obs_like' — resolved as the UNION:
-# `ice_giants_obs_like` inserted after `deep_hot_jupiter` (where he put it) with
-# `nudging` kept last (where mainline has it), and his `held_suarez_sigma_b`
-# trigger appended to mainline's `wind_forcing` trigger list. Then
+# 1. ONE MERGE CONFLICT, in rose-meta.conf, both hunks a collision between
+#    mainline's newer 'nudging' option and Denis' 'ice_giants_obs_like' — resolved
+#    as the UNION: `ice_giants_obs_like` inserted after `deep_hot_jupiter` (where he
+#    put it) with `nudging` kept last (where mainline has it), and his
+#    `held_suarez_sigma_b` trigger appended to mainline's `wind_forcing` trigger list.
+#
+# 2. ONE THING GIT CANNOT SEE, because it is an API change in a file the branch
+#    never touched: between vn3.0 and vn3.2 `sci_chi_transform_mod::chi2llr` gained
+#    four arguments —
+#
+#      chi2llr(chi_1, chi_2, chi_3, panel_id,
+#              geometry, topology, coord_system, scaled_radius,   ! <- new
+#              lon, lat, radius)
+#
+#    Mainline updated every one of its own external_forcing kernels for that;
+#    Denis' unrebased branch still calls the 7-argument form, so
+#    `ice_giants_kernel_mod.F90` fails to compile with `Type mismatch in argument
+#    'geometry' ... passed REAL(8) to INTEGER(4)`. The fix here is exactly what
+#    mainline did to the sibling `deep_hot_jupiter_kernel_mod.F90`: import
+#    `geometry`/`topology` from base_mesh_config_mod, `coord_system` from
+#    finite_element_config_mod and `scaled_radius` from planet_config_mod, and pass
+#    them. Expect more of this kind the further the branch falls behind — grep the
+#    branch's call sites against the sibling kernels first.
+#
+# Then
 #
 #   git -C vendor/lfric_apps diff <the 2026.07.1 commit> HEAD \
 #       > patches/optional/32-lfric_apps-ice-giants-forcing.patch

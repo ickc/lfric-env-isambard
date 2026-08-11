@@ -259,10 +259,10 @@ index 00000000..7f6d2c3e
 +end module ice_giants_forcings_mod
 diff --git a/science/gungho/source/kernel/external_forcing/ice_giants_kernel_mod.F90 b/science/gungho/source/kernel/external_forcing/ice_giants_kernel_mod.F90
 new file mode 100644
-index 00000000..ec4586ce
+index 00000000..627cd19d
 --- /dev/null
 +++ b/science/gungho/source/kernel/external_forcing/ice_giants_kernel_mod.F90
-@@ -0,0 +1,157 @@
+@@ -0,0 +1,167 @@
 +!-----------------------------------------------------------------------------
 +! (c) Crown copyright 2022 Met Office. All rights reserved.
 +! The file LICENCE, distributed with this code, contains details of the terms
@@ -287,6 +287,14 @@ index 00000000..ec4586ce
 +  use ice_giants_forcings_mod,  only: ice_giants_newton_frequency, &
 +                                      ice_giants_equilibrium_theta
 +  use kernel_mod,               only: kernel_type
++
++  ! vn3.0 -> vn3.2: chi2llr now takes the mesh geometry/topology, the
++  ! finite-element coordinate system and the scaled planet radius explicitly.
++  ! Same four imports mainline added to every other external_forcing kernel
++  ! (cf. deep_hot_jupiter_kernel_mod).
++  use base_mesh_config_mod,      only: geometry, topology
++  use finite_element_config_mod, only: coord_system
++  use planet_config_mod,         only: scaled_radius
 +
 +  implicit none
 +
@@ -397,7 +405,9 @@ index 00000000..ec4586ce
 +    coords(3) = coords(3) + chi_3( location )/ndf_chi
 +  end do
 +
-+  call chi2llr(coords(1), coords(2), coords(3), ipanel, lon, lat, radius)
++  call chi2llr( coords(1), coords(2), coords(3), ipanel,         &
++                geometry, topology, coord_system, scaled_radius, &
++                lon, lat, radius )
 +
 +  exner0 = exner_in_wth(map_wth(1))
 +
