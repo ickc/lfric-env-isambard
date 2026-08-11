@@ -12,6 +12,7 @@ patches/41-uoe_science_suites-u-dt000-patch.sh        stages it: rose app-upgrad
 patches/41-uoe_science_suites-u-dt000-isambard3.patch ...this — the site diff, 587 lines
 patches/optional/32-lfric_apps-ice-giants-forcing*    the science: Denis' branch, forward-ported
 examples/science-suites/u-dt000/                      only what this repo owns: this file
+                                                      and known-issues notes
 ```
 
 `git apply -R` (or `pixi run unpatch`) gives the upstream suite back; `git diff` in the
@@ -101,6 +102,15 @@ u-dr932 and u-dn704 do not, and would start aborting on their own namelists. Tha
 why the patch lives in `patches/optional/` outside the shared stack, and why this
 suite invokes it by path from its extract task rather than inheriting it. See
 [`patches/optional/README.md`](../../../patches/optional/README.md).
+
+**One defect in it is known and unfixed**, in Denis' code rather than our forward-port:
+making the Held-Suarez relaxation rates namelist-driven left the *temperature*
+relaxation reading `wind_relax_time_scale`, so `theta_relax_time_scale` has no effect on
+`theta_forcing='held_suarez'` or `'tidally_locked_earth'`. It is inert for this suite —
+our theta path is `ice_giants_obs_like`, and the two timescales are equal anyway — but
+it is a trap for the next configuration, and it should go back to Denis with the patch.
+Written up in
+[`known-issues/held-suarez-theta-relaxation-uses-the-wind-timescale.md`](known-issues/held-suarez-theta-relaxation-uses-the-wind-timescale.md).
 
 ## What was NOT changed
 

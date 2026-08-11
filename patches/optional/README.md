@@ -26,3 +26,15 @@ shared machinery.
 
 Numbering continues the top-level series (`3x` = `lfric_apps`), so the family a
 patch belongs to is still readable at a glance.
+
+## Known defects in what these patches carry
+
+A patch here is somebody else's in-progress branch, forward-ported — so it can carry
+bugs that are neither ours nor upstream's, and they need somewhere to be recorded
+before the patch is handed back.
+
+- `32-lfric_apps-ice-giants-forcing`: the Held-Suarez *temperature* relaxation reads
+  `wind_relax_time_scale`, so `theta_relax_time_scale` has no effect on
+  `theta_forcing='held_suarez'` or `'tidally_locked_earth'`. Inert for u-dt000, which
+  uses neither. Denis' code, to go back to him with the patch —
+  [`examples/science-suites/u-dt000/known-issues/held-suarez-theta-relaxation-uses-the-wind-timescale.md`](../../examples/science-suites/u-dt000/known-issues/held-suarez-theta-relaxation-uses-the-wind-timescale.md).

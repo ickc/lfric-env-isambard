@@ -96,6 +96,13 @@
 # and u-dt000's dependencies.yaml names his branch (or the tag) directly. The
 # .patch file next to this script is exactly the diff to hand him.
 #
+# Send the known defect with it: making the Held-Suarez rates namelist-driven left
+# `held_suarez_newton_frequency` (the THETA relaxation) reading wind_relax_time_scale,
+# so theta_relax_time_scale has no effect on theta_forcing='held_suarez' or
+# 'tidally_locked_earth'. Inert for u-dt000, which uses neither. Written up in
+# examples/science-suites/u-dt000/known-issues/
+#   held-suarez-theta-relaxation-uses-the-wind-timescale.md
+#
 # Idempotent: re-running is a no-op.
 set -o pipefail
 _here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
