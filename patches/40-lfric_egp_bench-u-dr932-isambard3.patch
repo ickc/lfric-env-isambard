@@ -1,7 +1,7 @@
 diff -ruN a/src/suites/u-dr932/app/extract/rose-app.conf b/src/suites/u-dr932/app/extract/rose-app.conf
---- a/src/suites/u-dr932/app/extract/rose-app.conf	2026-08-10 23:15:25.000000000 +0000
-+++ b/src/suites/u-dr932/app/extract/rose-app.conf	2026-08-10 23:15:34.000000000 +0000
-@@ -1,4 +1,25 @@
+--- a/src/suites/u-dr932/app/extract/rose-app.conf	2026-08-11 01:38:39.000000000 +0000
++++ b/src/suites/u-dr932/app/extract/rose-app.conf	2026-08-11 01:39:38.000000000 +0000
+@@ -1,4 +1,30 @@
 +# [isambard3] The Met Office extract, unchanged in mechanism: merge_sources.py
 +# reads this suite's dependencies.yaml and clones each declared repo@ref into
 +# $CYLC_WORKFLOW_SHARE_DIR/source. Editing dependencies.yaml (a fork, a branch, a
@@ -16,6 +16,11 @@ diff -ruN a/src/suites/u-dr932/app/extract/rose-app.conf b/src/suites/u-dr932/ap
 +#   sources mid-compile and the vn3.2 forcing-only config trips an upstream
 +#   slow-physics regression. See examples/science-suites/site/patch-sources.sh.
 +#
++# The two are chained with `&&`, not `;`: with `;` the task's exit status would be
++# patch-sources.sh's alone, and that returns 0 on a tree whose extraction failed (the
++# patches skip absent targets by design), so a failed clone would be reported as a
++# succeeded extract and the build would go on to consume a partial or stale tree.
++#
 +# `mirrors` points at this repo's vendored submodules by default (MIRROR_LOC in
 +# rose-suite.conf) instead of the Met Office mirror host, which does not exist here.
 +# That path needs no network at all; `tokens` (the default) clones from github over
@@ -24,15 +29,15 @@ diff -ruN a/src/suites/u-dr932/app/extract/rose-app.conf b/src/suites/u-dr932/ap
 -default=merge_sources.py -d $CYLC_WORKFLOW_RUN_DIR
 -mirrors=merge_sources.py -d $CYLC_WORKFLOW_RUN_DIR --mirrors --mirror_loc=$MIRROR_LOC
 -tokens=merge_sources.py -d $CYLC_WORKFLOW_RUN_DIR --tokens
-+default=merge_sources.py -d $CYLC_WORKFLOW_RUN_DIR ; \
++default=merge_sources.py -d $CYLC_WORKFLOW_RUN_DIR && \
 +       =bash "$REPO_ROOT/examples/science-suites/site/patch-sources.sh" "$SOURCE_ROOT"
-+mirrors=merge_sources.py -d $CYLC_WORKFLOW_RUN_DIR --mirrors --mirror_loc=$MIRROR_LOC ; \
++mirrors=merge_sources.py -d $CYLC_WORKFLOW_RUN_DIR --mirrors --mirror_loc=$MIRROR_LOC && \
 +       =bash "$REPO_ROOT/examples/science-suites/site/patch-sources.sh" "$SOURCE_ROOT"
-+tokens=merge_sources.py -d $CYLC_WORKFLOW_RUN_DIR --tokens ; \
++tokens=merge_sources.py -d $CYLC_WORKFLOW_RUN_DIR --tokens && \
 +       =bash "$REPO_ROOT/examples/science-suites/site/patch-sources.sh" "$SOURCE_ROOT"
 diff -ruN a/src/suites/u-dr932/app/mesh/rose-app.conf b/src/suites/u-dr932/app/mesh/rose-app.conf
---- a/src/suites/u-dr932/app/mesh/rose-app.conf	2026-08-10 23:15:33.000000000 +0000
-+++ b/src/suites/u-dr932/app/mesh/rose-app.conf	2026-08-10 23:15:34.000000000 +0000
+--- a/src/suites/u-dr932/app/mesh/rose-app.conf	2026-08-11 01:38:43.000000000 +0000
++++ b/src/suites/u-dr932/app/mesh/rose-app.conf	2026-08-11 01:39:38.000000000 +0000
 @@ -1,7 +1,12 @@
 +# [isambard3] meta vn3.1 -> vn3.2 via `rose app-upgrade`, to match the source this
 +# env builds (2026.07.1). Only mechanical: planar_mesh apply_stretch_transform ->
@@ -48,8 +53,8 @@ diff -ruN a/src/suites/u-dr932/app/mesh/rose-app.conf b/src/suites/u-dr932/app/m
  [env]
  OMP_NUM_THREADS=1
 diff -ruN a/src/suites/u-dr932/dependencies.yaml b/src/suites/u-dr932/dependencies.yaml
---- a/src/suites/u-dr932/dependencies.yaml	2026-08-10 23:15:25.000000000 +0000
-+++ b/src/suites/u-dr932/dependencies.yaml	2026-08-10 23:15:34.000000000 +0000
+--- a/src/suites/u-dr932/dependencies.yaml	2026-08-11 01:38:40.000000000 +0000
++++ b/src/suites/u-dr932/dependencies.yaml	2026-08-11 01:39:38.000000000 +0000
 @@ -23,27 +23,45 @@
  #
  # It is up to the user to ensure these merge cleanly
@@ -105,8 +110,8 @@ diff -ruN a/src/suites/u-dr932/dependencies.yaml b/src/suites/u-dr932/dependenci
 -    ref: 2026.03.1
 +    ref: 2026.07.1
 diff -ruN a/src/suites/u-dr932/flow.cylc b/src/suites/u-dr932/flow.cylc
---- a/src/suites/u-dr932/flow.cylc	2026-08-10 23:15:25.000000000 +0000
-+++ b/src/suites/u-dr932/flow.cylc	2026-08-10 23:15:33.000000000 +0000
+--- a/src/suites/u-dr932/flow.cylc	2026-08-11 01:38:40.000000000 +0000
++++ b/src/suites/u-dr932/flow.cylc	2026-08-11 01:39:38.000000000 +0000
 @@ -1,5 +1,26 @@
  #!jinja2
  
@@ -346,8 +351,8 @@ diff -ruN a/src/suites/u-dr932/flow.cylc b/src/suites/u-dr932/flow.cylc
              --ntasks={{TOTAL_RANKS_REQ}}
              --ntasks-per-node={{ LFRIC_ATM_PPN }}
 diff -ruN a/src/suites/u-dr932/rose-suite.conf b/src/suites/u-dr932/rose-suite.conf
---- a/src/suites/u-dr932/rose-suite.conf	2026-08-10 23:15:25.000000000 +0000
-+++ b/src/suites/u-dr932/rose-suite.conf	2026-08-10 23:15:34.000000000 +0000
+--- a/src/suites/u-dr932/rose-suite.conf	2026-08-11 01:38:40.000000000 +0000
++++ b/src/suites/u-dr932/rose-suite.conf	2026-08-11 01:39:38.000000000 +0000
 @@ -1,31 +1,54 @@
 +# u-dr932 — GungHo Shallow/Deep Hot Jupiter Temperature Forcing.
 +#
