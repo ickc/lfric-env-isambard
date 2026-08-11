@@ -1,6 +1,6 @@
 diff -ruN a/src/suites/u-dr932/app/extract/rose-app.conf b/src/suites/u-dr932/app/extract/rose-app.conf
 --- a/src/suites/u-dr932/app/extract/rose-app.conf	2026-08-11 01:38:39.000000000 +0000
-+++ b/src/suites/u-dr932/app/extract/rose-app.conf	2026-08-11 01:39:38.000000000 +0000
++++ b/src/suites/u-dr932/app/extract/rose-app.conf	2026-08-11 01:39:54.000000000 +0000
 @@ -1,4 +1,30 @@
 +# [isambard3] The Met Office extract, unchanged in mechanism: merge_sources.py
 +# reads this suite's dependencies.yaml and clones each declared repo@ref into
@@ -37,7 +37,7 @@ diff -ruN a/src/suites/u-dr932/app/extract/rose-app.conf b/src/suites/u-dr932/ap
 +       =bash "$REPO_ROOT/examples/science-suites/site/patch-sources.sh" "$SOURCE_ROOT"
 diff -ruN a/src/suites/u-dr932/app/mesh/rose-app.conf b/src/suites/u-dr932/app/mesh/rose-app.conf
 --- a/src/suites/u-dr932/app/mesh/rose-app.conf	2026-08-11 01:38:43.000000000 +0000
-+++ b/src/suites/u-dr932/app/mesh/rose-app.conf	2026-08-11 01:39:38.000000000 +0000
++++ b/src/suites/u-dr932/app/mesh/rose-app.conf	2026-08-11 01:39:54.000000000 +0000
 @@ -1,7 +1,12 @@
 +# [isambard3] meta vn3.1 -> vn3.2 via `rose app-upgrade`, to match the source this
 +# env builds (2026.07.1). Only mechanical: planar_mesh apply_stretch_transform ->
@@ -54,7 +54,7 @@ diff -ruN a/src/suites/u-dr932/app/mesh/rose-app.conf b/src/suites/u-dr932/app/m
  OMP_NUM_THREADS=1
 diff -ruN a/src/suites/u-dr932/dependencies.yaml b/src/suites/u-dr932/dependencies.yaml
 --- a/src/suites/u-dr932/dependencies.yaml	2026-08-11 01:38:40.000000000 +0000
-+++ b/src/suites/u-dr932/dependencies.yaml	2026-08-11 01:39:38.000000000 +0000
++++ b/src/suites/u-dr932/dependencies.yaml	2026-08-11 01:39:54.000000000 +0000
 @@ -23,27 +23,45 @@
  #
  # It is up to the user to ensure these merge cleanly
@@ -111,14 +111,14 @@ diff -ruN a/src/suites/u-dr932/dependencies.yaml b/src/suites/u-dr932/dependenci
 +    ref: 2026.07.1
 diff -ruN a/src/suites/u-dr932/flow.cylc b/src/suites/u-dr932/flow.cylc
 --- a/src/suites/u-dr932/flow.cylc	2026-08-11 01:38:40.000000000 +0000
-+++ b/src/suites/u-dr932/flow.cylc	2026-08-11 01:39:38.000000000 +0000
++++ b/src/suites/u-dr932/flow.cylc	2026-08-11 01:39:54.000000000 +0000
 @@ -1,5 +1,26 @@
  #!jinja2
  
 +{# ============================================================================
 +   u-dr932 as run on Isambard 3 against the lfric-env module (this repo).
 +
-+   This IS Denis Sergeev's suite (dennissergeev/lfric_egp_bench@ffe611e,
++   This IS Denis Sergeev's suite (dennissergeev/lfric_egp_bench@e6ee57a,
 +   src/suites/u-dr932), not a rewrite of it: the hostname->MACHINE detection, the
 +   task graph, the Met Office `launch-exe`, the app configs and every other
 +   platform's branch are his, untouched. Only the `isambard3-gnu` branch is
@@ -352,7 +352,7 @@ diff -ruN a/src/suites/u-dr932/flow.cylc b/src/suites/u-dr932/flow.cylc
              --ntasks-per-node={{ LFRIC_ATM_PPN }}
 diff -ruN a/src/suites/u-dr932/rose-suite.conf b/src/suites/u-dr932/rose-suite.conf
 --- a/src/suites/u-dr932/rose-suite.conf	2026-08-11 01:38:40.000000000 +0000
-+++ b/src/suites/u-dr932/rose-suite.conf	2026-08-11 01:39:38.000000000 +0000
++++ b/src/suites/u-dr932/rose-suite.conf	2026-08-11 01:39:54.000000000 +0000
 @@ -1,31 +1,54 @@
 +# u-dr932 — GungHo Shallow/Deep Hot Jupiter Temperature Forcing.
 +#

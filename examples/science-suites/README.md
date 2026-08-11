@@ -267,17 +267,24 @@ bash examples/science-suites/run-suite.sh u-dr932   # cray environment (the defa
 ```
 
 That is the whole launch. `run-suite.sh` is a convenience wrapper, not a new
-mechanism — it does three things you could do by hand:
+mechanism — it does four things you could do by hand:
 
 ```bash
 # 1. put the built environment on PATH (rose/cylc/psyclone come from its view)
 . examples/science-suites/site/activate-env.sh
 
-# 2. write the `isambard3` Slurm platform + a roomy cylc-run dir into ~/.cylc/flow
+# 2. stage the suite: rose app-upgrade to the version this env builds, then the
+#    Isambard 3 site patch. Only for suites that live in a submodule (u-dr932);
+#    u-dn704 and u-dt000 are directories here and need no staging.
+bash patches/40-lfric_egp_bench-u-dr932-patch.sh
+
+# 3. write the `isambard3` Slurm platform + a roomy cylc-run dir into ~/.cylc/flow
 bash scripts/setup-cylc.sh
 
-# 3. validate, install and play, telling the suite which environment to load
-cylc vip examples/science-suites/u-dr932 --workflow-name u-dr932 \
+# 4. validate, install and play, telling the suite which environment to load.
+#    NOTE the path: u-dr932 is the STAGED SUBMODULE, not a directory under
+#    examples/science-suites/ (which holds only its README and known-issues).
+cylc vip vendor/lfric_egp_bench/src/suites/u-dr932 --workflow-name u-dr932 \
   -S "REPO_ROOT='$PWD'" \
   -S "LFRIC_STACK='cray'" \
   -S "LFRIC_PREFIX='<the PREFIX Stage 1 installed into, unversioned>'" \

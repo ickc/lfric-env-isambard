@@ -434,7 +434,8 @@ why u-dr932 and u-dn704 run and scale here. Two things came out of this investig
 
 **Since then, the two u-dr932s have been unified.** `examples/science-suites/u-dr932/`
 was a copy of an older snapshot of this suite; it is now **Denis' suite itself**
-(`lfric_egp_bench@ffe611e`) with his own working configuration — deep hot Jupiter,
+(`lfric_egp_bench@e6ee57a`, a pinned submodule plus a patch) with his own working
+configuration — deep hot Jupiter,
 C48, l66, stretch 0.5 towards (−90, 0), dt = 50 s, 108 ranks — and a short list of
 `[isambard3]` changes that includes §5.1's fix. That directory's `README.md` is the
 itemised diff. Two things there supersede parts of this document:
