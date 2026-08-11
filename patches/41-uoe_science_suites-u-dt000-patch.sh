@@ -92,8 +92,20 @@ if [ -z "${ROSE_META_PATH:-}" ]; then
                       -type d -name rose-meta 2>/dev/null | tr '\n' ':')"
   export ROSE_META_PATH
 fi
-if [ -z "$ROSE_META_PATH" ]; then
-  warn "no rose-meta found under vendor/lfric_{apps,core}; skipping the u-dt000 patch."
+# Test for jules-lfric specifically, not just for a non-empty ROSE_META_PATH: `find`
+# returns a list as soon as lfric_apps/lfric_core are initialised, so someone who ran
+# `submodule-init` but not `init-physics` would sail past an emptiness check and hit
+# the missing-rose-meta.conf traceback instead of this advice -- which is the exact
+# failure the note above predicts.
+_have_jules_meta=false
+IFS=':' read -r -a _meta_dirs <<< "$ROSE_META_PATH"
+for _d in "${_meta_dirs[@]}"; do
+  if [ -n "$_d" ] && [ -d "$_d/jules-lfric" ]; then _have_jules_meta=true; break; fi
+done
+if [ "$_have_jules_meta" != true ]; then
+  warn "no jules-lfric rose-meta on ROSE_META_PATH; skipping the u-dt000 patch."
+  warn "  the vn2.2 -> vn3.0 macro needs jules-lfric/vn7.9/rose-meta.conf, which lives"
+  warn "  in the jules submodule:"
   warn "  git submodule update --init vendor/lfric_apps vendor/lfric_core vendor/physics/jules"
   exit 0
 fi
