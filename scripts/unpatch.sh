@@ -22,7 +22,13 @@ _here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
 # undoes them. See patches/optional/README.md.
 for sub in lfric_core lfric_apps spack-packages lfric_egp_bench uoe_science_suites; do
   d="$REPO_ROOT/vendor/$sub"
-  if git -C "$d" rev-parse --git-dir >/dev/null 2>&1; then
+  # An UNINITIALISED submodule is an empty directory, and `git -C <empty dir>
+  # rev-parse --git-dir` happily succeeds by walking UP to this repo -- at which
+  # point `reset --hard` + `clean -fd` would blow away the caller's uncommitted
+  # work in the whole checkout. (Measured: it does exactly that.) So test that the
+  # directory is a repository ROOT, not merely inside one.
+  top="$(git -C "$d" rev-parse --show-toplevel 2>/dev/null)"
+  if [ -n "$top" ] && [ "$top" = "$(cd -- "$d" 2>/dev/null && pwd -P)" ]; then
     echo ">>> resetting vendor/$sub to pinned commit"
     git -C "$d" reset --hard
     git -C "$d" clean -fd

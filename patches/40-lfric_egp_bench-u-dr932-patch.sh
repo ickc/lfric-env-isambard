@@ -75,14 +75,20 @@ upgrade_app() {
 
 # rose needs the LFRic rose-meta packages. Honour an existing ROSE_META_PATH;
 # otherwise build it from the vendored LFRic trees the environment is pinned to.
+# NB vendor/physics is in the list and has to be: lfric_apps' jules_interface
+# metadata imports jules-lfric, which lives in the jules submodule, so without it
+# the upgrade dies on a missing jules-lsm/jules-lfric/vn8.1/rose-meta.conf. That
+# only shows up on a FROM-PRISTINE run (`pixi run unpatch` then `patch-all`),
+# because an already-upgraded config short-circuits before rose is ever invoked.
 if [ -z "${ROSE_META_PATH:-}" ]; then
   ROSE_META_PATH="$(find "$REPO_ROOT/vendor/lfric_apps" "$REPO_ROOT/vendor/lfric_core" \
+                         "$REPO_ROOT/vendor/physics" \
                       -type d -name rose-meta 2>/dev/null | tr '\n' ':')"
   export ROSE_META_PATH
 fi
 if [ -z "$ROSE_META_PATH" ]; then
   warn "no rose-meta found under vendor/lfric_{apps,core}; skipping the u-dr932 patch."
-  warn "  git submodule update --init vendor/lfric_apps vendor/lfric_core"
+  warn "  git submodule update --init vendor/lfric_apps vendor/lfric_core vendor/physics/jules"
   exit 0
 fi
 
