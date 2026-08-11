@@ -9,15 +9,28 @@ set -uo pipefail
 _here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
 # shellcheck source=scripts/common.sh
 . "$_here/common.sh"
+# shellcheck source=scripts/lib.sh
+. "$_here/lib.sh"   # for _lfric_submodule_present
 
 # Only the submodules that patches touch. vendor/spack and the package repo
 # mo-spack-packages are not patched. (lfric_apps is patched by
-# patches/30-lfric_apps-local-sources-patch.sh; lfric_egp_bench carries the
-# u-dr932 science suite and is staged by patches/40-lfric_egp_bench-*, so
-# resetting it is also how you get Denis' suite back verbatim.)
-for sub in lfric_core lfric_apps spack-packages lfric_egp_bench; do
+# patches/30-lfric_apps-local-sources-patch.sh; lfric_egp_bench and
+# uoe_science_suites carry the u-dr932 and u-dt000 science suites and are staged by
+# patches/40-* and patches/41-*, so resetting them is also how you get the upstream
+# suites back verbatim.)
+#
+# NOT here: patches/optional/*. Those apply to a suite's freshly EXTRACTED source
+# tree under its cylc-run share/ directory, never to vendor/ — `cylc clean` is what
+# undoes them. See patches/optional/README.md.
+for sub in lfric_core lfric_apps spack-packages lfric_egp_bench uoe_science_suites; do
   d="$REPO_ROOT/vendor/$sub"
-  if git -C "$d" rev-parse --git-dir >/dev/null 2>&1; then
+  # An UNINITIALISED submodule is an empty directory, and `git -C <empty dir>
+  # rev-parse --git-dir` happily succeeds by walking UP to this repo -- at which
+  # point `reset --hard` + `clean -fd` would blow away the caller's uncommitted
+  # work in the whole checkout. (Measured: it does exactly that.) lib.sh's
+  # _lfric_submodule_present is the repo's one test for this: an initialised
+  # submodule has its own .git.
+  if _lfric_submodule_present "$sub"; then
     echo ">>> resetting vendor/$sub to pinned commit"
     git -C "$d" reset --hard
     git -C "$d" clean -fd
@@ -25,4 +38,4 @@ for sub in lfric_core lfric_apps spack-packages lfric_egp_bench; do
     echo "skip vendor/$sub (not initialized)"
   fi
 done
-echo "unpatch complete: lfric_core, lfric_apps, spack-packages, lfric_egp_bench restored."
+echo "unpatch complete: lfric_core, lfric_apps, spack-packages, lfric_egp_bench, uoe_science_suites restored."

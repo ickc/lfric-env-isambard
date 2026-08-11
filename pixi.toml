@@ -43,11 +43,12 @@ submodule-init = "git submodule update --init --recursive --jobs 4 -- vendor/spa
 # science-suites extract them per-suite). All four are public — no credentials.
 init-physics = "git submodule update --init --jobs 4 -- vendor/physics/casim vendor/physics/jules vendor/physics/socrates vendor/physics/ukca"
 
-# Science-suite examples only: clone the pinned upstream suite repo. u-dr932 lives
-# in here and is staged by patches/40-lfric_egp_bench-u-dr932-patch.sh -- it is not
-# copied into this repo. Thin wrapper around examples/science-suites/run-suite.sh's
-# prerequisite; see examples/science-suites/README.md.
-init-suites = "git submodule update --init --jobs 2 -- vendor/lfric_egp_bench"
+# Science-suite examples only: clone the pinned upstream suite repos. u-dr932 lives
+# in lfric_egp_bench and u-dt000 in uoe_science_suites; each is staged by its
+# patches/4x-*-patch.sh -- neither is copied into this repo. Thin wrapper around
+# examples/science-suites/run-suite.sh's prerequisite; see
+# examples/science-suites/README.md.
+init-suites = "git submodule update --init --jobs 2 -- vendor/lfric_egp_bench vendor/uoe_science_suites"
 
 # Stage/update the pinned physics + lfric_core submodules to the refs in
 # vendor/lfric_apps/dependencies.yaml, then commit the gitlinks. This is the

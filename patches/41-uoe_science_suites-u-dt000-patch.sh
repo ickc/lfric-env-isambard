@@ -1,31 +1,39 @@
 #!/usr/bin/env bash
-# Target submodule: vendor/lfric_egp_bench  (dennissergeev/lfric_egp_bench)
+# Target submodule: vendor/uoe_science_suites  (UniExeterRSE/Isambard3-LFRic-Env-Science-Suites)
 #
-# Stage the u-dr932 science suite for Isambard 3. The suite is NOT copied into
-# this repo -- it is a pinned submodule, treated exactly as Stage 1 treats its
-# LFRic sources, so the difference between what a scientist runs and what runs
+# Stage the u-dt000 science suite -- LFRic Atm, Uranus/Neptune (ice giant)
+# temperature and wind forcing -- for Isambard 3. Same arrangement as
+# 40-lfric_egp_bench-u-dr932-patch.sh: the suite is NOT copied into this repo, it is
+# a pinned submodule, so the difference between what a scientist runs and what runs
 # here is a real diff rather than a described one.
 #
 # Two steps, in this order:
 #
-#   1. VERSION ALIGNMENT. The suite is written for LFRic vn3.1; this repo's
-#      environment builds vn3.2. Rather than carry ~2000 lines of mechanical diff,
-#      this RUNS the native tool -- `rose app-upgrade -C <app> $LFRIC_SUITE_META_VN`
-#      -- over the suite's app configs. Self-maintaining, and it keeps step 2 small
-#      enough to read.
+#   1. VERSION ALIGNMENT. The suite is written for LFRic vn2.2; this repo's
+#      environment builds vn3.2. Rather than carry the mechanical diff, this RUNS
+#      the native tool -- `rose app-upgrade -C <app> $LFRIC_SUITE_META_VN` -- over
+#      the suite's app configs. The whole vn2.2 -> vn3.0 -> vn3.1 -> vn3.2 macro
+#      chain applies cleanly, ~900 lines of namelist churn for lfric_atm and three
+#      settings for mesh. Self-maintaining, and it keeps step 2 small enough to read.
 #
-#   2. SITE ADAPTATION. `git apply` of 40-lfric_egp_bench-u-dr932-isambard3.patch,
-#      419 lines touching five files (flow.cylc, rose-suite.conf,
-#      dependencies.yaml, app/extract, app/mesh). That patch is the reviewable
-#      artefact: it is what would be sent upstream as a pull request, and every
-#      hunk carries an `[isambard3]` comment saying what it replaced and why.
-#      See examples/science-suites/u-dr932/README.md for the itemised index.
+#   2. SITE ADAPTATION. `git apply` of 41-uoe_science_suites-u-dt000-isambard3.patch,
+#      touching seven files (flow.cylc, rose-suite.conf, meta/rose-meta.conf,
+#      dependencies.yaml [new], app/git_extract_lfric, app/build_lfric_atm,
+#      app/mesh, and a header comment on app/lfric_atm). That patch is the
+#      reviewable artefact, and every hunk carries an `[isambard3]` comment saying
+#      what it replaced and why. See examples/science-suites/u-dt000/README.md for
+#      the itemised index.
+#
+# The suite's SCIENCE is not in either step. `theta_forcing='ice_giants_obs_like'`
+# comes from Denis Sergeev's lfric_apps branch, forward-ported to vn3.2 by
+# patches/optional/32-lfric_apps-ice-giants-forcing-patch.sh, which the staged
+# suite's `git_extract_lfric` task applies to the tree it just cloned.
 #
 # BOTH STEPS ARE SKIPPED, cleanly, when their preconditions are absent -- the
 # submodule not initialised, or `rose` not on PATH. That matters because
-# patch-all.sh runs during the Stage-1 build, long before an environment exists
-# to provide rose. examples/science-suites/run-suite.sh re-runs this script with
-# the environment activated, which is where it actually takes effect. It never
+# patch-all.sh runs during the Stage-1 build, long before an environment exists to
+# provide rose. examples/science-suites/run-suite.sh re-runs this script with the
+# environment activated, which is where it actually takes effect. It never
 # half-applies: if rose is missing, neither step runs.
 #
 # Idempotent: re-running is a no-op.
@@ -39,9 +47,9 @@ WORKING_DIR="${LFRIC_SRC_ROOT:-$REPO_ROOT/vendor}"
 # Bump this when that pin moves.
 SUITE_META_VN="${LFRIC_SUITE_META_VN:-vn3.2}"
 
-SUITE_ROOT="$WORKING_DIR/lfric_egp_bench"
-SUITE_DIR="$SUITE_ROOT/src/suites/u-dr932"
-PATCH_FILE="$_here/40-lfric_egp_bench-u-dr932-isambard3.patch"
+SUITE_ROOT="$WORKING_DIR/uoe_science_suites"
+SUITE_DIR="$SUITE_ROOT/suites/u-dt000"
+PATCH_FILE="$_here/41-uoe_science_suites-u-dt000-isambard3.patch"
 
 info() { echo "INFO: $*"; }
 warn() { echo "WARN: $*" >&2; }
@@ -49,12 +57,12 @@ fail() { echo "ERROR: $*" >&2; return 1; }
 
 # --- preconditions ----------------------------------------------------------
 if [ ! -d "$SUITE_DIR" ]; then
-  warn "vendor/lfric_egp_bench not initialised; skipping the u-dr932 suite patch."
-  warn "  git submodule update --init vendor/lfric_egp_bench"
+  warn "vendor/uoe_science_suites not initialised; skipping the u-dt000 suite patch."
+  warn "  git submodule update --init vendor/uoe_science_suites"
   exit 0
 fi
 if ! command -v rose >/dev/null 2>&1; then
-  warn "no 'rose' on PATH; skipping the u-dr932 suite patch entirely (both steps)."
+  warn "no 'rose' on PATH; skipping the u-dt000 suite patch entirely (both steps)."
   warn "  It is applied by examples/science-suites/run-suite.sh, which activates the"
   warn "  environment first. Nothing is half-applied."
   exit 0
@@ -75,11 +83,9 @@ upgrade_app() {
 
 # rose needs the LFRic rose-meta packages. Honour an existing ROSE_META_PATH;
 # otherwise build it from the vendored LFRic trees the environment is pinned to.
-# NB vendor/physics is in the list and has to be: lfric_apps' jules_interface
-# metadata imports jules-lfric, which lives in the jules submodule, so without it
-# the upgrade dies on a missing jules-lsm/jules-lfric/vn8.1/rose-meta.conf. That
-# only shows up on a FROM-PRISTINE run (`pixi run unpatch` then `patch-all`),
-# because an already-upgraded config short-circuits before rose is ever invoked.
+# NB vendor/physics is in the list and has to be: the vn2.2 -> vn3.0 macro pulls in
+# the jules-lfric metadata, and without it the upgrade dies on a missing
+# jules-lfric/vn7.9/rose-meta.conf.
 if [ -z "${ROSE_META_PATH:-}" ]; then
   ROSE_META_PATH="$(find "$REPO_ROOT/vendor/lfric_apps" "$REPO_ROOT/vendor/lfric_core" \
                          "$REPO_ROOT/vendor/physics" \
@@ -97,8 +103,8 @@ for _d in "${_meta_dirs[@]}"; do
   if [ -n "$_d" ] && [ -d "$_d/jules-lfric" ]; then _have_jules_meta=true; break; fi
 done
 if [ "$_have_jules_meta" != true ]; then
-  warn "no jules-lfric rose-meta on ROSE_META_PATH; skipping the u-dr932 patch."
-  warn "  lfric_apps' jules_interface metadata imports jules-lfric/vn8.1, which lives"
+  warn "no jules-lfric rose-meta on ROSE_META_PATH; skipping the u-dt000 patch."
+  warn "  the vn2.2 -> vn3.0 macro needs jules-lfric/vn7.9/rose-meta.conf, which lives"
   warn "  in the jules submodule:"
   warn "  git submodule update --init vendor/lfric_apps vendor/lfric_core vendor/physics/jules"
   exit 0
@@ -116,8 +122,8 @@ if ! git -C "$SUITE_ROOT" apply --check -p1 "$PATCH_FILE" >/dev/null 2>&1; then
   fail "  Most likely the submodule has moved off the pin this patch was made"
   fail "  against, or step 1 upgraded to a different rose-meta version than the"
   fail "  patch expects (SUITE_META_VN=$SUITE_META_VN). Regenerate it -- see"
-  fail "  examples/science-suites/u-dr932/README.md, 'Regenerating the patch'."
+  fail "  examples/science-suites/u-dt000/README.md, 'Regenerating the patch'."
   exit 1
 fi
 git -C "$SUITE_ROOT" apply -p1 "$PATCH_FILE" || { fail "git apply failed"; exit 1; }
-info "Applied the Isambard 3 site patch to u-dr932."
+info "Applied the Isambard 3 site patch to u-dt000."
