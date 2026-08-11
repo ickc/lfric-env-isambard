@@ -36,16 +36,13 @@ SUITE="${1:-}"
 [ -n "$SUITE" ] || die "usage: run-suite.sh <suite-id> [cylc vip args...]  (e.g. u-dr932)"
 shift || true
 
-# Where each suite's Rose/Cylc tree lives, and what stages it. Two kinds:
+# Where each suite's Rose/Cylc tree lives, and what stages it.
 #
-#   u-dr932 and u-dt000 are the UPSTREAM suites as pinned submodules
-#   (vendor/lfric_egp_bench, vendor/uoe_science_suites), staged by a patch script
-#   exactly as Stage 1 stages its LFRic sources. Nothing is copied into this repo,
-#   so the delta against what a scientist runs is a real diff --
-#   patches/4x-*-isambard3.patch -- which is also the pull request to send upstream.
-#
-#   u-dn704 is still a copy under examples/science-suites/. It will move to the
-#   same mechanism when it is next re-validated.
+# All three are the UPSTREAM suites as pinned submodules (vendor/lfric_egp_bench,
+# vendor/uoe_science_suites), staged by a patch script exactly as Stage 1 stages its
+# LFRic sources. Nothing is copied into this repo, so the delta against what a
+# scientist runs is a real diff -- patches/4x-*-isambard3.patch -- which is also the
+# pull request to send upstream.
 case "$SUITE" in
   u-dr932)
     SUITE_DIR="$REPO_ROOT/vendor/lfric_egp_bench/src/suites/u-dr932"
@@ -55,19 +52,21 @@ case "$SUITE" in
     SUITE_DIR="$REPO_ROOT/vendor/uoe_science_suites/suites/u-dt000"
     SUITE_PATCH="$REPO_ROOT/patches/41-uoe_science_suites-u-dt000-patch.sh"
     ;;
+  u-dn704)
+    SUITE_DIR="$REPO_ROOT/vendor/uoe_science_suites/suites/u-dn704"
+    SUITE_PATCH="$REPO_ROOT/patches/42-uoe_science_suites-u-dn704-patch.sh"
+    ;;
   *)
-    SUITE_DIR="$_here/$SUITE"
-    SUITE_PATCH=""
+    die "no such suite: $SUITE  (known: u-dn704, u-dr932, u-dt000)"
     ;;
 esac
-if [ ! -d "$SUITE_DIR" ] && [ -n "$SUITE_PATCH" ]; then
+if [ ! -d "$SUITE_DIR" ]; then
   # SUITE_DIR is <repo>/vendor/<submodule>/... — name that submodule in the error.
   _sub="${SUITE_DIR#"$REPO_ROOT/vendor/"}"
   die "suite tree missing: $SUITE_DIR
        Initialise the submodule it lives in:
          git submodule update --init vendor/${_sub%%/*}"
 fi
-[ -d "$SUITE_DIR" ] || die "no such suite: $SUITE_DIR"
 
 # common.sh sets PREFIX/MODULE*/LFRIC_STACK and respects LFRIC_PREFIX/LFRIC_STACK.
 # shellcheck source=scripts/common.sh
@@ -85,10 +84,8 @@ info "cylc $(cylc version 2>/dev/null) | rose $(rose version 2>/dev/null | awk '
 #    Isambard 3 site patch. Idempotent. It has to happen HERE rather than in
 #    patch-all.sh because it needs the env's `rose`, which only exists after step 1
 #    (patch-all.sh runs during the Stage-1 build, where the patch is inert).
-if [ -n "$SUITE_PATCH" ]; then
-  info "staging $SUITE: $(basename "$SUITE_PATCH")"
-  bash "$SUITE_PATCH" || die "suite patch failed: $SUITE_PATCH"
-fi
+info "staging $SUITE: $(basename "$SUITE_PATCH")"
+bash "$SUITE_PATCH" || die "suite patch failed: $SUITE_PATCH"
 
 # 3. Cylc site config: the `isambard3` Slurm platform + a roomy cylc-run dir.
 #    Reuse the repo's opt-in setup-cylc.sh (idempotent; writes ~/.cylc/flow).
