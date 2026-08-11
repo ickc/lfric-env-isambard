@@ -26,7 +26,7 @@ diff --git a/suites/u-dt000/app/git_extract_lfric/rose-app.conf b/suites/u-dt000
 index fa73ea3..8d55f1f 100644
 --- a/suites/u-dt000/app/git_extract_lfric/rose-app.conf
 +++ b/suites/u-dt000/app/git_extract_lfric/rose-app.conf
-@@ -1,70 +1,44 @@
+@@ -1,70 +1,49 @@
 -mode=command
 -opt.jobs=1
 -
@@ -59,6 +59,11 @@ index fa73ea3..8d55f1f 100644
 +#   `theta_forcing='ice_giants_obs_like'` and the three namelist items that come
 +#   with it. It is invoked BY PATH, from here, because it must not apply to any
 +#   other suite — see patches/optional/README.md and dependencies.yaml.
++#
++# The three are chained with `&&`, not `;`: rose runs the command through a shell
++# without `-e`, so with `;` the task's exit status is the LAST command's and a failed
++# clone or a failed patch would still report SUCCESS to cylc — leaving
++# build_lfric_atm to compile a missing or half-patched tree.
 +#
 +# `mirrors` points at this repo's vendored submodules by default (MIRROR_LOC in
 +# rose-suite.conf) instead of the Met Office mirror host, which does not exist here.
@@ -131,14 +136,14 @@ index fa73ea3..8d55f1f 100644
 -JULES_REMOTE=git@github.com:MetOffice/JULES.git
 -JULES_FALLBACK=stable
 -SOCRATES_REMOTE=git@github.com:MetOffice/socrates.git
-+default=merge_sources.py -d $CYLC_WORKFLOW_RUN_DIR ; \
-+       =bash "$REPO_ROOT/examples/science-suites/site/patch-sources.sh" "$SOURCE_ROOT" ; \
++default=merge_sources.py -d $CYLC_WORKFLOW_RUN_DIR && \
++       =bash "$REPO_ROOT/examples/science-suites/site/patch-sources.sh" "$SOURCE_ROOT" && \
 +       =LFRIC_SRC_ROOT="$SOURCE_ROOT" bash "$REPO_ROOT/patches/optional/32-lfric_apps-ice-giants-forcing-patch.sh"
-+mirrors=merge_sources.py -d $CYLC_WORKFLOW_RUN_DIR --mirrors --mirror_loc=$MIRROR_LOC ; \
-+       =bash "$REPO_ROOT/examples/science-suites/site/patch-sources.sh" "$SOURCE_ROOT" ; \
++mirrors=merge_sources.py -d $CYLC_WORKFLOW_RUN_DIR --mirrors --mirror_loc=$MIRROR_LOC && \
++       =bash "$REPO_ROOT/examples/science-suites/site/patch-sources.sh" "$SOURCE_ROOT" && \
 +       =LFRIC_SRC_ROOT="$SOURCE_ROOT" bash "$REPO_ROOT/patches/optional/32-lfric_apps-ice-giants-forcing-patch.sh"
-+tokens=merge_sources.py -d $CYLC_WORKFLOW_RUN_DIR --tokens ; \
-+       =bash "$REPO_ROOT/examples/science-suites/site/patch-sources.sh" "$SOURCE_ROOT" ; \
++tokens=merge_sources.py -d $CYLC_WORKFLOW_RUN_DIR --tokens && \
++       =bash "$REPO_ROOT/examples/science-suites/site/patch-sources.sh" "$SOURCE_ROOT" && \
 +       =LFRIC_SRC_ROOT="$SOURCE_ROOT" bash "$REPO_ROOT/patches/optional/32-lfric_apps-ice-giants-forcing-patch.sh"
 diff --git a/suites/u-dt000/app/lfric_atm/rose-app.conf b/suites/u-dt000/app/lfric_atm/rose-app.conf
 index 1d754af..586fd68 100644
