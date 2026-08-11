@@ -36,12 +36,13 @@ rename** landed. Branch `stage3-science-suites`, PR #8.
   - dn704 now **targets the cray variant** (the srun launcher won't drive spack mpich).
     Earlier spack/mpiexec runs (`run2`, single-node TCP) are superseded. dr932 is now also
     cray/srun (single-node); both could be scaled multi-node by raising the rank count.
-- **All suites run on the cray environment now** (mesh→`srun`, `LAUNCH_SCRIPT`→`site/bin/launch-exe`,
-  no mpiexec). dn704 = multi-node + XIOS server; dr932 = single-node attached; dt000 = config
-  ported (mirrors dn704) but NOT run (ice-giant blocked, follow-up 1).
-- **u-dt000** config ported to cray/srun (validates) but still **blocked on its missing science**
-  (see follow-up 1) — not run. Infra fixes in place (`env-script = eval $(rose task-env)` for
-  `ROSE_DATA`; `--mem=0`).
+- **All suites run on the cray environment now** (mesh→`srun`, no mpiexec).
+  dn704 = multi-node + dedicated XIOS server via `site/bin/launch-exe`; dr932 and dt000 =
+  single-node, XIOS attached, stock Met Office `launch-exe`.
+- **u-dt000 is unblocked and runs end-to-end** — see follow-up 1. It is no longer a copy:
+  pinned submodule (`vendor/uoe_science_suites`) + `patches/41-*`, the Met Office
+  `merge_sources.py` extract, namelists re-derived by `rose app-upgrade vn2.2 → vn3.2`,
+  and its ice-giant science supplied by `patches/optional/32-*`.
 - **Mechanism (b) — per-suite offline source** (commit `09ca75a`): each suite has a
   `dependencies.yaml`; `examples/science-suites/site/extract-sources.sh` extracts each
   declared `repo@ref` OFFLINE from the vendored local mirrors (`git archive`, no network)
@@ -59,30 +60,28 @@ extract re-runs from the mirror). Logs: `~/cylc-run/<id>/run1/log/job/<cycle>/<t
 
 ---
 
-## Follow-up 1 — Locate + stage the u-dt000 ice-giant LFRic fork (BLOCKER)
+## Follow-up 1 — Locate + stage the u-dt000 ice-giant LFRic fork (DONE)
 
-**Why:** u-dt000's science is `theta_forcing='ice_giants_obs_like'` (namelist
-`external_forcing`). Verified absent from **both** the vendored vn3.1.1 **and** the
-suite's own declared mainline `lfric_apps@vn2.2` (`git archive vn2.2 | grep` → empty;
-`held_suarez_sigma_b` is a hardcoded `parameter` in both, not a namelist field). The
-upstream suite's extract points only at MetOffice mainline, which lacks the science — so
-the forcing lives in a **fork the suite never references**.
+**It was Denis Sergeev's branch**, `dennissergeev/lfric_apps@ice_giants_tf`
+(`b57ddcc9`), and he named it himself when asked. Two commits of science on top of
+`vn3.0`: the ice-giants forcing kernel, the `ice_giants_obs_like` metadata value, and —
+the thing the run actually died on — `held_suarez_sigma_b` / `wind_relax_time_scale` /
+`theta_relax_time_scale` promoted from hardcoded Fortran `parameter`s to namelist items.
 
-**Steps:**
-1. Ask upstream (UniExeter RSE — the suites repo maintainers) **where the ice-giant
-   forcing branch lives** (likely an Exeter fork of `lfric_apps`, or a MOSRS branch not
-   migrated to git). Get the remote URL + ref.
-2. Stage it ONCE into the local mirror (online, then offline thereafter):
-   `git -C vendor/lfric_apps remote add <fork> <url> && git -C vendor/lfric_apps fetch <fork>`
-   (+ any matching `lfric_core`/physics refs the fork needs — check its `dependencies.sh`).
-3. Point `examples/science-suites/u-dt000/dependencies.yaml` `lfric_apps` (and deps) at
-   that ref. If the fork is a *branch on top of a tag*, see follow-up 2.
-4. Run u-dt000; iterate the run task on any remaining vn-schema gaps (methodology above).
-5. If the fork needs a different PSyclone/XIOS than the env pins (`py-psyclone@3.2.2`,
-   `xios@2701`) → it's an L2 case needing a second env; flag to maintainer before building.
+It is **not** declared in `dependencies.yaml`, and that is deliberate: the branch is
+still at vn3.0 (Denis has not had time to upgrade it), and merging it onto `2026.07.1`
+conflicts in the gungho rose-meta, which `merge_sources.py` treats as a hard error. So
+the merge is done once and carried as
+`patches/optional/32-lfric_apps-ice-giants-forcing-patch.sh` — opt-in, applied by
+u-dt000's own extract task, because its `compulsory=true` metadata items would
+invalidate u-dr932's and u-dn704's namelists. The `.patch` file is what to hand back to
+Denis; when he rebases, `dependencies.yaml` takes the two-source form and the patch is
+deleted.
 
-**Done when:** u-dt000 runs end-to-end with its real ice-giant forcing, **or** the fork is
-confirmed unavailable/inaccessible (documented in PR #8 with whom was asked).
+u-dt000 moved to the full u-dr932 arrangement at the same time — pinned submodule
+(`vendor/uoe_science_suites`) + `patches/41-*`, the Met Office `merge_sources.py`
+extract, and its namelists re-derived by `rose app-upgrade vn2.2 → vn3.2` rather than
+hand-ported. See `examples/science-suites/u-dt000/README.md`.
 
 ## Follow-up 2 — Merge-fork-onto-tag support (SUPERSEDED for u-dr932; open for the rest)
 
@@ -96,10 +95,16 @@ against what Denis runs is a real diff and directly the PR to send him. It runs 
 *upstream* extract
 (`merge_sources.py` from SimSys_Scripts), which implements fork-merge natively — so on
 that suite the feature is simply present, and reimplementing it here would be
-duplicating a Met Office tool. The remaining work is to move u-dn704 and u-dt000 onto
-the same extract when they are next re-validated, and then retire
-`extract-sources.sh` altogether. The offline property is not lost: `USE_MIRRORS=true`
-with `--mirror_loc=$REPO_ROOT/vendor/mirrors` clones from the vendored submodules.
+duplicating a Met Office tool. **u-dt000 has since moved onto the same extract** (`vendor/uoe_science_suites`
++ `patches/41-*`), so the remaining work is u-dn704 alone, after which
+`extract-sources.sh` is retired altogether. The offline property is not lost:
+`USE_MIRRORS=true` with `--mirror_loc=$REPO_ROOT/vendor/mirrors` clones from the
+vendored submodules.
+
+Note what u-dt000 proved about the fork-merge feature itself: `merge_sources.py`
+implements it, but it fails on any conflict outside `rose-stem/`, so a fork branch that
+has fallen behind mainline cannot be declared this way at all. When that happens the
+answer is a forward-port patch (`patches/optional/`), not a workaround in the extract.
 
 **Note on Follow-up 3's "dead upstream extract Jinja — DONE".** That cleanup removed
 `MIRROR_LOC`/`USE_MIRRORS`/`USE_TOKENS`/`ROSE_APP_COMMAND_KEY` from the suites. For

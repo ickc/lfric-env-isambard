@@ -10,8 +10,10 @@ config. So these examples run the suites *that* way, rather than reinventing it.
 > `scripts/build.sh`). These suites are **not** that core — they are things you do
 > *with* it. Treat them as templates to copy and adapt. u-dr932 is
 > [Denis Sergeev's own suite](https://github.com/dennissergeev/lfric_egp_bench);
-> u-dn704 and u-dt000 come from the upstream
+> u-dn704 and u-dt000 come from the (now archived)
 > [Isambard3-LFRic-Env-Science-Suites](https://github.com/UniExeterRSE/Isambard3-LFRic-Env-Science-Suites).
+> u-dr932 and u-dt000 are carried as **pinned submodules + a patch**, not copies;
+> u-dn704 is still a copy.
 
 The environment Stage 1 builds already ships `cylc`, `rose` and `rose_picker` in
 its view (dependencies of `lfric-apps-isambard`), so there is nothing extra to
@@ -122,24 +124,39 @@ science the model already implements. When a suite's science needs **code** that
 model lacks, no namelist edit can bridge the gap — that's a *source* / build-time
 divergence. The clean way to express it is the upstream-native per-suite
 `dependencies.yaml` (each LFRic-source repo with `source:`+`ref:`, which can even merge
-a fork onto a tag); see `PLAN.md` for the offline-extract design. u-dt000 is the hard
-case: its `ice_giants_obs_like` forcing is in **neither** the vendored `2026.07.1` (vn3.2) **nor**
-its own declared mainline vn2.2 — it needs a fork the suite doesn't reference, which
-must be located upstream first. See `PLAN.md`.
+a fork onto a tag).
+
+**u-dt000 was the hard case, and it is worth reading as the worked example.** Its
+`theta_forcing='ice_giants_obs_like'` is in no MetOffice tag at all: it lives on
+[`dennissergeev/lfric_apps@ice_giants_tf`](https://github.com/dennissergeev/lfric_apps/tree/ice_giants_tf),
+which also promotes three Held-Suarez constants to namelist items — the reason the run
+died on `Cannot match namelist object name held_suarez_sigma_b` for so long. The
+two-source `dependencies.yaml` form is exactly the right expression of that and does not
+work *yet*, because the branch is still based on vn3.0 and merging it onto `2026.07.1`
+conflicts in the gungho rose-meta. So the merge is done once, here, and carried as an
+**opt-in** source patch (`patches/optional/32-lfric_apps-ice-giants-forcing-*`) that the
+suite's own extract task applies — opt-in because its new metadata items are
+`compulsory=true` and would break every other suite's namelists. Full story in
+[`u-dt000/README.md`](u-dt000/README.md).
 
 ## How it works here (what was adapted)
 
-**u-dr932 is not copied into this repo at all.** It is a pinned submodule of its
-upstream repository (`vendor/lfric_egp_bench`), staged by
-`patches/40-lfric_egp_bench-u-dr932-patch.sh` — the same treatment Stage 1 gives its
-LFRic sources. The script runs `rose app-upgrade` to the version this env builds, then
-`git apply`s `patches/40-lfric_egp_bench-u-dr932-isambard3.patch`. Anything upstream
-absorbs drops out of that patch — it shrank by 40 lines the day Denis merged our
-placement fix. So the difference
-between what a scientist runs and what runs here is a **real diff**: `git apply -R`
-gives the upstream suite back, and the patch file is directly the pull request to send
-upstream. u-dn704 and u-dt000 are still copies, and move to this when they are next
-re-validated.
+**u-dr932 and u-dt000 are not copied into this repo at all.** Each is a pinned
+submodule of its upstream repository (`vendor/lfric_egp_bench`,
+`vendor/uoe_science_suites`), staged by its own patch script — the same treatment
+Stage 1 gives its LFRic sources. The script runs `rose app-upgrade` to the version this
+env builds, then `git apply`s the site diff:
+
+| suite | submodule | staged by | site diff |
+|---|---|---|---|
+| u-dr932 | `vendor/lfric_egp_bench` @ `e6ee57a` | `patches/40-lfric_egp_bench-u-dr932-patch.sh` | 419 lines, 5 files |
+| u-dt000 | `vendor/uoe_science_suites` @ `8fc5bc8` | `patches/41-uoe_science_suites-u-dt000-patch.sh` | 587 lines, 8 files |
+
+Anything upstream absorbs drops out of that patch — u-dr932's shrank by 40 lines the day
+Denis merged our placement fix. So the difference between what a scientist runs and what
+runs here is a **real diff**: `git apply -R` (or `pixi run unpatch`) gives the upstream
+suite back, and the patch file is directly the pull request to send upstream. u-dn704 is
+still a copy, and moves to this when it is next re-validated.
 
 Beyond that, each suite is the upstream Rose/Cylc suite with three site-specific
 changes, so it runs against *our* env on Isambard 3:
@@ -163,11 +180,16 @@ changes, so it runs against *our* env on Isambard 3:
    vendored. The default is `USE_TOKENS=true` — https clones from github, which need
    no token for these public repositories.
 
-   > u-dn704 and u-dt000 have not been moved to this yet; they still use
+   u-dt000 appends one more step, by path: `patches/optional/32-lfric_apps-ice-giants-
+   forcing-patch.sh`, which is its *science* — Denis Sergeev's `ice_giants_tf` branch
+   forward-ported to vn3.2. It is deliberately outside the shared stack, because the
+   metadata it adds is `compulsory=true` and would make every other suite's namelists
+   invalid. See [`patches/optional/README.md`](../../patches/optional/README.md).
+
+   > u-dn704 has not been moved to this yet; it still uses
    > `site/extract-sources.sh`, which materialises a ref offline from the vendored
    > submodules with `git archive`. It is a strict-offline equivalent of the
-   > `USE_MIRRORS=true` path above, and will be retired when those two are next
-   > re-validated.
+   > `USE_MIRRORS=true` path above, and will be retired when it is next re-validated.
 2. **Env activation → our modulefile.** `site/activate-env.sh` (passed as the
    suite's `ACTIVATE_ENV`) is a **thin activator**: it `module load`s
    `lfric-env/<version>/$LFRIC_STACK`, and that one module supplies the whole
