@@ -352,6 +352,13 @@ one that scales across nodes (see Prerequisites).
 takes the install down with it (`difft` on this machine crashes with
 `<jemalloc>: Unsupported system page size`). Launch with `env -u GIT_EXTERNAL_DIFF`.
 
+**If `cylc install` says `previous installations were from <some other path>`:** a
+workflow name is bound to the directory it was first installed from, recorded in
+`~/cylc-run/<suite>/_cylc-install/source`. Moving a suite from a copy under
+`examples/science-suites/` into a `vendor/` submodule changes that path — u-dt000 hit
+this, and u-dn704 will. Either `cylc clean <suite> -y` (which deletes the old runs) or,
+to keep them, repoint that one symlink at the suite's new home.
+
 ## Adapting this for your own suite
 
 Prefer **pinning the upstream suite as a submodule under `vendor/` and carrying a
