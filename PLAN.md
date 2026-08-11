@@ -43,12 +43,18 @@ rename** landed. Branch `stage3-science-suites`, PR #8.
   pinned submodule (`vendor/uoe_science_suites`) + `patches/41-*`, the Met Office
   `merge_sources.py` extract, namelists re-derived by `rose app-upgrade vn2.2 → vn3.2`,
   and its ice-giant science supplied by `patches/optional/32-*`.
-- **Mechanism (b) — per-suite offline source** (commit `09ca75a`): each suite has a
-  `dependencies.yaml`; `examples/science-suites/site/extract-sources.sh` extracts each
-  declared `repo@ref` OFFLINE from the vendored local mirrors (`git archive`, no network)
-  into `SOURCE_ROOT/{lfric_apps,lfric_core,physics/*}`, then applies the LFRic-source
-  patch stack (`patches/{10,11,30}` honour `LFRIC_SRC_ROOT`, default `vendor/`). Strict
-  offline: a ref absent from the mirror is a hard error naming what to stage.
+- **u-dn704 is no longer a copy either** — pinned submodule (`vendor/uoe_science_suites`,
+  the same one u-dt000 lives in) + `patches/42-*`, the Met Office `merge_sources.py`
+  extract, namelists re-derived by `rose app-upgrade vn3.0 → vn3.2`. Its upstream is
+  MOSRS `roses-u/d/n/7/0/4/trunk` @ r345586, which the UniExeter repo's committed
+  `.svn/wc.db` records; see `examples/science-suites/u-dn704/README.md`.
+- **Mechanism (b) — per-suite source** (commit `09ca75a`): each suite has a
+  `dependencies.yaml` and the upstream `merge_sources.py` extract, with
+  `site/patch-sources.sh` appended to apply the LFRic-source patch stack
+  (`patches/{10,11,30,31}` honour `LFRIC_SRC_ROOT`, default `vendor/`). The bespoke
+  offline extract this repo carried for u-dn704 (`site/extract-sources.sh`, `git
+  archive` from the vendored mirrors) is **retired**: `USE_MIRRORS=true` with
+  `MIRROR_LOC=$PWD/vendor/mirrors` is the same property via upstream's own mechanism.
 - **Rename** (commit `bedd813`): Stage 2/3 reframed as sibling *examples* on the one
   prerequisite build (Stage 1); `examples/lfric-atm → examples/minimal-compile`.
 
@@ -95,9 +101,9 @@ against what Denis runs is a real diff and directly the PR to send him. It runs 
 *upstream* extract
 (`merge_sources.py` from SimSys_Scripts), which implements fork-merge natively — so on
 that suite the feature is simply present, and reimplementing it here would be
-duplicating a Met Office tool. **u-dt000 has since moved onto the same extract** (`vendor/uoe_science_suites`
-+ `patches/41-*`), so the remaining work is u-dn704 alone, after which
-`extract-sources.sh` is retired altogether. The offline property is not lost:
+duplicating a Met Office tool. **u-dt000 and u-dn704 have since moved onto the same
+extract** (`vendor/uoe_science_suites` + `patches/41-*` / `patches/42-*`), and
+`extract-sources.sh` is retired. The offline property is not lost:
 `USE_MIRRORS=true` with `--mirror_loc=$REPO_ROOT/vendor/mirrors` clones from the
 vendored submodules.
 

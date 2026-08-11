@@ -68,16 +68,18 @@ example} × {`cray`, `spack`}. This is the one outcome that must stay green. The
 - `vendor/` — pinned submodules, three classes. **Env/build tooling (Stage 1):** spack,
   spack-packages, mo-spack-packages. **Science suites:** lfric_egp_bench (Denis
   Sergeev's repo — u-dr932) and uoe_science_suites (the archived UniExeterRSE repo —
-  u-dt000). Each suite is staged by its `patches/4x-*-patch.sh`, NOT copied into
-  this repo.
+  u-dt000 and u-dn704, both of which it carries as `svn checkout`s of the MOSRS
+  `roses-u` suites; the `.svn/wc.db` records the upstream URL + revision). Each suite
+  is staged by its `patches/4x-*-patch.sh`, NOT copied into this repo.
   **LFRic source (the examples build from these):**
   lfric_apps, lfric_core, physics/{casim,jules,socrates,ukca} — these are the
   `dependencies.yaml` set; the science-suites treat them as local mirrors to extract a
   declared ref from — `vendor/mirrors/` presents them in the Met Office
   `MetOffice/<repo>.git` layout so the upstream extract can use them offline.
 - `patches/*-patch.sh` — applied in sorted order by `patch-all.sh` (top level only,
-  `-maxdepth 1`). `40-lfric_egp_bench-*` / `41-uoe_science_suites-*` stage the u-dr932 /
-  u-dt000 suites (`rose app-upgrade` + a `git apply` of the site diff); both are inert
+  `-maxdepth 1`). `40-lfric_egp_bench-*` / `41-uoe_science_suites-*` /
+  `42-uoe_science_suites-*` stage the u-dr932 / u-dt000 / u-dn704 suites
+  (`rose app-upgrade` + a `git apply` of the site diff); all three are inert
   without `rose`, so `run-suite.sh` re-runs them with the env activated.
   `patches/optional/` is **outside** that stack: per-suite LFRic-source patches a single
   suite opts into by path from its own extract task, because applying them everywhere

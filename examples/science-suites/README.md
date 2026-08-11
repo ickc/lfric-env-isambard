@@ -11,9 +11,10 @@ config. So these examples run the suites *that* way, rather than reinventing it.
 > *with* it. Treat them as templates to copy and adapt. u-dr932 is
 > [Denis Sergeev's own suite](https://github.com/dennissergeev/lfric_egp_bench);
 > u-dn704 and u-dt000 come from the (now archived)
-> [Isambard3-LFRic-Env-Science-Suites](https://github.com/UniExeterRSE/Isambard3-LFRic-Env-Science-Suites).
-> u-dr932 and u-dt000 are carried as **pinned submodules + a patch**, not copies;
-> u-dn704 is still a copy.
+> [Isambard3-LFRic-Env-Science-Suites](https://github.com/UniExeterRSE/Isambard3-LFRic-Env-Science-Suites),
+> which carries them as `svn checkout`s of the Met Office MOSRS suites
+> `roses-u/d/n/7/0/4/trunk` and `d/t/0/0/0/trunk`. **All three are carried as pinned
+> submodules + a patch**, not copies.
 
 The environment Stage 1 builds already ships `cylc`, `rose` and `rose_picker` in
 its view (dependencies of `lfric-apps-isambard`), so there is nothing extra to
@@ -151,12 +152,12 @@ env builds, then `git apply`s the site diff:
 |---|---|---|---|
 | u-dr932 | `vendor/lfric_egp_bench` @ `e6ee57a` | `patches/40-lfric_egp_bench-u-dr932-patch.sh` | 419 lines, 5 files |
 | u-dt000 | `vendor/uoe_science_suites` @ `8fc5bc8` | `patches/41-uoe_science_suites-u-dt000-patch.sh` | 587 lines, 8 files |
+| u-dn704 | `vendor/uoe_science_suites` @ `8fc5bc8` | `patches/42-uoe_science_suites-u-dn704-patch.sh` | 389 lines, 7 files |
 
 Anything upstream absorbs drops out of that patch — u-dr932's shrank by 40 lines the day
 Denis merged our placement fix. So the difference between what a scientist runs and what
 runs here is a **real diff**: `git apply -R` (or `pixi run unpatch`) gives the upstream
-suite back, and the patch file is directly the pull request to send upstream. u-dn704 is
-still a copy, and moves to this when it is next re-validated.
+suite back, and the patch file is directly the pull request to send upstream.
 
 Beyond that, each suite is the upstream Rose/Cylc suite with three site-specific
 changes, so it runs against *our* env on Isambard 3:
@@ -296,8 +297,8 @@ mechanism — it does four things you could do by hand:
 . examples/science-suites/site/activate-env.sh
 
 # 2. stage the suite: rose app-upgrade to the version this env builds, then the
-#    Isambard 3 site patch. Only for suites that live in a submodule (u-dr932);
-#    u-dn704 and u-dt000 are directories here and need no staging.
+#    Isambard 3 site patch. All three suites live in a submodule, so all three
+#    need this (patches/41-* for u-dt000, patches/42-* for u-dn704).
 bash patches/40-lfric_egp_bench-u-dr932-patch.sh
 
 # 3. write the `isambard3` Slurm platform + a roomy cylc-run dir into ~/.cylc/flow
@@ -355,8 +356,8 @@ takes the install down with it (`difft` on this machine crashes with
 **If `cylc install` says `previous installations were from <some other path>`:** a
 workflow name is bound to the directory it was first installed from, recorded in
 `~/cylc-run/<suite>/_cylc-install/source`. Moving a suite from a copy under
-`examples/science-suites/` into a `vendor/` submodule changes that path — u-dt000 hit
-this, and u-dn704 will. Either `cylc clean <suite> -y` (which deletes the old runs) or,
+`examples/science-suites/` into a `vendor/` submodule changes that path — both u-dt000
+and u-dn704 hit this. Either `cylc clean <suite> -y` (which deletes the old runs) or,
 to keep them, repoint that one symlink at the suite's new home.
 
 ## Adapting this for your own suite
@@ -364,8 +365,15 @@ to keep them, repoint that one symlink at the suite's new home.
 Prefer **pinning the upstream suite as a submodule under `vendor/` and carrying a
 patch**, as u-dr932 does, over copying it in — a copy drifts silently, which is exactly
 how the two u-dr932s came to differ. Wire it up in `run-suite.sh`'s `case` block and add
-a `patches/NN-<repo>-<suite>-patch.sh`. Where the suite is not in git (a MOSRS/rosie
-suite, say), a copy is the only option and the rest of this section still applies.
+a `patches/NN-<repo>-<suite>-patch.sh`.
+
+**"It's a MOSRS suite, so it can't be a submodule" is worth testing before you accept
+it.** u-dn704 and u-dt000 both live in `roses-u` subversion, which is SSO-gated and not
+git — but a repository that already contains a checkout of them does exist and *can* be
+pinned, and its `.svn/wc.db` even records which revision it was taken at (see
+[`u-dn704/README.md`](u-dn704/README.md)). Pinning that and diffing against it beats
+copying, because the copy is the thing that drifts. Only fall back to a copy when there
+is genuinely no git object anywhere that contains the suite.
 
 Then start from **what upstream already does** and change only what the platform forces
 you to; u-dr932 is the worked example and its [`README.md`](u-dr932/README.md) is the

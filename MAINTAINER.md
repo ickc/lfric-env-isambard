@@ -52,7 +52,7 @@ vendor/                 # pinned submodules
   spack/  spack-packages/                     # Spack + its builtin packages
   lfric_apps/  lfric_core/  mo-spack-packages/ #   LFRic sources (mirrors) + MO package repo
   lfric_egp_bench/                            #   upstream science suite (u-dr932), patched
-  uoe_science_suites/                         #   upstream science suite (u-dt000), patched
+  uoe_science_suites/                         #   upstream science suites (u-dt000, u-dn704), patched
   physics/{casim,jules,socrates,ukca}/         #   LFRic physics sources (examples only)
 patches/                # one *-patch.sh per upstream patch (applied in sorted order)
   optional/             #   per-suite source patches, OUTSIDE the stack — a suite opts
