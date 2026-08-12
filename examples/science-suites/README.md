@@ -335,16 +335,23 @@ mechanism — it does four things you could do by hand:
 . examples/science-suites/site/activate-env.sh
 
 # 2. stage the suite: rose app-upgrade to the version this env builds, then the
-#    Isambard 3 site patch. All three suites live in a submodule, so all three
-#    need this (patches/41-* for u-dt000, patches/42-* for u-dn704).
+#    Isambard 3 site patch. Every suite needs this; which stager, and what it
+#    patches, depends on where the suite lives:
+#      u-dr932  patches/40-lfric_egp_bench-u-dr932-patch.sh  -> the vendor/ submodule
+#      u-dt000  patches/suites/41-roses-u-u-dt000-patch.sh   -> ~/roses/u-dt000
+#      u-dn704  patches/suites/42-roses-u-u-dn704-patch.sh   -> ~/roses/u-dn704
+#    The patches/suites/ pair act on a MOSRS checkout in your $HOME, which is why
+#    they sit outside patch-all.sh's stack. LFRIC_SUITE_DIR moves the target.
 bash patches/40-lfric_egp_bench-u-dr932-patch.sh
 
 # 3. write the `isambard3` Slurm platform + a roomy cylc-run dir into ~/.cylc/flow
 bash scripts/setup-cylc.sh
 
 # 4. validate, install and play, telling the suite which environment to load.
-#    NOTE the path: u-dr932 is the STAGED SUBMODULE, not a directory under
-#    examples/science-suites/ (which holds only its README and known-issues).
+#    NOTE the path: it is the STAGED SUITE, never a directory under
+#    examples/science-suites/ (which holds only each suite's README and
+#    known-issues). For u-dr932 that is the submodule below; for u-dt000 and
+#    u-dn704 it is ~/roses/<suite>, the MOSRS checkout.
 cylc vip vendor/lfric_egp_bench/src/suites/u-dr932 --workflow-name u-dr932 \
   -S "REPO_ROOT='$PWD'" \
   -S "LFRIC_STACK='cray'" \
@@ -393,10 +400,11 @@ takes the install down with it (`difft` on this machine crashes with
 
 **If `cylc install` says `previous installations were from <some other path>`:** a
 workflow name is bound to the directory it was first installed from, recorded in
-`~/cylc-run/<suite>/_cylc-install/source`. Moving a suite from a copy under
-`examples/science-suites/` into a `vendor/` submodule changes that path — both u-dt000
-and u-dn704 hit this. Either `cylc clean <suite> -y` (which deletes the old runs) or,
-to keep them, repoint that one symlink at the suite's new home.
+`~/cylc-run/<suite>/_cylc-install/source`. Moving a suite changes that path — u-dr932
+when it became a `vendor/` submodule, and u-dt000 and u-dn704 when they became MOSRS
+checkouts under `~/roses/<suite>`. Either `cylc clean <suite> -y` (which deletes the
+old runs) or, to keep them, repoint that one symlink at the suite's new home (for the
+MOSRS suites, `~/roses/<suite>`, or wherever `LFRIC_SUITE_DIR` points).
 
 ## Adapting this for your own suite
 
