@@ -20,7 +20,9 @@
 #     rosie checkout u-dt000            # -> ~/roses/u-dt000 (needs a MOSRS account)
 #     svn update -r 348703 ~/roses/u-dt000
 #
-# Set LFRIC_SUITE_DIR to use a checkout somewhere else.
+# Set LFRIC_SUITE_DIR to use a checkout somewhere else. The checkout MUST be at r348703 --
+# a mismatch is a hard error, because that is the revision this patch was validated
+# against; LFRIC_SUITE_REV overrides the pin for someone re-cutting deliberately.
 #
 # Two steps, in this order:
 #
@@ -55,7 +57,9 @@ _here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
 REPO_ROOT="${PIXI_PROJECT_ROOT:-$(cd "$_here/../.." && pwd)}"
 
 SUITE_ID="u-dt000"
-SUITE_REV="348703"
+# The revision this patch was cut and validated against. Overridable, but only
+# deliberately: see the revision check below.
+SUITE_REV="${LFRIC_SUITE_REV:-348703}"
 SUITE_URL="https://code.metoffice.gov.uk/svn/roses-u/d/t/0/0/0/trunk"
 SUITE_DIR="${LFRIC_SUITE_DIR:-$HOME/roses/$SUITE_ID}"
 PATCH_FILE="$_here/41-roses-u-u-dt000-isambard3.patch"
@@ -84,13 +88,22 @@ if ! command -v rose >/dev/null 2>&1; then
 fi
 [ -f "$PATCH_FILE" ] || { fail "site patch missing: $PATCH_FILE"; exit 1; }
 
-# `svn info` on a working copy is local -- no network, no credentials.
+# --- the revision this patch was cut against --------------------------------
+# `svn info` on a working copy is local -- no network, no credentials. A mismatch is a
+# HARD error, and it is checked HERE, before step 1: `rose app-upgrade` rewrites the
+# checkout's app configs, so a wrong revision must be rejected while the tree is still
+# pristine rather than left half-staged on an unvalidated baseline. To base on a
+# different revision deliberately: LFRIC_SUITE_REV=<rev> (and re-cut the patch).
 if command -v svn >/dev/null 2>&1 && [ -d "$SUITE_DIR/.svn" ]; then
   _rev="$(svn info --show-item revision "$SUITE_DIR" 2>/dev/null | tr -d '[:space:]')"
   if [ -n "$_rev" ] && [ "$_rev" != "$SUITE_REV" ]; then
-    warn "$SUITE_DIR is at r$_rev; this patch was cut against r$SUITE_REV."
-    warn "  svn update -r $SUITE_REV $SUITE_DIR   (or re-cut the patch -- see"
-    warn "  examples/science-suites/$SUITE_ID/README.md, 'Regenerating the site patch')"
+    fail "$SUITE_DIR is at r$_rev; this patch was cut and validated against r$SUITE_REV."
+    fail "  Nothing has been changed. Pin the checkout back:"
+    fail "    svn update -r $SUITE_REV $SUITE_DIR"
+    fail "  or base on r$_rev deliberately (re-cut the patch first -- see"
+    fail "  examples/science-suites/$SUITE_ID/README.md, 'Regenerating the site patch'):"
+    fail "    LFRIC_SUITE_REV=$_rev ..."
+    exit 1
   fi
 fi
 

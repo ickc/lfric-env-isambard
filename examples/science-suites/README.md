@@ -181,6 +181,11 @@ rosie checkout u-dn704                       # -> ~/roses/u-dn704
 svn update -r 361458 ~/roses/u-dn704         # the revision the patch is cut against
 ```
 
+That `svn update` is not optional: the stagers read `svn info` and **refuse** a checkout
+at any other revision, because a site patch that happens to apply to a neighbouring
+revision would hand you a suite nobody validated. To base on a different revision
+deliberately, re-cut the patch and say so with `LFRIC_SUITE_REV=<rev>`.
+
 `rosie checkout` shells out to `svn checkout`; stock `/usr/bin/svn` on the login nodes is
 enough (the Met Office's patched svn matters for FCM keywords and commits, not for
 reading). If svn asks for your password on every command, there is no usable password
