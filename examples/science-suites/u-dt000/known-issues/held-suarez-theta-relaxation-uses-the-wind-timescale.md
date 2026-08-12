@@ -108,7 +108,7 @@ wind_relax_time_scale=100.0
 - And the two timescales are equal anyway, so even defect (a) would be numerically
   invisible here.
 
-The 72 000-step run recorded in [`../README.md`](../README.md) is therefore unaffected.
+The 28 800-step run recorded in [`../README.md`](../README.md) is therefore unaffected.
 This is a latent trap for the *next* configuration, not a correction to that result.
 
 ## 5. The Codex wording

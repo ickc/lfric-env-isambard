@@ -101,7 +101,7 @@ task would fail before the build ever started.
 So the merge is done here instead, once, and carried as
 [`patches/optional/32-lfric_apps-ice-giants-forcing.patch`](../../../patches/optional/32-lfric_apps-ice-giants-forcing.patch)
 — 312 lines over five files, applied to the extracted tree by the suite's own
-`git_extract_lfric` task. The conflict resolution is the union of the two: his
+`extract` task. The conflict resolution is the union of the two: his
 `ice_giants_obs_like` inserted where he put it (after `deep_hot_jupiter`), mainline's
 `nudging` kept last, and his `held_suarez_sigma_b` trigger appended to mainline's
 `wind_forcing` trigger list. The regeneration recipe is in the header of
@@ -129,10 +129,13 @@ Written up in
 Worth stating first, because it is most of the suite:
 
 - **The science.** `theta_forcing='ice_giants_obs_like'`, `held_suarez_sigma_b=0.97`,
-  `theta_relax_time_scale=100.0`, `wind_relax_time_scale=100.0`, C48 multigrid, 50
-  levels over a 3.0 × 10⁵ m domain at a 2.527 × 10⁷ m planet radius, dt = 120 s,
-  108 ranks, analytic initialisation, gnu. All the suite's own values.
-- **The task graph** (`git_extract_lfric → build_* → generate_mesh → lfric_atm`), the
+  `theta_relax_time_scale=100.0`, `wind_relax_time_scale=100.0`, C96 multigrid, 50
+  levels over a 3.0 × 10⁵ m domain at a 2.527 × 10⁷ m planet radius, dt = 300 s,
+  `PHYSICS_CONF='stability'`, 108 ranks, analytic initialisation. All the suite's own
+  values — and its *current* ones: r348703 runs C96_MG at dt = 300 s where the copy
+  this repo used to carry ran C48_MG at dt = 120 s. Only `COMPILER` moves, `'cce'` →
+  `'gnu'`, because this environment is a GCC 14.3 build.
+- **The task graph** (`extract → build_* → generate_mesh → lfric_atm`), the
   task names, and every other platform's branch (`ex`, Met Office ex1a). The file still
   renders unchanged off Isambard 3; nothing here is conditional on being in this repo.
 - **`launch-exe`.** `LAUNCH_SCRIPT` is still
@@ -222,10 +225,11 @@ them offline from `vendor/mirrors/`.
 | `app/mesh/rose-app.conf` | `mpiexec -n 1` → `srun --ntasks=1`. The cray environment is cray-mpich and ships no `mpiexec`. Same one rank. |
 | `[scheduler]` | **added** `install = dependencies.yaml` — not one of the paths `cylc install` copies by default, and `merge_sources.py` reads it out of the installed run directory. |
 | `lfric_atm` environment | **added** `MPICH_ENV_DISPLAY` / `MPICH_OFI_NIC_VERBOSE`, so `job.out` records the OFI provider — `provider: cxi` is the one-line proof the run is on Slingshot rather than TCP. |
-| `rose-suite.conf` `EXPT_RUNLEN` | `P10000D` → `P100D`. One cycle rather than 100 — the only change to the run itself. Same 72 000-timestep job. |
-| `rose-suite.conf` `LFRIC_CPU` | `PT2H` → `PT12H`, the Slurm `--time`. One cycle is 72 000 timesteps; u-dr932's 17 280 timesteps of comparable work take 1 h 37 m on the same node count, so `PT2H` was never going to be enough. |
-| `rose-suite.conf` `VN` | `'2.2'` → `'3.2'`, matching `dependencies.yaml` and the app `meta=`. Nothing reads it. |
-| `rose-suite.conf` `[file:bin/tweak_iodef]` | `::core2.2` over ssh → `::main` over https. Clones anonymously, no SSO. |
+| `rose-suite.conf` `EXPT_RUNLEN` | `P10000D` → `P100D`. One cycle rather than 100 — the only change to the run itself. Same 28 800-timestep per-cycle job. |
+| `rose-suite.conf` `LFRIC_CPU` | `PT1H` → `PT12H`, the Slurm `--time`. One cycle is 28 800 timesteps at C96_MG; the comparable C48 cycle took 3 h 56 m here, so an hour was never going to be enough. |
+| `rose-suite.conf` `VN` | `'3.0'` → `'3.2'`, matching `dependencies.yaml` and the app `meta=`. Nothing reads it. |
+| `rose-suite.conf` `[file:bin/*]` | the three `git:localmirrors:` sources → `https://github.com/MetOffice/…` at the same `::main`. `localmirrors:` is a git alias a Met Office site configures; there is no such host here, and all three repositories are public, so https clones anonymously with no SSO. |
+| `rose-suite.conf` `COMPILER` | `'cce'` → `'gnu'`. This environment is built with GCC 14.3; there is no Cray Compiler Environment build of it. |
 
 ## What was observed on this environment
 
@@ -341,4 +345,3 @@ its own convention.
 
 Keep the patch to those five files: anything mechanical belongs in the upgrade step, not
 here, and anything to do with the ice-giant forcing belongs in `patches/optional/32-*`.
-`patches/optional/32-*`, not here.
