@@ -117,7 +117,7 @@ and the upgrade step comes back.
 
 | where | change |
 |---|---|
-| `lfric_atm [[[directives]]]` | `--nodes=1 --ntasks=6` → `--nodes=2 --ntasks=25 --ntasks-per-node=13`. 24 model ranks + 1 XIOS server. `--ntasks-per-node=13` is what **splits the model across both nodes** (ranks 0–12 / 13–23) instead of letting the block layout pack all 24 onto node 1 with only the server on node 2 — which would make this a single-node run wearing a two-node hat. |
+| `lfric_atm [[[directives]]]` | upstream's PBS `-l select=1` / `-q=normal` → `--nodes=2 --ntasks=25 --ntasks-per-node=13`. 24 model ranks + 1 XIOS server. `--ntasks-per-node=13` is what **splits the model across both nodes** (ranks 0–12 / 13–23) instead of letting the block layout pack all 24 onto node 1 with only the server on node 2 — which would make this a single-node run wearing a two-node hat. |
 | same | **added** `--exclusive` and `--mem=64G`. SelectType here is `select/cons_tres`, so without `--exclusive` the job lands on partially-occupied nodes and competes for memory bandwidth — see [`staging/dr932-mpi-scaling/`](../../../staging/dr932-mpi-scaling/). |
 | `[[ISAMBARD3]]` | `CORES_PER_NODE` 128 → 144. A Grace node is 2 × 72 cores; 128 is the Met Office EX1A number. |
 | `lfric_atm [[[environment]]]` | **added** `MPICH_ENV_DISPLAY` / `MPICH_OFI_NIC_VERBOSE`, so `job.out` records the OFI provider — `provider: cxi` is the one-line proof the run is on Slingshot rather than falling back to TCP. |
@@ -151,8 +151,8 @@ u-dr932 and u-dt000 do **not** use it: single-node with XIOS attached, where ups
 | where | change |
 |---|---|
 | `[[root]] init-script` | **added.** Cylc runs each job under `bash -l`, which resets Lmod and purges the module the scheduler had loaded — the job then dies with `rose: command not found` before any family `pre-script` runs. `init-script` is the only hook early enough, and it is also before the task `[[[environment]]]` block, so the module selection is exported there. |
-| `[[BUILD]]` | `FC`/`LDMPI` = `mpif90`, `FPP` = `"cpp -traditional-cpp"` → `$FC`/`$LDMPI`/`$FPP`. Inherit the toolchain from the loaded module instead of naming a compiler, so `LFRIC_STACK=cray\|spack` needs no edit here. This is the Stage-1 contract. |
-| `rose-suite.conf` | `ISAMBARD3_SPACK_SETUP` and `ACTIVATE_ENV` emptied — they pointed at the UniExeter port's own in-tree spack. `run-suite.sh` injects `ACTIVATE_ENV` via `cylc vip -S`, and emptying `SPACK_SETUP` is what makes the `ISAMBARD3` pre-script take that branch instead of `spack env activate`. |
+| `[[BUILD]]` | **added** `FC = $FC`, `LDMPI = $LDMPI`, `FPP = $FPP`. Upstream names no compiler here at all — it inherits the EX1A module loads — so this adds rather than replaces: take the toolchain from the loaded module, and `LFRIC_STACK=cray\|spack` needs no edit here. This is the Stage-1 contract. |
+| `rose-suite.conf` | **added** `ACTIVATE_ENV=''`, declared in `meta/rose-meta.conf` alongside it. Empty is the Met Office case (no activation); `run-suite.sh` injects the real path via `cylc vip -S`, and the root `init-script` sources it. |
 
 ### Data — `BIG_DATA_DIR`
 
