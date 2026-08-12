@@ -171,8 +171,8 @@ mirror host here.
 | where | change |
 |---|---|
 | `[[root]] init-script` | **added.** Cylc runs each job under `bash -l`, which resets Lmod and purges the module the scheduler had loaded — the job then dies with `cylc: command not found` before any `pre-script` runs. `init-script` is the only hook early enough, and it is also before the task `[[[environment]]]` block, so the module selection is exported there. |
-| `[[root]] env-script` | **added** `eval $(rose task-env)`, so `ROSE_DATA` exists for the `lfric_atm` task's inline `mkdir` (which runs under `set -u`, before `rose task-run`). |
-| `[[BUILD]]` | `FC`/`LDMPI` `= mpif90` and `FPP = "cpp -traditional-cpp"` → `= $FC` / `$LDMPI` / `$FPP`. Inherit the compiler from the loaded module instead of naming one, so `LFRIC_STACK=cray\|spack` needs no edit here. |
+| `[[root]] env-script` | **unchanged** — `eval $(rose task-env)` is upstream's, and it is why `ROSE_DATA` exists for the `lfric_atm` task's inline `mkdir` (which runs under `set -u`, before `rose task-run`). Listed here because the `init-script` above sits next to it and the two are easy to confuse. |
+| `[[BUILD]]` | **added** `FC = $FC`, `LDMPI = $LDMPI`, `FPP = $FPP`. Upstream names no compiler here — it inherits the site's module loads — so this adds rather than replaces: take the compiler from the loaded module, and `LFRIC_STACK=cray\|spack` needs no edit here. |
 | `rose-suite.conf` `EX_HOST` | `'ex'` (Monsoon) → `'isambard3'`, the switch that selects the new `ISAMBARD3` family; `ISAMBARD3_RUN_PARTITION` / `ISAMBARD3_SHARED_PARTITION` / `ACTIVATE_ENV` added alongside it. `run-suite.sh` injects the real `ACTIVATE_ENV` path via `cylc vip -S`. |
 | `[[ISAMBARD3]]` | **added**, alongside upstream's `[[EX1A]]` — `platform = isambard3`, `RUN_METHOD = srun`, and no module loads of its own, because the root `init-script` has already loaded ours. Every `EX1A` branch is untouched, so the file still renders as upstream elsewhere. |
 | `[[root]] [[[environment]]]` | **added** `REPO_ROOT`, `LFRIC_STACK`, `LFRIC_PREFIX`. |
