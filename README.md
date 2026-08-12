@@ -39,9 +39,12 @@ Example: science-suites   —  RUN a real suite   (cylc on the login node ─▶
   on the built env the way scientists do — `cylc` schedules the suite and submits to
   Slurm; each suite declares its LFRic source refs in `dependencies.yaml` and compiles
   its own `lfric_atm` (e.g. `pixi run run-suite u-dr932`, on the default `cray` env).
-  u-dr932 and u-dt000 are the upstream suites themselves — pinned submodules plus a
-  patch each, so what we changed for Isambard 3 is a reviewable diff; they need
-  `pixi run init-suites` first.
+  Each suite is the upstream tree itself plus a patch, so what we changed for Isambard 3
+  is a reviewable diff — but they live in two different places, so getting one differs:
+  u-dr932 is a pinned submodule (`pixi run init-suites` first), while u-dn704 and
+  u-dt000 are Met Office rose suites in MOSRS subversion that you check out yourself
+  with `rosie checkout` (needs a MOSRS account). `run-suite.sh` prints the exact command
+  if the checkout is missing.
 
 There are **two dependency variants**, chosen with `LFRIC_STACK`:
 
