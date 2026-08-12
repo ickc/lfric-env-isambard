@@ -155,6 +155,12 @@ Index: flow.cylc
              CORE_ROOT_DIR = $SOURCE_ROOT/lfric_core
              PHYSICS_ROOT = $SOURCE_ROOT
 +{% if EX_HOST == 'isambard3' %}
++            {# [isambard3] ADDED: where this repo lives (the extract task applies this
++               repo's patch stack) + the env selection site/activate-env.sh reads. FIRST:
++               cylc emits these in order, so LAUNCH_SCRIPT below can expand $REPO_ROOT. #}
++            REPO_ROOT = {{ REPO_ROOT }}
++            LFRIC_STACK = {{ LFRIC_STACK }}
++            LFRIC_PREFIX = {{ LFRIC_PREFIX }}
 +            {# [isambard3] CHANGED: off the Met Office meto launcher. That one wires the
 +               dedicated-XIOS-server MPMD up only under RUN_METHOD=mpiexec (Hydra colon
 +               syntax); its srun path emits a bare `srun <exe>` with no server at all.
@@ -163,12 +169,6 @@ Index: flow.cylc
 +               client and server in one MPI_COMM_WORLD. Same contract otherwise
 +               (BIN_DIR, EXEC_NAME, TOTAL_RANKS, XIOS_SERVER_*), so it stays a drop-in. #}
 +            LAUNCH_SCRIPT = $REPO_ROOT/examples/science-suites/site/bin
-+            {# [isambard3] ADDED: where this repo lives, so the extract task can apply its
-+               LFRic-source patch stack to the freshly cloned tree; and the env selection
-+               read by site/activate-env.sh. #}
-+            REPO_ROOT = {{ REPO_ROOT }}
-+            LFRIC_STACK = {{ LFRIC_STACK }}
-+            LFRIC_PREFIX = {{ LFRIC_PREFIX }}
 +{% else %}
              LAUNCH_SCRIPT = $APPS_ROOT_DIR/rose-stem/site/meto/common/bin
 +{% endif %}
