@@ -325,7 +325,8 @@ svn revert -R $W && svn update -r <the revision> $W
 mkdir -p $T/a $T/b && tar -C $W --exclude=.svn -cf - . | tar -C $T/a -xf -
 
 # 2. re-apply the site edits on top of that, then diff a/ against b/
-git apply -p1 --directory=. -C $W patches/suites/41-roses-u-u-dt000-isambard3.patch
+#    (git's global -C, before the subcommand: `git apply -C` is context lines)
+git -C $W apply -p1 $PWD/patches/suites/41-roses-u-u-dt000-isambard3.patch
 #   ... adjust ...
 tar -C $W --exclude=.svn -cf - . | tar -C $T/b -xf -
 (cd $T && diff -ruN a b) > patches/suites/41-roses-u-u-dt000-isambard3.patch

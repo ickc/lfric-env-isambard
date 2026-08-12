@@ -255,13 +255,15 @@ When the pinned revision moves, or the environment's LFRic version changes. Ther
 upgrade step to work around here, so the checkout's own `svn diff` **is** the patch:
 
 ```bash
+# from the root of this repo, so $PWD resolves the patch paths below
 W=~/roses/u-dn704
 
 # 1. clean checkout at the revision you want to base on
 svn revert -R $W && svn update -r <the revision> $W
 
 # 2. re-apply the site edits, adjust, and dump the diff
-git apply -p0 -C $W patches/suites/42-roses-u-u-dn704-isambard3.patch
+#    (git's global -C, before the subcommand: `git apply -C` is context lines)
+git -C $W apply -p0 $PWD/patches/suites/42-roses-u-u-dn704-isambard3.patch
 #   ... adjust ...
 (cd $W && svn diff .) > patches/suites/42-roses-u-u-dn704-isambard3.patch
 
