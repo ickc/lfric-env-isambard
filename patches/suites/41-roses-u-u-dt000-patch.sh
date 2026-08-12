@@ -45,8 +45,11 @@
 # patches/optional/32-lfric_apps-ice-giants-forcing-patch.sh, which the staged suite's
 # extract task applies to the tree it just cloned. See the note in dependencies.yaml.
 #
-# BOTH STEPS ARE SKIPPED, cleanly, when their preconditions are absent -- no checkout, or
-# no `rose` on PATH. It never half-applies. Idempotent: re-running is a no-op.
+# BOTH STEPS ARE SKIPPED, cleanly, when there is no suite here to patch at all -- no
+# checkout, or no `rose` on PATH. Every OTHER missing precondition (the rose-meta the
+# upgrade reads, a wrong revision, a patch that will not apply) is a HARD error, because
+# run-suite.sh reads exit 0 as "staged" and would go on to `cylc vip` the UNPATCHED Met
+# Office suite. It never half-applies. Idempotent: re-running is a no-op.
 #
 # This is NOT part of patch-all.sh's stack (it lives under patches/suites/, which
 # patch-all's `-maxdepth 1` excludes) -- a suite checked out in the user's home is not
@@ -127,9 +130,11 @@ for _d in "${_meta_dirs[@]}"; do
   if [ -n "$_d" ] && [ -d "$_d/jules-lfric" ]; then _have_jules_meta=true; break; fi
 done
 if [ "$_have_jules_meta" != true ]; then
-  warn "no jules-lfric rose-meta on ROSE_META_PATH; skipping the $SUITE_ID patch."
-  warn "  git submodule update --init vendor/lfric_apps vendor/lfric_core vendor/physics/jules"
-  exit 0
+  fail "no jules-lfric rose-meta on ROSE_META_PATH; cannot upgrade $SUITE_ID's app configs."
+  fail "  Nothing has been changed. Initialise the LFRic trees the meta comes from:"
+  fail "    git submodule update --init vendor/lfric_apps vendor/lfric_core vendor/physics/jules"
+  fail "  (or point ROSE_META_PATH at your own.)"
+  exit 1
 fi
 
 upgrade_app() {
