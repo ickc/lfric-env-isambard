@@ -421,7 +421,7 @@ diff -ruN a/rose-suite.conf b/rose-suite.conf
 +# git mirror host, which does not exist here, so the extract falls to --tokens: https clones
 +# from github, which work anonymously for these public repositories. To extract offline from
 +# this repo's vendored submodules instead:
-+#   run-suite.sh u-dt000 -S USE_MIRRORS=false -S "MIRROR_LOC='$PWD/vendor/mirrors'"
++#   run-suite.sh u-dt000 -S USE_MIRRORS=true -S "MIRROR_LOC='$PWD/vendor/mirrors'"
  MIRROR_LOC="localmirrors:"
  PHYSICS_CONF='stability'
  TOTAL_RANKS_REQ=108
