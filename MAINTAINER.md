@@ -55,6 +55,10 @@ vendor/                 # pinned submodules
   lfric_egp_bench/                            #   upstream science suite (u-dr932), patched
   physics/{casim,jules,socrates,ukca}/         #   LFRic physics sources (examples only)
 patches/                # one *-patch.sh per upstream patch (applied in sorted order)
+                        #   patch-all.sh is -maxdepth 1: BOTH subdirs below are outside it
+  suites/               #   stagers for the MOSRS suites (41-u-dt000, 42-u-dn704) + their
+                        #   .patch files. Out of the stack because they patch a checkout
+                        #   in the user's $HOME; run-suite.sh runs them, not patch-all.sh
   optional/             #   per-suite source patches, OUTSIDE the stack — a suite opts
                         #   in by path from its own extract task (see its README)
 logs/                   # sbatch stdout (.gitkeep tracked; *.out ignored)
