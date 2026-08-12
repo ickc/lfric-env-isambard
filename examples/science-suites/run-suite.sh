@@ -62,19 +62,29 @@ case "$SUITE" in
   u-dt000)
     SUITE_DIR="${LFRIC_SUITE_DIR:-$HOME/roses/$SUITE}"
     SUITE_PATCH="$REPO_ROOT/patches/suites/41-roses-u-u-dt000-patch.sh"
-    SUITE_GET="rosie checkout $SUITE && svn update -r 348703 \$HOME/roses/$SUITE
-         (needs a MOSRS account; \`rosie\` comes from the env activated above)"
+    SUITE_GET=mosrs
     ;;
   u-dn704)
     SUITE_DIR="${LFRIC_SUITE_DIR:-$HOME/roses/$SUITE}"
     SUITE_PATCH="$REPO_ROOT/patches/suites/42-roses-u-u-dn704-patch.sh"
-    SUITE_GET="rosie checkout $SUITE && svn update -r 361458 \$HOME/roses/$SUITE
-         (needs a MOSRS account; \`rosie\` comes from the env activated above)"
+    SUITE_GET=mosrs
     ;;
   *)
     die "no such suite: $SUITE  (known: u-dn704, u-dr932, u-dt000)"
     ;;
 esac
+
+# The revision to check out is the stager's SUITE_REV -- read it out of the stager rather
+# than repeating it here. The stager rejects any OTHER revision as a hard error, so a
+# second copy of the number would, the first time the pin moves, hand the user a command
+# whose result the very next step refuses. If the read fails, say where to look instead of
+# printing a wrong revision.
+if [ "$SUITE_GET" = mosrs ]; then
+  # shellcheck disable=SC2016  # the $ and \( are sed's, not the shell's
+  _rev="$(sed -n 's/^SUITE_REV="\${LFRIC_SUITE_REV:-\([0-9][0-9]*\)}".*$/\1/p' "$SUITE_PATCH")"
+  SUITE_GET="rosie checkout $SUITE && svn update -r ${_rev:-<SUITE_REV in $(basename "$SUITE_PATCH")>} \$HOME/roses/$SUITE
+         (needs a MOSRS account; \`rosie\` comes from the env activated above)"
+fi
 
 # common.sh sets PREFIX/MODULE*/LFRIC_STACK and respects LFRIC_PREFIX/LFRIC_STACK.
 # shellcheck source=scripts/common.sh
