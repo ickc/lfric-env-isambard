@@ -229,76 +229,57 @@ them offline from `vendor/mirrors/`.
 
 ## What was observed on this environment
 
-**It runs end-to-end.** First time this suite has got past its own namelists.
-Validated on the **cray** environment (`lfric-env/v2026.07.21/cray`), one Grace node,
-108 ranks `--exclusive`:
+**It runs end-to-end**, on the upstream Met Office suite (r348703), on the **cray**
+environment (`lfric-env/v2026.07.21/cray`), one Grace node, 108 ranks `--exclusive`
+(`run5`):
 
 | step | |
 |---|---|
-| `git_extract_lfric` | 32 s — six repositories cloned from github over https on the login node, then the patch stack, then the ice-giants forcing patch |
-| `build_mesh` / `generate_mesh` | 2 m 39 s / 5 s |
-| `build_lfric_atm` | 15 m 18 s |
-| `lfric_atm` | **3 h 56 m 20 s** for the full 72 000-timestep cycle (100 days at dt = 120 s), `COMPLETED` |
+| `extract` | 30 s — six repositories cloned from github over https, then the patch stack (`PATCH_SOURCES_OK`), then `Applied dennissergeev/lfric_apps@ice_giants_tf (forward-ported to vn3.2)` |
+| `build_mesh` / `generate_mesh` | 1 m 03 s / 1 s |
+| `build_lfric_atm` | 8 m 57 s |
+| `lfric_atm` | **5 h 00 m 21 s** for the full 28 800-timestep cycle (100 days at dt = 300 s, C96_MG), `COMPLETED` |
 
 The forcing is demonstrably the one we came for: `slow_physics: Running Ice Giants
-obs-like theta forcing` appears at **every** timestep, from 1 to 72 000. Before this
-work the same suite stopped at `Cannot match namelist object name
+obs-like theta forcing` appears at **every** timestep — 28 800 occurrences, from step 1.
+Before this work the same suite stopped at `Cannot match namelist object name
 held_suarez_sigma_b` / `STOP 1` while reading its namelists, having never taken a step.
+
+> **This is a different cycle from the one previously recorded here** (3 h 56 m for
+> 72 000 steps at C48_MG, dt = 120 s). Upstream has moved its own science on: r348703
+> runs **C96_MG at dt = 300 s with `PHYSICS_CONF='stability'`**. Four times the cells at
+> two-and-a-half times the step. That configuration is the suite's, and this repo does
+> not second-guess it — so the timings are not comparable with the earlier entry, and are
+> not meant to be.
 
 Health of the integration, over the whole cycle:
 
-- **Dry mass conserved to 1 × 10⁻¹³ relative** — `0.902491049911896637E+21` at
-  initialisation against `0.902491049911807902E+21` at timestep 72 000.
-- **No `NaN`, no `Infinity`, no `ERROR` or `WARNING`** anywhere in the 4.5 M-line
-  model log. Worth noting against
-  [u-dr932's open issue](../u-dr932/known-issues/energy-diagnostics-overflow-at-32-bit.md):
-  this suite runs at `RDEF_PRECISION=64` and its conservation block prints finite
-  values throughout, which is consistent with that overflow being a 32-bit
-  intermediates problem rather than a model blow-up.
-- **Bounded, not diverging.** The W2 wind dofs rise from ~7 × 10⁸ at timestep 1 and
-  plateau at ~6 × 10¹² by ~timestep 2 000, then stay there for the remaining 70 000
-  steps; `theta` stays in 171–1550 K. Transport Courant numbers stay ~10⁻³ and the
-  BLOCK_GCR solver converges every step.
-- **XIOS wrote everything, attached, on Lustre**: 20 diagnostic files, one native-grid
-  and one lat-lon per 10-day chunk (~29 MB and ~26 MB each), plus `lfric_initial.nc`
-  (18 MB) — 3.4 GB in total — and the end-of-cycle checkpoint.
+- **Dry mass conserved to 6.2 × 10⁻⁷ relative** — `0.902478229285E+21` at initialisation
+  against `0.902478792235E+21` at timestep 28 800.
+- **Bounded, not diverging.** `theta` stays in 171–1562 K and `u_in_w3` in
+  −45 to +85 at the final step; the solver converges every step.
+- **The three energy-conservation diagnostics read `Infinity`, from timestep 1** —
+  `total energy`, `horizontal kinetic energy` and `vertical kinetic energy`, 28 800 times
+  each. This is **not new and not ours**: it is exactly
+  [u-dr932's open issue](../u-dr932/known-issues/energy-diagnostics-overflow-at-32-bit.md),
+  a 32-bit overflow in one kernel's intermediates, and upstream runs this suite at
+  `RDEF_PRECISION=32`. The physical fields are finite and mass is conserved, so it is a
+  diagnostic defect rather than a blow-up. (An earlier entry here reported no `Infinity`
+  for this suite; that run was at `RDEF_PRECISION=64`, which is consistent with the same
+  diagnosis.)
+- **XIOS wrote everything, attached, on Lustre**: 269 NetCDF files, 0.58 GB, plus the
+  end-of-cycle checkpoint.
+
+`MPICH_ENV_DISPLAY`/`MPICH_OFI_NIC_VERBOSE` are set by the port, but there is no
+`provider: cxi` line to point at and there should not be: at `TOTAL_RANKS_REQ=108` this
+is a **single-node** job (`--nodes=1 --ntasks=108 --ntasks-per-node=108 --exclusive`), so
+every rank talks over on-node shared memory and the interconnect is never exercised.
+[u-dn704](../u-dn704/README.md) is the multi-node case.
 
 **What this does not establish is the science.** The run is numerically healthy and the
-forcing is active, but nobody has compared these fields against Guendelman & Kaspi
-(2025) or against Denis' own output, and the wind magnitudes above are raw W2 degrees of
-freedom (fluxes scaled by face area at a 2.527 × 10⁷ m planet radius), not velocities in
-m s⁻¹. Treat this as "the suite now runs its intended forcing on this environment", not
-as a validation of the result.
-
-The environment reaches the `srun` step — `MPICH_ENV_DISPLAY` output appears in the
-step's stderr, and nothing in the binary or its RPATH supplies that. There is no
-`provider: cxi` line to point at, and there should not be: this is a single-node job, so
-cray-mpich never brings up the OFI netmod for inter-node traffic. u-dn704 is where the
-Slingshot path is exercised.
-
-### Two build failures on the way, both worth recording
-
-**1. `chi2llr` gained four arguments between vn3.0 and vn3.2.** Denis' kernel called the
-old 7-argument form and would not compile:
-
-```
-ice_giants_kernel_mod.F90:135:
-  call chi2llr(coords(1), coords(2), coords(3), ipanel, lon, lat, radius)
-Error: Type mismatch in argument 'geometry'; passed REAL(8) to INTEGER(4)
-```
-
-Mainline updated all of its own external_forcing kernels for that (`vn3.0`'s
-`deep_hot_jupiter_kernel_mod` has the identical old call; `vn3.2`'s has the new one).
-**Git cannot see this class of breakage** — the change is in a file the branch never
-touched, so the merge is clean and the compile is not. It is now part of the
-forward-port patch, and its header says to diff the branch's call sites against the
-sibling kernels first when regenerating.
-
-**2. `$CYLC_TASK_WORK_DIR` is shared across retries**, so the second attempt found both
-the PSyclone-generated `jules_extra_kernel_mod.f90` and the source `.F90` and died with
-`More than one match for kernel file`. A re-run artefact only — a fresh run never sees
-it — but if you `cylc trigger` a failed `build_lfric_atm`, delete
-`work/<cycle>/build_lfric_atm/` first.
+forcing is active, but nobody has compared these fields against Guendelman & Kaspi (2025)
+or against Denis' own output. Treat this as "the suite now runs its intended forcing on
+this environment", not as a validation of the result.
 
 ## Running it
 
