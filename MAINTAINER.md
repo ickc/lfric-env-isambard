@@ -39,10 +39,11 @@ examples/science-suites/ # SCIENCE-SUITE EXAMPLES: run real Rose/Cylc LFRic suit
   site/activate-env.sh   #   ACTIVATE_ENV: module-load the env for suite tasks
   site/patch-sources.sh  #   apply the LFRic patch stack to a suite's extracted tree
   site/bin/launch-exe    #   srun launcher (drop-in for the MO one; XIOS-server MPMD)
-  u-dn704/ u-dr932/ u-dt000/  # only README + known-issues: the SUITES are the
-                          #   submodules vendor/lfric_egp_bench (u-dr932) and
-                          #   vendor/uoe_science_suites (u-dn704, u-dt000), staged
-                          #   by patches/40-*, 41-* and 42-*
+  site/rose.conf         #   rosie's `u-` prefix map, so `rosie checkout` works here
+  u-dn704/ u-dr932/ u-dt000/  # only README + known-issues: the SUITES live upstream.
+                          #   u-dr932 = submodule vendor/lfric_egp_bench (patches/40-*);
+                          #   u-dn704 + u-dt000 = MOSRS checkouts in ~/roses
+                          #   (patches/suites/42-*, 41-*)
 spack-env/              # Spack env TEMPLATES (tracked); build.sh instantiates under PREFIX
   common.yaml           #   shared config: repos, gcc@14.3.0 external, python
   cray/spack.yaml       #   variant: system cray-mpich + Cray HDF5/netCDF (default)
@@ -52,7 +53,6 @@ vendor/                 # pinned submodules
   spack/  spack-packages/                     # Spack + its builtin packages
   lfric_apps/  lfric_core/  mo-spack-packages/ #   LFRic sources (mirrors) + MO package repo
   lfric_egp_bench/                            #   upstream science suite (u-dr932), patched
-  uoe_science_suites/                         #   upstream science suites (u-dt000, u-dn704), patched
   physics/{casim,jules,socrates,ukca}/         #   LFRic physics sources (examples only)
 patches/                # one *-patch.sh per upstream patch (applied in sorted order)
   optional/             #   per-suite source patches, OUTSIDE the stack — a suite opts

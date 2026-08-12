@@ -9,12 +9,10 @@ config. So these examples run the suites *that* way, rather than reinventing it.
 > The reproducible **core** of this repo is the environment (Stage 1,
 > `scripts/build.sh`). These suites are **not** that core — they are things you do
 > *with* it. Treat them as templates to copy and adapt. u-dr932 is
-> [Denis Sergeev's own suite](https://github.com/dennissergeev/lfric_egp_bench);
-> u-dn704 and u-dt000 come from the (now archived)
-> [Isambard3-LFRic-Env-Science-Suites](https://github.com/UniExeterRSE/Isambard3-LFRic-Env-Science-Suites),
-> which carries them as `svn checkout`s of the Met Office MOSRS suites
-> `roses-u/d/n/7/0/4/trunk` and `d/t/0/0/0/trunk`. **All three are carried as pinned
-> submodules + a patch**, not copies.
+> [Denis Sergeev's own suite](https://github.com/dennissergeev/lfric_egp_bench) on
+> GitHub; u-dn704 and u-dt000 are Met Office suites in MOSRS subversion
+> (`roses-u/d/n/7/0/4/trunk` and `d/t/0/0/0/trunk`). **None is copied into this repo** —
+> each is fetched from its own upstream and adapted by a patch.
 
 The environment Stage 1 builds already ships `cylc`, `rose` and `rose_picker` in
 its view (dependencies of `lfric-apps-isambard`), so there is nothing extra to
@@ -74,15 +72,16 @@ accept.
 | Suite | Science case | Status on this env |
 |-------|--------------|--------------------|
 | **u-dr932** | GungHo Shallow/Deep Hot Jupiter temperature forcing (C48 multigrid, idealised) | ✅ **builds + runs end-to-end** — and is now **Denis Sergeev's suite itself** ([`lfric_egp_bench@e6ee57a`](https://github.com/dennissergeev/lfric_egp_bench/tree/main/src/suites/u-dr932)), with his working configuration, rather than a copy of an older snapshot of it; see [`u-dr932/README.md`](u-dr932/README.md) for the itemised `[isambard3]` diff. Validated on the **cray** environment: one Grace node, 108 ranks `--exclusive`, the full 17 280-timestep cycle (deep hot Jupiter, C48, l66, mesh stretched 0.5 towards −90/0, dt = 50 s) in **1 h 37 m** against 5 h 07 m – 8 h 59 m for the same cycle on the UoE stack, with all three XIOS diagnostic files written. Self-contained (radiation off, analytic init; no external data). Needs `patches/31-lfric_apps-slow-physics-mphys-field-patch.sh`: vn3.2 stopped creating the UM-physics fields for a forcing-only config while `slow_physics` still fetched `dtheta_mphys`. |
-| **u-dn704** | LFRic Atm NWP GAL9 @ C12 | ✅ **builds + runs end-to-end, multi-node** on the **cray** environment — 24 model ranks + 1 dedicated XIOS server across 2 nodes over **Slingshot (cxi)**; the XIOS server wrote the native-UGRID parallel-HDF5 output (`lfric_gal_diagnostics.nc` ~62 MB); re-validated on the `2026.07.1` / vn3.2 stack (62 MB, S144 to completion). The NWP ancils, start dump and `um_aux` ctldata are **staged on Isambard 3** at the default `BIG_DATA_DIR=/projects/u35v/sw/lfricdata` and read offline at run time (GA9 spectra come from the vendored socrates — no MO `um_aux` clone, no SSO). |
-| **u-dt000** | LFRic Atm Uranus/Neptune (ice giant) temperature forcing | ✅ **builds + runs end-to-end** — the long-standing `held_suarez_sigma_b` blocker is **resolved**. Its science, `theta_forcing='ice_giants_obs_like'`, comes from [`dennissergeev/lfric_apps@ice_giants_tf`](https://github.com/dennissergeev/lfric_apps/tree/ice_giants_tf) forward-ported vn3.0 → vn3.2 (`patches/optional/32-*`); the suite itself is now the upstream one as a pinned submodule + `patches/41-*`, on the Met Office `merge_sources.py` extract, with its namelists re-derived by `rose app-upgrade vn2.2 → vn3.2`. Validated on the **cray** environment: one Grace node, 108 ranks `--exclusive`, the full 72 000-timestep cycle (C48, 50 levels, dt = 120 s, analytic start) in **3 h 56 m**, `slow_physics: Running Ice Giants obs-like theta forcing` at every step, dry mass conserved to 1 × 10⁻¹³, no NaN/Infinity, 3.4 GB of XIOS output. Self-contained (no ancils, no start dump). **The science is not validated** — only that the suite runs its intended forcing here; see [`u-dt000/README.md`](u-dt000/README.md). |
+| **u-dn704** | LFRic Atm NWP GAL9 @ C12 | ✅ **builds + runs end-to-end, multi-node** on the **cray** environment — 24 model ranks + 1 dedicated XIOS server across 2 nodes over **Slingshot (cxi)**; the XIOS server wrote the native-UGRID parallel-HDF5 output (`lfric_gal_diagnostics.nc` ~62 MB); re-validated on the `2026.07.1` / vn3.2 stack. Now built on the upstream Met Office suite itself (`roses-u/d/n/7/0/4/trunk` @ r361458) + `patches/suites/42-*`, which needs **no** version-alignment step: upstream took this suite to vn3.2 / `2026.07.1` in July 2026, the same release this environment builds. The NWP ancils, start dump and `um_aux` ctldata are **staged on Isambard 3** at the default `BIG_DATA_DIR=/projects/u35v/sw/lfricdata` and read offline at run time (GA9 spectra come from the vendored socrates — no MO `um_aux` clone, no SSO). |
+| **u-dt000** | LFRic Atm Uranus/Neptune (ice giant) temperature forcing | ✅ **builds + runs end-to-end** — the long-standing `held_suarez_sigma_b` blocker is **resolved**. Its science, `theta_forcing='ice_giants_obs_like'`, comes from [`dennissergeev/lfric_apps@ice_giants_tf`](https://github.com/dennissergeev/lfric_apps/tree/ice_giants_tf) forward-ported vn3.0 → vn3.2 (`patches/optional/32-*`); the suite itself is the upstream Met Office one, checked out from MOSRS (`roses-u/d/t/0/0/0/trunk` @ r348703) + `patches/suites/41-*`, on the Met Office `merge_sources.py` extract, with its namelists re-derived by `rose app-upgrade vn3.0 → vn3.2`. Validated on the **cray** environment: one Grace node, 108 ranks `--exclusive`, the full 72 000-timestep cycle (C48, 50 levels, dt = 120 s, analytic start) in **3 h 56 m**, `slow_physics: Running Ice Giants obs-like theta forcing` at every step, dry mass conserved to 1 × 10⁻¹³, no NaN/Infinity, 3.4 GB of XIOS output. Self-contained (no ancils, no start dump). **The science is not validated** — only that the suite runs its intended forcing here; see [`u-dt000/README.md`](u-dt000/README.md). |
 
 ### Version alignment (forward-porting suite configs)
 
-This repo's vendored LFRic is **newer** (`2026.07.1` = apps vn3.2) than the upstream
-suites pin (vn3.0 / vn2.2), and these examples build `lfric_atm` from the vendored
-source (see below). So a suite's namelists must match **vn3.2**, not the version it
-was written for. These are mechanical, non-science edits — e.g. u-dr932/u-dn704's
+A suite's namelists must match the LFRic the environment builds (`2026.07.1` = apps
+vn3.2), not the version the suite was written for. How big that gap is depends on the
+suite, and it is not constant: **u-dn704 has no gap at all** now that it is taken from
+its real upstream, because the Met Office moved it to vn3.2 themselves; u-dr932 (vn3.1)
+and u-dt000 (vn3.0) still need the upgrade, which their stagers run. These are mechanical, non-science edits — e.g. u-dr932/u-dn704's
 `finite_element` namelist gained `coord_space='Wchi'` and `coord_order_nonprime=1`
 (required by vn3.1.1, absent in vn3.0). This is the legitimate adaptation: a
 scientist running on *this* env writes vn3.2 configs. The deeper a suite's
@@ -142,22 +141,56 @@ suite's own extract task applies — opt-in because its new metadata items are
 
 ## How it works here (what was adapted)
 
-**u-dr932 and u-dt000 are not copied into this repo at all.** Each is a pinned
-submodule of its upstream repository (`vendor/lfric_egp_bench`,
-`vendor/uoe_science_suites`), staged by its own patch script — the same treatment
-Stage 1 gives its LFRic sources. The script runs `rose app-upgrade` to the version this
-env builds, then `git apply`s the site diff:
+**No suite is copied into this repo.** Each one is fetched from its own upstream and
+staged by a patch script — the same treatment Stage 1 gives its LFRic sources — so the
+difference between what a scientist runs and what runs here is a **real diff**.
 
-| suite | submodule | staged by | site diff |
+Upstream comes in two kinds, because the suites have two kinds of home:
+
+| suite | upstream | staged by | site diff |
 |---|---|---|---|
-| u-dr932 | `vendor/lfric_egp_bench` @ `e6ee57a` | `patches/40-lfric_egp_bench-u-dr932-patch.sh` | 419 lines, 5 files |
-| u-dt000 | `vendor/uoe_science_suites` @ `8fc5bc8` | `patches/41-uoe_science_suites-u-dt000-patch.sh` | 587 lines, 8 files |
-| u-dn704 | `vendor/uoe_science_suites` @ `8fc5bc8` | `patches/42-uoe_science_suites-u-dn704-patch.sh` | 389 lines, 7 files |
+| u-dr932 | submodule `vendor/lfric_egp_bench` @ `e6ee57a` | `patches/40-lfric_egp_bench-u-dr932-patch.sh` | 419 lines, 5 files |
+| u-dt000 | MOSRS `roses-u/d/t/0/0/0/trunk` @ r348703 | `patches/suites/41-roses-u-u-dt000-patch.sh` | 434 lines, 5 files |
+| u-dn704 | MOSRS `roses-u/d/n/7/0/4/trunk` @ r361458 | `patches/suites/42-roses-u-u-dn704-patch.sh` | 455 lines, 7 files |
 
-Anything upstream absorbs drops out of that patch — u-dr932's shrank by 40 lines the day
-Denis merged our placement fix. So the difference between what a scientist runs and what
-runs here is a **real diff**: `git apply -R` (or `pixi run unpatch`) gives the upstream
-suite back, and the patch file is directly the pull request to send upstream.
+u-dr932 is Denis Sergeev's, on GitHub, so it is a pinned submodule. **u-dn704 and
+u-dt000 are Met Office rose suites and live in MOSRS subversion** — and are staying
+there: [simulation-systems#566](https://github.com/MetOffice/simulation-systems/discussions/566)
+moved the *source* extraction to git, explicitly *"not where the workflows themselves
+reside"*. There is nothing to vendor, so they are **checked out the way a Met Office
+scientist checks them out** (see below) and the site patch is applied to that checkout.
+
+Anything upstream absorbs drops out of the patch, and this is not theoretical: u-dr932's
+shrank by 40 lines the day Denis merged our placement fix, and when u-dn704 moved onto
+its real upstream it lost its whole `rose app-upgrade` step, because the Met Office had
+already taken that suite to vn3.2 and `2026.07.1` — the release this environment builds.
+Reversing the patch gives the upstream suite back (`git apply -R` / `pixi run unpatch`
+for the submodule, `svn revert -R` for the checkouts), and the patch file is directly the
+change to propose upstream.
+
+### Getting a suite from MOSRS
+
+`rosie` ships in the environment Stage 1 builds, and
+[`site/rose.conf`](site/rose.conf) gives it the `u-` prefix map that a Met Office site
+install would normally supply. You need a **MOSRS account** — `roses-u` is not
+anonymously readable.
+
+```bash
+. examples/science-suites/site/activate-env.sh
+rosie checkout u-dn704                       # -> ~/roses/u-dn704
+svn update -r 361458 ~/roses/u-dn704         # the revision the patch is cut against
+```
+
+`rosie checkout` shells out to `svn checkout`; stock `/usr/bin/svn` on the login nodes is
+enough (the Met Office's patched svn matters for FCM keywords and commits, not for
+reading). If svn asks for your password on every command, there is no usable password
+store configured — point it at gpg-agent (`password-stores = gpg-agent` in
+`~/.subversion/config`, a `pinentry-program` in `~/.gnupg/gpg-agent.conf`, and
+`export GPG_TTY=$(tty)` in your shell rc). That caches for the agent's TTL, per login
+node.
+
+`run-suite.sh` looks in `~/roses/<suite>` by default; set `LFRIC_SUITE_DIR` to use a
+checkout elsewhere. It prints the exact command above if the checkout is missing.
 
 Beyond that, each suite is the upstream Rose/Cylc suite with three site-specific
 changes, so it runs against *our* env on Isambard 3:

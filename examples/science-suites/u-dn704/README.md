@@ -4,59 +4,76 @@ This is the **Met Office EX example workflow**, run against this repo's environm
 It is the **multi-node** one of the three science-suite examples: 24 model ranks split
 across two Grace nodes over Slingshot, plus a dedicated XIOS server.
 
-It is **not a copy in this repo** — it is a pinned submodule plus a patch, the same
-treatment [`u-dr932`](../u-dr932/README.md) and [`u-dt000`](../u-dt000/README.md) get,
-and the same treatment Stage 1 gives its LFRic sources.
+It is **not a copy in this repo**, and not a vendored one either. It is the Met Office's
+suite, checked out from where it actually lives, plus a patch — the same treatment
+[`u-dr932`](../u-dr932/README.md) and [`u-dt000`](../u-dt000/README.md) get, and the same
+treatment Stage 1 gives its LFRic sources.
 
 ```
-vendor/uoe_science_suites/suites/u-dn704              the suite (submodule, pinned)
-patches/42-uoe_science_suites-u-dn704-patch.sh        stages it: rose app-upgrade, then...
-patches/42-uoe_science_suites-u-dn704-isambard3.patch ...this — the site diff, 389 lines
-examples/science-suites/u-dn704/                      only what this repo owns: this file
+~/roses/u-dn704                                     the suite (rosie checkout, pinned by revision)
+patches/suites/42-roses-u-u-dn704-patch.sh          stages it: the site patch, and nothing else
+patches/suites/42-roses-u-u-dn704-isambard3.patch   ...that — the site diff, 455 lines
+examples/science-suites/u-dn704/                    only what this repo owns: this file
 ```
 
-`git apply -R` (or `pixi run unpatch`) gives the upstream suite back; `git diff` in the
-submodule shows exactly what we changed. Every hunk carries an `[isambard3]` comment
-saying what it replaced and why; this file is the index of them.
+`svn revert -R ~/roses/u-dn704` gives the upstream suite back; `svn diff` in the checkout
+shows exactly what we changed — the patch file *is* that `svn diff`. Every hunk carries
+an `[isambard3]` comment saying what it replaced and why; this file is the index of
+them.
 
 ## Where upstream is
 
-Worth writing down, because it took some finding.
+Worth writing down, because it took some finding — and because the first answer was
+wrong.
 
 u-dn704 is a **Met Office rose suite**, and its home is MOSRS **subversion**:
 
 ```
-https://code.metoffice.gov.uk/svn/roses-u/d/n/7/0/4/trunk
+https://code.metoffice.gov.uk/svn/roses-u/d/n/7/0/4/trunk   @ r361458
 browse: https://code.metoffice.gov.uk/trac/roses-u/browser/d/n/7/0/4/trunk
 ```
 
 `vendor/lfric_apps/README.md` links it as the "MetOffice EX HPC" example suite (its
-sibling `u-dn674` is the Azure SPICE one). That repository is SSO-gated and is not git,
-so it cannot be a submodule, and `rose-suite.info` — `owner=jamesbruten`, an access
-list of Met Office names — confirms whose it is.
+sibling `u-dn674` is the Azure SPICE one), and `MetOffice/simulation-systems`'
+`standard_suites.rst` tells reviewers to `rosie co u-dn704`. `rose-suite.info` —
+`owner=jamesbruten`, an access list of Met Office names — confirms whose it is.
 
-What *can* be pinned is the **UniExeterRSE port** this repo already carries for
-u-dt000. That repository holds an `svn checkout` of the suite, `.svn` metadata and all,
-committed alongside it — which records exactly what it was taken from:
+**There is no git upstream, and there will not be one soon.**
+[simulation-systems#566](https://github.com/MetOffice/simulation-systems/discussions/566)
+moved the *source* extraction to git and says so explicitly: *"This changes where the
+Source code for the models is extracted from, **not** where the workflows themselves
+reside … we recommend keeping them in the roses repository for the time being."*
+`MetOffice/roses` and `roses-u` are 404, and a GitHub code search finds `u-dn704` only
+as a trac link. So the suite is **checked out**, not vendored — see
+[`../README.md`](../README.md), "Getting a suite from MOSRS".
+
+### The wrong answer, and how it was caught
+
+An earlier version of this branch pinned
+[`UniExeterRSE/Isambard3-LFRic-Env-Science-Suites`](https://github.com/UniExeterRSE/Isambard3-LFRic-Env-Science-Suites)
+as the upstream, because that (now archived) repository contains the suite — as a
+committed `svn checkout`, `.svn` metadata and all, which is how the MOSRS URL and
+revision were found in the first place:
 
 ```console
-$ python3 -c "import sqlite3;d=sqlite3.connect('vendor/uoe_science_suites/suites/u-dn704/.svn/wc.db');\
+$ python3 -c "import sqlite3;d=sqlite3.connect('suites/u-dn704/.svn/wc.db');\
 print(list(d.execute('select root from repository')));\
 print(list(d.execute(\"select repos_path,revision,changed_revision from nodes where local_relpath=''\")))"
 [('https://code.metoffice.gov.uk/svn/roses-u',)]
 [('d/n/7/0/4/trunk', 345586, 345479)]
 ```
 
-So: **git upstream = `vendor/uoe_science_suites` (pinned at `8fc5bc8`); provenance =
-roses-u `d/n/7/0/4/trunk` @ r345586**, last changed at r345479. u-dt000 sits in the
-same repository and carries the same evidence (`d/t/0/0/0/trunk` @ r344841).
+That was a useful clue and a bad baseline. Diffing that tree against MOSRS r345586
+shows it is upstream **plus UniExeterRSE's own Isambard 3 port** — +161/−27 lines over
+7 files (the `ISAMBARD3` family, the `EX_HOST` switch, `ISAMBARD3_*` variables and
+their metadata, `ACTIVATE_ENV`, a spack-activate branch, github URLs replacing
+`localmirrors:`, the suite title). Pinning it meant carrying a third party's porting
+decisions as if they were the Met Office's — and it meant two of our own `[isambard3]`
+hunks were quietly *reverting* them: MOSRS already reads `[file:lut]` and
+`[file:precalc]` from `$BIG_DATA_DIR/um_aux`, and UniExeter was the one who pointed
+them at the private `um_aux` git repo.
 
-> **That upstream is archived.** The UniExeter repository has been superseded by
-> `MetOffice/mo-spack-packages` + `MetOffice/csc-environments`, so there is no live
-> repository for this site diff to be sent back to as a pull request. It is still
-> carried as a patch rather than a copy, because that is what keeps the delta
-> reviewable — and because the patch is still the right artefact to hand to whoever
-> owns `d/n/7/0/4/trunk` if the platform is ever added there.
+This repo supersedes that one. It should not have been pinning it as an upstream.
 
 ## What was NOT changed
 
@@ -78,22 +95,23 @@ Worth stating first, because it is most of the suite:
 
 ## The changes
 
-### Version — vn3.0 → vn3.2
+### Version — nothing to do
 
-This repo's environment is built against LFRic `2026.07.1` (apps vn3.2); the suite is
-written for vn3.0. **This is not in the patch file** — the staging script *runs* the
-native tool, `rose app-upgrade -y -C <app> vn3.2`, over the submodule's app configs.
-The vn3.0 → vn3.1 → vn3.2 macro chain applies cleanly: ~700 lines of namelist churn for
-`lfric_atm` (renames such as `pc2ini`→`pc2_init_method` and `i_bm_ez_opt`→`bm_ez_opt`,
-`jules_pftparm` into its indexed per-PFT form, new vn3.2 members at their macro
-defaults) and three settings for `mesh` (`apply_stretch_transform`→`stretch_function`).
+**This suite needs no version alignment at all**, and that is the clearest dividend of
+basing on the real upstream. On 2026-07-17 (r361457–r361458) the Met Office took
+u-dn704 to `meta=lfric-lfric_atm/vn3.2`, `meta=lfric-mesh_tools/vn3.2` and
+`dependencies.yaml ref: 2026.07.1` — **the same release this environment builds** — and
+even bumped its EX1A module loads to `2026.7.1/ngms` + `lfric-gnu/12.2.0/3.2`.
 
-That churn used to be carried as a **hand port** in this repo's copy of the suite, item
-by item, each with a comment explaining which LFRic check it satisfied. Every one of
-those is now the macro's output instead. Bump `SUITE_META_VN` in the patch script when
-the `vendor/lfric_apps` pin moves.
+So unlike [u-dr932](../u-dr932/README.md) (vn3.1) and [u-dt000](../u-dt000/README.md)
+(vn3.0), this suite's stager has **no `rose app-upgrade` step**, and the patch carries no
+`dependencies.yaml` hunk. Their `app/mesh` diff is byte-for-byte what our upgrade macro
+used to produce (`apply_stretch_transform` → `stretch_function='uniform'`, three
+`stretch_transform` members trigger-ignored) — the same tool, run by the owners.
 
-`dependencies.yaml` moves from `2025.12.1` to `2026.07.1` to match.
+The stager asserts `meta=…/vn3.2` anyway. If a future revision moves off it, that
+assertion fails loudly rather than letting the suite build namelists the model rejects,
+and the upgrade step comes back.
 
 ### Placement — the multi-node case
 
@@ -136,14 +154,13 @@ u-dr932 and u-dt000 do **not** use it: single-node with XIOS attached, where ups
 | `[[BUILD]]` | `FC`/`LDMPI` = `mpif90`, `FPP` = `"cpp -traditional-cpp"` → `$FC`/`$LDMPI`/`$FPP`. Inherit the toolchain from the loaded module instead of naming a compiler, so `LFRIC_STACK=cray\|spack` needs no edit here. This is the Stage-1 contract. |
 | `rose-suite.conf` | `ISAMBARD3_SPACK_SETUP` and `ACTIVATE_ENV` emptied — they pointed at the UniExeter port's own in-tree spack. `run-suite.sh` injects `ACTIVATE_ENV` via `cylc vip -S`, and emptying `SPACK_SETUP` is what makes the `ISAMBARD3` pre-script take that branch instead of `spack env activate`. |
 
-### Data — `um_aux` is private
+### Data — `BIG_DATA_DIR`
 
-`[file:lut]` and `[file:precalc]` fetched the ga7_1 lookup tables and spectral files
-from `git@github.com:MetOffice/um_aux.git`. **That repository is private** (404
-anonymously) — unlike `lfric_apps`, `lfric_core`, `casim`, `jules`, `socrates` and
-`ukca`, which the extract clones over https with no credentials. So both read from the
-copies staged on the project filesystem instead, under the same `BIG_DATA_DIR` as the
-ancillaries and the start dump.
+Upstream already reads the ga7_1 lookup tables and spectral files from
+`$BIG_DATA_DIR/um_aux/...`, so there is **nothing to change** there. (The UniExeter copy
+had pointed them at `git@github.com:MetOffice/um_aux.git`, which is private — 404
+anonymously — so our patch used to carry a hunk undoing that. Basing on real upstream
+deleted it.)
 
 `BIG_DATA_DIR` itself moves from `$CYLC_WORKFLOW_SHARE_DIR/data` (which nothing
 populates) to `/projects/u35v/sw/lfricdata`, a Jinja default you can override with
@@ -232,33 +249,31 @@ bash examples/science-suites/run-suite.sh u-dn704 -S "BIG_DATA_DIR='/path/to/dat
 
 ### Regenerating the site patch
 
-When the submodule pin moves, or the environment's LFRic version changes:
+When the pinned revision moves, or the environment's LFRic version changes. There is no
+upgrade step to work around here, so the checkout's own `svn diff` **is** the patch:
 
 ```bash
-. examples/science-suites/site/activate-env.sh
-# ABSOLUTE paths: rose runs from inside the app dir, and a relative entry here fails
-# with the unhelpful "[FAIL] Error: could not find meta flag".
-export ROSE_META_PATH=$(find $PWD/vendor/lfric_{apps,core} $PWD/vendor/physics \
-                          -type d -name rose-meta | tr '\n' ':')
-S=vendor/uoe_science_suites
+W=~/roses/u-dn704
 
-# 1. upstream at the pin, upgraded — this is the BASE the patch is diffed against
-git -C $S checkout -B tmp-upgraded <the pin>
-(cd $S/suites/u-dn704/app && rose app-upgrade -y -C lfric_atm vn3.2 \
-                          && rose app-upgrade -y -C mesh vn3.2)
-git -C $S commit -am 'rose app-upgrade u-dn704 vn3.0 -> vn3.2'
+# 1. clean checkout at the revision you want to base on
+svn revert -R $W && svn update -r <the revision> $W
 
-# 2. re-apply the site edits, then diff. --no-ext-diff is not optional: the redirect
-#    truncates the patch BEFORE git runs, so a configured external differ (difft
-#    aborts on aarch64 here) leaves you with a zero-byte patch and nothing to reapply.
-git -C $S apply patches/42-uoe_science_suites-u-dn704-isambard3.patch
+# 2. re-apply the site edits, adjust, and dump the diff
+git apply -p0 -C $W patches/suites/42-roses-u-u-dn704-isambard3.patch
 #   ... adjust ...
-git -C $S diff --no-ext-diff > patches/42-uoe_science_suites-u-dn704-isambard3.patch
+(cd $W && svn diff .) > patches/suites/42-roses-u-u-dn704-isambard3.patch
 
-# 3. back to the pin
-git -C $S checkout --detach <the pin> && git -C $S reset --hard <the pin>
-git -C $S clean -fd && git -C $S branch -D tmp-upgraded
+# 3. update SUITE_REV in patches/suites/42-roses-u-u-dn704-patch.sh to match
 ```
 
-Keep the patch to those seven files: anything mechanical belongs in the upgrade step,
-not here.
+`svn diff` needs no credentials — it compares against the pristine copies in `.svn`. Do
+check what upstream changed between revisions first (`svn diff -r A:B <url>`, which does
+need them): if a revision moves the app configs off vn3.2, the stager's assertion fires
+and a `rose app-upgrade` step has to come back, as
+[u-dt000](../u-dt000/README.md)'s stager still has.
+
+Note the asymmetry with the other two suites, whose patches are diffed against an
+*upgraded* tree and so apply with `-p1`. Each stager encapsulates its own convention.
+
+Keep the patch to those seven files: anything mechanical belongs upstream or in an
+upgrade step, not here.

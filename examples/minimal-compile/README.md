@@ -8,10 +8,9 @@ the science-suite examples in `../science-suites/`).
 > The reproducible *core* of this repo is the **environment** (Stage 1,
 > `scripts/build.sh`). This example is **not** that core — it is the smallest thing
 > you can do *with* the environment. Treat `build.sh` here as a **template** to copy
-> and adapt for your own science target. For full Rose/Cylc science suites, see the
-> upstream [Isambard3-LFRic-Env-Science-Suites](https://github.com/UniExeterRSE/Isambard3-LFRic-Env-Science-Suites),
-> whose `suites/u-*` directories live separately from the `env_lfric_*` build,
-> mirroring this build / example split.
+> and adapt for your own science target. For full Rose/Cylc science suites — real Met
+> Office suites, fetched from where they actually live and adapted by a reviewable
+> patch — see [`../science-suites/`](../science-suites/README.md).
 
 ## What it does
 

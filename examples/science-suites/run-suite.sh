@@ -12,9 +12,10 @@
 # What this does:
 #   1. Activates the built env (rose/cylc/psyclone + view on PATH) for the chosen
 #      variant — so `cylc`/`rose` are the env's, matching what the suite tasks use.
-#   2. Stages the suite, where it is a pinned submodule of its upstream repo:
-#      `rose app-upgrade` to the LFRic version this env builds, then the Isambard 3
-#      site patch. Idempotent; needs the env from step 1, hence the order.
+#   2. Stages the suite where it lives — a pinned submodule (u-dr932) or a MOSRS
+#      checkout (u-dn704, u-dt000): the Isambard 3 site patch, preceded by a
+#      `rose app-upgrade` for the suites that still lag the environment's LFRic.
+#      Idempotent; needs the env from step 1, hence the order.
 #   3. Installs the Cylc site config (the `isambard3` Slurm platform + a roomy
 #      cylc-run dir) via the repo's opt-in scripts/setup-cylc.sh.
 #   4. Runs `cylc vip` (validate-install-play) on the suite, injecting LFRIC_STACK/
@@ -59,9 +60,10 @@ case "$SUITE" in
     SUITE_GET="git submodule update --init vendor/lfric_egp_bench"
     ;;
   u-dt000)
-    SUITE_DIR="$REPO_ROOT/vendor/uoe_science_suites/suites/u-dt000"
-    SUITE_PATCH="$REPO_ROOT/patches/41-uoe_science_suites-u-dt000-patch.sh"
-    SUITE_GET="git submodule update --init vendor/uoe_science_suites"
+    SUITE_DIR="${LFRIC_SUITE_DIR:-$HOME/roses/$SUITE}"
+    SUITE_PATCH="$REPO_ROOT/patches/suites/41-roses-u-u-dt000-patch.sh"
+    SUITE_GET="rosie checkout $SUITE && svn update -r 348703 \$HOME/roses/$SUITE
+         (needs a MOSRS account; \`rosie\` comes from the env activated above)"
     ;;
   u-dn704)
     SUITE_DIR="${LFRIC_SUITE_DIR:-$HOME/roses/$SUITE}"
@@ -103,12 +105,13 @@ bash "$SUITE_PATCH" || die "suite patch failed: $SUITE_PATCH"
 #    Reuse the repo's opt-in setup-cylc.sh (idempotent; writes ~/.cylc/flow).
 bash "$REPO_ROOT/scripts/setup-cylc.sh" || die "setup-cylc.sh failed"
 
-# `cylc install` runs the cylc.post_install.log_vc_info plugin, which shells out to
-# `git diff` over the suite source. The staged suite is a PATCHED submodule, so that
-# diff is never empty -- and a broken GIT_EXTERNAL_DIFF in the caller's environment
-# then takes the whole install down with it (difft on aarch64 here dies with
-# "<jemalloc>: Unsupported system page size"). Cylc only wants the diff for its own
-# provenance log, so drop the external differ for the launch.
+# `cylc install` runs the cylc.post_install.log_vc_info plugin, which records the source's
+# version control state -- `svn info`/`svn diff` for the MOSRS checkouts, `git diff` for
+# the submodule. The staged suite is always PATCHED, so that diff is never empty -- and on
+# the git side a broken GIT_EXTERNAL_DIFF in the caller's environment then takes the whole
+# install down with it (difft on aarch64 here dies with "<jemalloc>: Unsupported system
+# page size"). Cylc only wants the diff for its own provenance log, so drop the external
+# differ for the launch. Only meaningful for a git source, hence the repo test.
 #
 # Two ways to set one, so two steps. The env var we can just unset. `git config
 # diff.external` -- the commoner difftastic install -- we cannot: there is no env
@@ -118,15 +121,16 @@ bash "$REPO_ROOT/scripts/setup-cylc.sh" || die "setup-cylc.sh failed"
 # `true`, which the env var half then wins with. That costs the provenance diff's
 # content -- but only for a user whose differ was going to abort anyway.
 unset GIT_EXTERNAL_DIFF
-if ! git -C "$SUITE_DIR" diff >/dev/null 2>&1; then
+if git -C "$SUITE_DIR" rev-parse --git-dir >/dev/null 2>&1 &&
+   ! git -C "$SUITE_DIR" diff >/dev/null 2>&1; then
   info "git diff.external is broken here; neutralising it for the cylc install"
   export GIT_EXTERNAL_DIFF=true
 fi
 
-# 4. Launch. Inject our env + source selection as Jinja template vars: flow.cylc
-#    builds from $REPO_ROOT/vendor/* (the patched submodules), exports LFRIC_STACK/
-#    LFRIC_PREFIX into the task env, and the ISAMBARD3 pre-script sources
-#    ACTIVATE_ENV. The scheduler daemonises; watch with `cylc tui $SUITE`.
+# 4. Launch. Inject our env + source selection as Jinja template vars: REPO_ROOT lets the
+#    extract task reach this repo's patch stack, LFRIC_STACK/LFRIC_PREFIX go into the task
+#    env, and the root init-script sources ACTIVATE_ENV. The scheduler daemonises; watch
+#    with `cylc tui $SUITE`.
 # NB: pass LFRIC_PREFIX=$BASE (the per-arch, UNVERSIONED base), NOT $PREFIX.
 # common.sh treats LFRIC_PREFIX as the base and appends $LFRIC_ENV_VERSION itself
 # (same contract as the sbatch scripts). Passing $PREFIX double-versions the path
