@@ -408,18 +408,31 @@ MOSRS suites, `~/roses/<suite>`, or wherever `LFRIC_SUITE_DIR` points).
 
 ## Adapting this for your own suite
 
-Prefer **pinning the upstream suite as a submodule under `vendor/` and carrying a
-patch**, as u-dr932 does, over copying it in — a copy drifts silently, which is exactly
-how the two u-dr932s came to differ. Wire it up in `run-suite.sh`'s `case` block and add
-a `patches/NN-<repo>-<suite>-patch.sh`.
+**Never copy the suite in.** A copy drifts silently, which is exactly how the two
+u-dr932s came to differ. Carry a *pin plus a patch* instead, and take the pin from the
+suite's own upstream. Which mechanism that is depends on where the suite really lives,
+and both are worked examples here:
 
-**"It's a MOSRS suite, so it can't be a submodule" is worth testing before you accept
-it.** u-dn704 and u-dt000 both live in `roses-u` subversion, which is SSO-gated and not
-git — but a repository that already contains a checkout of them does exist and *can* be
-pinned, and its `.svn/wc.db` even records which revision it was taken at (see
-[`u-dn704/README.md`](u-dn704/README.md)). Pinning that and diffing against it beats
-copying, because the copy is the thing that drifts. Only fall back to a copy when there
-is genuinely no git object anywhere that contains the suite.
+- **Upstream is git** (u-dr932): pin it as a submodule under `vendor/` and add a
+  `patches/NN-<repo>-<suite>-patch.sh`, exactly as Stage 1 pins its LFRic sources.
+- **Upstream is MOSRS `roses-u`** (u-dn704, u-dt000): there is nothing to vendor —
+  rose workflows are staying in subversion
+  ([simulation-systems#566](https://github.com/MetOffice/simulation-systems/discussions/566)
+  moved the *source* extraction to git, explicitly *"not where the workflows themselves
+  reside"*). Check it out the way a Met Office scientist does, pin it by **revision**,
+  and add a `patches/suites/NN-roses-u-<suite>-patch.sh` that patches that checkout.
+  Then `svn diff` in the checkout is your delta and `svn revert -R` gives upstream back.
+
+Either way, wire the suite into `run-suite.sh`'s `case` block, which is where its tree,
+its stager and its "how to get it" message live.
+
+**A git repository that merely contains someone's `svn checkout` is not the upstream,
+and pinning it is a trap.** This repo made that mistake and undid it: such a tree is
+upstream *plus that third party's own port*, so pinning it makes their porting decisions
+look like the Met Office's — and two of our `[isambard3]` hunks turned out to be
+silently reverting theirs. `.svn/wc.db` recording a revision makes it look
+authoritative, and it is not. Go to `roses-u`, even though it costs a MOSRS account;
+[`u-dn704/README.md`](u-dn704/README.md) records how that was caught.
 
 Then start from **what upstream already does** and change only what the platform forces
 you to; u-dr932 is the worked example and its [`README.md`](u-dr932/README.md) is the
