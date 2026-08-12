@@ -98,10 +98,10 @@ Index: flow.cylc
 @@ -1,4 +1,27 @@
  #!jinja2
 +{# [isambard3] ADDED: platform selection. Upstream targets the Met Office EX only, via
-+   the single EX1A family and PBS directives. Everything this port adds is guarded on
-+   EX_HOST == 'isambard3', and every {% else %} branch below is upstream's text
-+   unchanged -- so with the default EX_HOST this file still renders exactly as the Met
-+   Office suite. #}
++   the single EX1A family and PBS directives. Everything THIS FILE adds is guarded on
++   EX_HOST == 'isambard3' and every {% else %} branch below is upstream's text unchanged,
++   so with the default EX_HOST it renders exactly as the Met Office suite. The port's two
++   app/*/rose-app.conf hunks are NOT guarded -- rose app configs take no Jinja. #}
 +{% if EX_HOST is not defined %}{% set EX_HOST = '' %}{% endif %}
 +{% if ACTIVATE_ENV is not defined %}{% set ACTIVATE_ENV = '' %}{% endif %}
 +{# This repo's env + source selection, injected by run-suite.sh (`cylc vip -S ...`) so

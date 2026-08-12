@@ -89,7 +89,12 @@ Worth stating first, because it is most of the suite:
   (This suite used to be the one exception in this repo — it ran a bespoke offline
   extract, `site/extract-sources.sh`. That is retired with this move.)
 - **The EX1A branches.** Every `{% if EX_HOST == 'isambard3' %}` guard is honoured, so
-  the file still renders as upstream on the Met Office EX.
+  `flow.cylc` still renders as upstream on the Met Office EX. Two hunks of the port are
+  **not** guarded, because they land in files that take no Jinja: `app/mesh/rose-app.conf`
+  (`mpiexec -n 1` → `srun --ntasks=1`) and `app/extract/rose-app.conf` (which appends
+  `patch-sources.sh`, using a `REPO_ROOT` that only `flow.cylc`'s `isambard3` branch
+  defines). Those two are what a Met Office reviewer of this diff would have to make
+  conditional — or take as the site-local part of the port.
 - **The build precisions**, `PSYCLONE_TRANSFORMATION`, `LFRIC_TARGET_PLATFORM`,
   `MAKE_THREADS`, the `[[BUILD]]` directives, `execution time limit`s.
 
