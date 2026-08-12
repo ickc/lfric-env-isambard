@@ -36,37 +36,43 @@ SUITE="${1:-}"
 [ -n "$SUITE" ] || die "usage: run-suite.sh <suite-id> [cylc vip args...]  (e.g. u-dr932)"
 shift || true
 
-# Where each suite's Rose/Cylc tree lives, and what stages it.
+# Where each suite's Rose/Cylc tree lives, what stages it, and how to get it if it is
+# not there. Nothing is copied into this repo: each suite is the UPSTREAM tree, and this
+# repo carries only a site diff (patches/…-isambard3.patch), which is therefore a real
+# diff and directly the change to propose upstream.
 #
-# All three are the UPSTREAM suites as pinned submodules (vendor/lfric_egp_bench,
-# vendor/uoe_science_suites), staged by a patch script exactly as Stage 1 stages its
-# LFRic sources. Nothing is copied into this repo, so the delta against what a
-# scientist runs is a real diff -- patches/4x-*-isambard3.patch -- which is also the
-# pull request to send upstream.
+# Two kinds of upstream, because the suites have two kinds of home:
+#
+#   u-dr932 is on GitHub, so it is a pinned submodule (vendor/lfric_egp_bench) staged
+#   exactly as Stage 1 stages its LFRic sources.
+#
+#   u-dn704 and u-dt000 are Met Office rose suites and live in MOSRS subversion, which
+#   is where rose workflows are staying (simulation-systems#566 moved the SOURCE
+#   extraction to git, "not where the workflows themselves reside"). There is nothing to
+#   vendor, so they are CHECKED OUT the way a Met Office scientist checks them out --
+#   `rosie checkout` -- and the site patch is applied to that checkout. LFRIC_SUITE_DIR
+#   overrides the location.
 case "$SUITE" in
   u-dr932)
     SUITE_DIR="$REPO_ROOT/vendor/lfric_egp_bench/src/suites/u-dr932"
     SUITE_PATCH="$REPO_ROOT/patches/40-lfric_egp_bench-u-dr932-patch.sh"
+    SUITE_GET="git submodule update --init vendor/lfric_egp_bench"
     ;;
   u-dt000)
     SUITE_DIR="$REPO_ROOT/vendor/uoe_science_suites/suites/u-dt000"
     SUITE_PATCH="$REPO_ROOT/patches/41-uoe_science_suites-u-dt000-patch.sh"
+    SUITE_GET="git submodule update --init vendor/uoe_science_suites"
     ;;
   u-dn704)
-    SUITE_DIR="$REPO_ROOT/vendor/uoe_science_suites/suites/u-dn704"
-    SUITE_PATCH="$REPO_ROOT/patches/42-uoe_science_suites-u-dn704-patch.sh"
+    SUITE_DIR="${LFRIC_SUITE_DIR:-$HOME/roses/$SUITE}"
+    SUITE_PATCH="$REPO_ROOT/patches/suites/42-roses-u-u-dn704-patch.sh"
+    SUITE_GET="rosie checkout $SUITE && svn update -r 361458 \$HOME/roses/$SUITE
+         (needs a MOSRS account; \`rosie\` comes from the env activated above)"
     ;;
   *)
     die "no such suite: $SUITE  (known: u-dn704, u-dr932, u-dt000)"
     ;;
 esac
-if [ ! -d "$SUITE_DIR" ]; then
-  # SUITE_DIR is <repo>/vendor/<submodule>/... — name that submodule in the error.
-  _sub="${SUITE_DIR#"$REPO_ROOT/vendor/"}"
-  die "suite tree missing: $SUITE_DIR
-       Initialise the submodule it lives in:
-         git submodule update --init vendor/${_sub%%/*}"
-fi
 
 # common.sh sets PREFIX/MODULE*/LFRIC_STACK and respects LFRIC_PREFIX/LFRIC_STACK.
 # shellcheck source=scripts/common.sh
@@ -80,10 +86,16 @@ fi
 command -v cylc >/dev/null 2>&1 || die "no 'cylc' on PATH after activating env — is the '$LFRIC_STACK' variant built? (view should ship cylc)"
 info "cylc $(cylc version 2>/dev/null) | rose $(rose version 2>/dev/null | awk '{print $2}') | variant=$LFRIC_STACK"
 
-# 2. Stage the suite: `rose app-upgrade` to the version this env builds, then the
-#    Isambard 3 site patch. Idempotent. It has to happen HERE rather than in
-#    patch-all.sh because it needs the env's `rose`, which only exists after step 1
-#    (patch-all.sh runs during the Stage-1 build, where the patch is inert).
+# 2. Stage the suite: the Isambard 3 site patch (and, for the suites that still lag the
+#    environment's LFRic, a `rose app-upgrade` first). Idempotent. It happens HERE rather
+#    than in patch-all.sh for two reasons: the upgrade needs the env's `rose`, which only
+#    exists after step 1; and a suite checked out in the user's home is not something an
+#    environment build may quietly rewrite.
+#
+#    Checked after activation, so the `rosie checkout` hint is a command you can run now.
+[ -d "$SUITE_DIR" ] || die "no $SUITE tree at $SUITE_DIR
+       Get it with:
+         $SUITE_GET"
 info "staging $SUITE: $(basename "$SUITE_PATCH")"
 bash "$SUITE_PATCH" || die "suite patch failed: $SUITE_PATCH"
 
