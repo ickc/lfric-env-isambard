@@ -76,6 +76,15 @@ fi
 [ -n "$_save_fpp" ]  && export FPP="$_save_fpp"
 unset _save_apps _save_core _save_tp _save_fpp
 
+# --- rosie: the `u-` prefix map --------------------------------------------
+# `rosie` comes from the module (metomi-rose), but the spack package ships vanilla
+# rose with no SITE configuration, so `rosie checkout u-dn704` dies with
+# "u: cannot determine prefix location". site/rose.conf supplies just the [rosie-id]
+# section that maps the `u-` prefix onto MOSRS roses-u — the site fact a Met Office
+# workstation would already have. Honour an existing ROSE_SITE_CONF_PATH: someone with
+# a real site install has a better one than ours.
+export ROSE_SITE_CONF_PATH="${ROSE_SITE_CONF_PATH:-$_aenv_here}"
+
 # --- HDF5 file locking on Lustre -------------------------------------------
 # Isambard 3's cylc-run lives on Lustre. HDF5 1.10+ tries to flock() files it
 # creates; Lustre rejects that, so XIOS's nc_create() of a NetCDF-4/HDF5 output

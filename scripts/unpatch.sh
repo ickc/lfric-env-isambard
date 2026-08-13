@@ -14,15 +14,21 @@ _here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
 
 # Only the submodules that patches touch. vendor/spack and the package repo
 # mo-spack-packages are not patched. (lfric_apps is patched by
-# patches/30-lfric_apps-local-sources-patch.sh; lfric_egp_bench and
-# uoe_science_suites carry the u-dr932 and u-dt000 science suites and are staged by
-# patches/40-* and patches/41-*, so resetting them is also how you get the upstream
-# suites back verbatim.)
+# patches/30-lfric_apps-local-sources-patch.sh; lfric_egp_bench carries the u-dr932
+# science suite and is staged by patches/40-*, so resetting it is also how you get
+# that upstream suite back verbatim.)
 #
-# NOT here: patches/optional/*. Those apply to a suite's freshly EXTRACTED source
-# tree under its cylc-run share/ directory, never to vendor/ — `cylc clean` is what
-# undoes them. See patches/optional/README.md.
-for sub in lfric_core lfric_apps spack-packages lfric_egp_bench uoe_science_suites; do
+# NOT here, and both deliberately:
+#
+#   patches/suites/* — u-dn704 and u-dt000 are MOSRS checkouts in the user's home,
+#   not submodules. Their unpatch is the native one, in the checkout:
+#       svn revert -R ~/roses/u-dn704
+#   This script will not reach into $HOME.
+#
+#   patches/optional/* — those apply to a suite's freshly EXTRACTED source tree under
+#   its cylc-run share/ directory, never to vendor/; `cylc clean` is what undoes them.
+#   See patches/optional/README.md.
+for sub in lfric_core lfric_apps spack-packages lfric_egp_bench; do
   d="$REPO_ROOT/vendor/$sub"
   # An UNINITIALISED submodule is an empty directory, and `git -C <empty dir>
   # rev-parse --git-dir` happily succeeds by walking UP to this repo -- at which
@@ -38,4 +44,5 @@ for sub in lfric_core lfric_apps spack-packages lfric_egp_bench uoe_science_suit
     echo "skip vendor/$sub (not initialized)"
   fi
 done
-echo "unpatch complete: lfric_core, lfric_apps, spack-packages, lfric_egp_bench, uoe_science_suites restored."
+echo "unpatch complete: lfric_core, lfric_apps, spack-packages, lfric_egp_bench restored."
+echo "    (u-dn704/u-dt000 are MOSRS checkouts: svn revert -R ~/roses/<suite>)"

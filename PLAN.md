@@ -39,16 +39,24 @@ rename** landed. Branch `stage3-science-suites`, PR #8.
 - **All suites run on the cray environment now** (mesh→`srun`, no mpiexec).
   dn704 = multi-node + dedicated XIOS server via `site/bin/launch-exe`; dr932 and dt000 =
   single-node, XIOS attached, stock Met Office `launch-exe`.
-- **u-dt000 is unblocked and runs end-to-end** — see follow-up 1. It is no longer a copy:
-  pinned submodule (`vendor/uoe_science_suites`) + `patches/41-*`, the Met Office
-  `merge_sources.py` extract, namelists re-derived by `rose app-upgrade vn2.2 → vn3.2`,
-  and its ice-giant science supplied by `patches/optional/32-*`.
-- **Mechanism (b) — per-suite offline source** (commit `09ca75a`): each suite has a
-  `dependencies.yaml`; `examples/science-suites/site/extract-sources.sh` extracts each
-  declared `repo@ref` OFFLINE from the vendored local mirrors (`git archive`, no network)
-  into `SOURCE_ROOT/{lfric_apps,lfric_core,physics/*}`, then applies the LFRic-source
-  patch stack (`patches/{10,11,30}` honour `LFRIC_SRC_ROOT`, default `vendor/`). Strict
-  offline: a ref absent from the mirror is a hard error naming what to stage.
+- **u-dt000 is unblocked and runs end-to-end** — see follow-up 1. It is no longer a copy,
+  and no longer vendored: a MOSRS checkout (`roses-u/d/t/0/0/0/trunk` @ r348703) +
+  `patches/suites/41-*`, on the Met Office `merge_sources.py` extract (which upstream now
+  carries itself), namelists re-derived by `rose app-upgrade vn3.0 → vn3.2`, and its
+  ice-giant science supplied by `patches/optional/32-*`.
+- **u-dn704 is no longer a copy either** — a MOSRS checkout
+  (`roses-u/d/n/7/0/4/trunk` @ r361458) + `patches/suites/42-*`. It needs NO version
+  alignment: upstream took the suite to vn3.2 / `2026.07.1` on 2026-07-17, the release
+  this env builds. **`vendor/uoe_science_suites` is gone** — that repo is a third party's
+  copy-plus-port of these two Met Office suites, and this repo supersedes it. See
+  `examples/science-suites/u-dn704/README.md`, "Where upstream is".
+- **Mechanism (b) — per-suite source** (commit `09ca75a`): each suite has a
+  `dependencies.yaml` and the upstream `merge_sources.py` extract, with
+  `site/patch-sources.sh` appended to apply the LFRic-source patch stack
+  (`patches/{10,11,30,31}` honour `LFRIC_SRC_ROOT`, default `vendor/`). The bespoke
+  offline extract this repo carried for u-dn704 (`site/extract-sources.sh`, `git
+  archive` from the vendored mirrors) is **retired**: `USE_MIRRORS=true` with
+  `MIRROR_LOC=$PWD/vendor/mirrors` is the same property via upstream's own mechanism.
 - **Rename** (commit `bedd813`): Stage 2/3 reframed as sibling *examples* on the one
   prerequisite build (Stage 1); `examples/lfric-atm → examples/minimal-compile`.
 
@@ -78,10 +86,18 @@ invalidate u-dr932's and u-dn704's namelists. The `.patch` file is what to hand 
 Denis; when he rebases, `dependencies.yaml` takes the two-source form and the patch is
 deleted.
 
-u-dt000 moved to the full u-dr932 arrangement at the same time — pinned submodule
-(`vendor/uoe_science_suites`) + `patches/41-*`, the Met Office `merge_sources.py`
-extract, and its namelists re-derived by `rose app-upgrade vn2.2 → vn3.2` rather than
-hand-ported. See `examples/science-suites/u-dt000/README.md`.
+u-dt000 moved to the full u-dr932 arrangement at the same time — upstream itself plus a
+reviewable site diff, now a MOSRS checkout (`d/t/0/0/0/trunk` @ r348703) +
+`patches/suites/41-*`, the Met Office `merge_sources.py` extract, and its namelists
+re-derived by `rose app-upgrade vn3.0 → vn3.2` rather than hand-ported. See
+`examples/science-suites/u-dt000/README.md`.
+
+**Upstream now declares the fork itself.** r348703's `dependencies.yaml` lists mainline
+plus `dennissergeev/lfric_apps@ice_giants_tf` in the two-source form — which is the right
+shape and confirms the diagnosis, but still cannot be used at `2026.07.1` for the conflict
+reason above. Our patch drops the second source and keeps the forward-port patch, with
+that reasoning written into the file. When Denis rebases, the patch goes and upstream's
+form stands unmodified.
 
 ## Follow-up 2 — Merge-fork-onto-tag support (SUPERSEDED for u-dr932; open for the rest)
 
@@ -95,9 +111,9 @@ against what Denis runs is a real diff and directly the PR to send him. It runs 
 *upstream* extract
 (`merge_sources.py` from SimSys_Scripts), which implements fork-merge natively — so on
 that suite the feature is simply present, and reimplementing it here would be
-duplicating a Met Office tool. **u-dt000 has since moved onto the same extract** (`vendor/uoe_science_suites`
-+ `patches/41-*`), so the remaining work is u-dn704 alone, after which
-`extract-sources.sh` is retired altogether. The offline property is not lost:
+duplicating a Met Office tool. **u-dt000 and u-dn704 have since moved onto the same
+extract** (MOSRS checkouts + `patches/suites/41-*` / `42-*`), and
+`extract-sources.sh` is retired. The offline property is not lost:
 `USE_MIRRORS=true` with `--mirror_loc=$REPO_ROOT/vendor/mirrors` clones from the
 vendored submodules.
 

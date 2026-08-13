@@ -38,12 +38,12 @@ examples/science-suites/ # SCIENCE-SUITE EXAMPLES: run real Rose/Cylc LFRic suit
   run-suite.sh           #   launcher: cylc vip a suite against the built env
   site/activate-env.sh   #   ACTIVATE_ENV: module-load the env for suite tasks
   site/patch-sources.sh  #   apply the LFRic patch stack to a suite's extracted tree
-  site/extract-sources.sh #  offline per-suite source extract (u-dn704 only; u-dr932
-                          #  and u-dt000 use the upstream merge_sources.py extract)
-  u-dn704/                #   adapted suite, copied in (dependencies.yaml + flow.cylc)
-  u-dr932/ u-dt000/       #   only README + known-issues: the SUITES are the submodules
-                          #   vendor/lfric_egp_bench + vendor/uoe_science_suites,
-                          #   staged by patches/40-* and patches/41-*
+  site/bin/launch-exe    #   srun launcher (drop-in for the MO one; XIOS-server MPMD)
+  site/rose.conf         #   rosie's `u-` prefix map, so `rosie checkout` works here
+  u-dn704/ u-dr932/ u-dt000/  # only README + known-issues: the SUITES live upstream.
+                          #   u-dr932 = submodule vendor/lfric_egp_bench (patches/40-*);
+                          #   u-dn704 + u-dt000 = MOSRS checkouts in ~/roses
+                          #   (patches/suites/42-*, 41-*)
 spack-env/              # Spack env TEMPLATES (tracked); build.sh instantiates under PREFIX
   common.yaml           #   shared config: repos, gcc@14.3.0 external, python
   cray/spack.yaml       #   variant: system cray-mpich + Cray HDF5/netCDF (default)
@@ -53,9 +53,12 @@ vendor/                 # pinned submodules
   spack/  spack-packages/                     # Spack + its builtin packages
   lfric_apps/  lfric_core/  mo-spack-packages/ #   LFRic sources (mirrors) + MO package repo
   lfric_egp_bench/                            #   upstream science suite (u-dr932), patched
-  uoe_science_suites/                         #   upstream science suite (u-dt000), patched
   physics/{casim,jules,socrates,ukca}/         #   LFRic physics sources (examples only)
 patches/                # one *-patch.sh per upstream patch (applied in sorted order)
+                        #   patch-all.sh is -maxdepth 1: BOTH subdirs below are outside it
+  suites/               #   stagers for the MOSRS suites (41-u-dt000, 42-u-dn704) + their
+                        #   .patch files. Out of the stack because they patch a checkout
+                        #   in the user's $HOME; run-suite.sh runs them, not patch-all.sh
   optional/             #   per-suite source patches, OUTSIDE the stack — a suite opts
                         #   in by path from its own extract task (see its README)
 logs/                   # sbatch stdout (.gitkeep tracked; *.out ignored)
