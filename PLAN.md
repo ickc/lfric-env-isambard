@@ -5,6 +5,10 @@ for a refactoring plan: how the workflow actually runs, where every byte lands o
 disk, what the `module load` contract really covers, what writes to `$HOME`, the
 documentation inconsistencies found in a sweep, and the resulting TODO list.
 
+The TODO list (§9) records *problems and the option space*, deliberately not chosen
+solutions — the refactor is not designed yet. §6 is the exception in weight rather than
+in kind: it is the one item with a reproduced, user-visible failure behind it.
+
 It replaces the previous PLAN.md ("Stage-3 follow-ups"), which was legacy: every
 follow-up in it was marked DONE or SUPERSEDED, and its branch (`stage3-science-suites`,
 PR #8) has long since merged — the newest ancestor is PR #15. Nothing was lost; the
@@ -50,6 +54,11 @@ The single most important structural fact: **`examples/` is not a layer.** Nothi
 Stage 2 is a prerequisite for anything else. minimal-compile and science-suites are
 integration tests that prove a bare `module load` is a sufficient toolchain, plus
 adaptation templates. The product handed to a scientist is the modulefile.
+
+That last claim is the one the rest of this document tests hardest, and §6 shows it does
+not currently hold for a science suite: `examples/science-suites/site/activate-env.sh`
+does work that a bare `module load` does not, and some of that work exists to undo the
+modulefile. Read the diagram's `CONTRACT` box as the intent, not the status quo.
 
 ---
 
@@ -192,6 +201,11 @@ from the suite's root `init-script` and the platform `pre-script`, then write
 `FC = $FC` / `LDMPI = $LDMPI` / `FPP = $FPP` instead of a literal compiler. The one
 trap is that upstream Met Office EX suites *hard-code* `FC = mpif90`, which overrides
 the module's `ftn` and breaks the cray build.
+
+**But "bake in the module load" is harder than it sounds, and this is where the contract
+actually leaks** — there is no hook in a cylc job that is both early enough to put
+`cylc`/`rose` on `PATH` and late enough to leave the suite's own `[[[environment]]]`
+alone. §6 works this through, with the user-visible failure it caused.
 
 > **user submits their workflows as usual — compile first, then run**
 
@@ -337,7 +351,184 @@ the "where does the repo live" question stop mattering. **R3.**
 
 ---
 
-## 6. What writes to `$HOME` — and how much of it is negotiable
+## 6. The `module load` contract — where it leaks, with field evidence
+
+Everywhere in this repo the contract is stated as: *`module load
+lfric-env/<version>/<variant>` and then carry on as usual.* On 2026-08-13 the first
+external user (Denis, u-dr932) tried exactly that and the build died. The failure is
+worth recording in full, because the interesting part is not the error — it is that
+the error falsifies the contract as stated.
+
+### 6.1 What happened
+
+```
+Makefile:68: /lfs1i3/scratch/u35v/khcheung.u35v/git/lfric-env-isambard/vendor/lfric_core/infrastructure/build/lfric.mk: Permission denied
+make: *** No rule to make target '.../vendor/lfric_core/infrastructure/build/lfric.mk'.  Stop.
+```
+
+The chain, verified against the installed artefacts rather than the sources:
+
+1. `$BASE/modulefiles/lfric-env.lua:171-172` (the logic snapshot; source is
+   `scripts/lfric-env.lua`) does
+   `setenv("CORE_ROOT_DIR", repo .. "/vendor/lfric_core")`, with
+   `repo_root = "/lfs1i3/scratch/u35v/khcheung.u35v/git/lfric-env-isambard"` baked into
+   `v2026.07.21/cray.lua:10`.
+2. `lfric_apps/applications/lfric_atm/Makefile` does
+   `include $(CORE_ROOT_DIR)/infrastructure/build/lfric.mk`.
+3. Concatenating 1 and 2 reproduces the error path character for character. Nothing
+   else on the machine sets that variable to that value.
+
+**The "Permission denied" is a red herring that happens to be load-bearing.**
+`lfric.mk` is `-rw-r--r--` and every directory from `git/` down is `drwxr-xr-x`.
+Exactly one directory blocks: `/lfs1i3/scratch/u35v/khcheung.u35v` is `drwxr-x---`
+owned by group `khcheung.u35v` — a *personal* group (§5). A `brics.u35v` colleague
+gets through `/lfs1i3/scratch/u35v` (0750 `root:brics.u35v`) and stops there, so the
+traversal returns `EACCES` and make reports it against the leaf.
+
+Had the path been readable, the build would have **succeeded** — against *our* pinned
+`vendor/lfric_apps` + `vendor/lfric_core` plus our patch stack, instead of the tree his
+own extract task had just produced from his own `dependencies.yaml`. Two source trees
+mixed: duplicate PSyclone kernels, version-skewed `.mod` files, a binary that
+corresponds to no declared source revision. The permission wall converted a silent
+wrong build into a loud failure. That is luck, not design.
+
+### 6.2 Why this is a contract problem, not a permissions problem
+
+**The modulefile is not additive.** It `setenv`s four variables that a science suite
+*owns*: `APPS_ROOT_DIR`, `CORE_ROOT_DIR`, `LFRIC_TARGET_PLATFORM`, `FPP`. Loading the
+module is therefore not a neutral act — it silently reroutes where a suite's build
+finds its sources.
+
+**And cylc's phase order means a suite cannot defend itself.** Verified in the
+installed cylc 8.4.2 (`cylc/flow/etc/job.sh:41,177`), the job runs:
+
+```
+init-script  →  cylc env  →  env-script  →  user_env  →  pre-script  →  script
+```
+
+`user_env` is the suite's `[[[environment]]]` block, where u-dr932 declares
+`CORE_ROOT_DIR = $SOURCE_ROOT/lfric_core` (upstream, unmodified — confirmed against
+`git show HEAD:` on the unpatched submodule). `pre-script` runs **after** it. So any
+activation that loads the module in a pre-script overrides the suite, and the order is
+fixed by cylc — the suite author cannot reorder it.
+
+Nor can the load simply move earlier. It has to be early enough that `cylc` and `rose`
+are on `PATH` before cylc's first `cylc message` and before `env-script`'s
+`rose task-env` (otherwise the job dies `exit 127` before any pre-script runs — the
+reason `flow.cylc:111-129` loads it in `init-script` at all), *and* late enough not to
+stamp on `user_env`. **No single hook satisfies both.** Our port loads it in both
+places and then undoes the damage by hand.
+
+**`site/activate-env.sh:65-75` is that undo** — it saves the four variables, loads the
+module, and restores them. Read plainly: it is a workaround for our own modulefile,
+not a service to the suite. And because the workaround lives in *our* file rather than
+in the module, a user who follows the documented contract and writes their own two-line
+activator inherits the defect. That is precisely what happened here.
+
+**Your reading is right.** If the contract only holds when the user activates through
+`activate-env.sh`, then the contract is not `module load` — it is `module load` *plus
+our activator*, and "business as usual" is overstated.
+
+### 6.3 What `module load` does not cover today
+
+Auditing `site/activate-env.sh` for everything it does beyond `module load`, and what
+kind of thing each is:
+
+| What it does | Kind |
+|---|---|
+| save/restore `APPS_ROOT_DIR` / `CORE_ROOT_DIR` / `LFRIC_TARGET_PLATFORM` / `FPP` | **defect workaround** (§6.2) |
+| `ROSE_SITE_CONF_PATH` → `site/rose.conf`, the `[rosie-id]` `u-` prefix map | genuine site fact, additive |
+| `HDF5_USE_FILE_LOCKING=FALSE` (Lustre rejects `flock()`; XIOS writes 0-byte output) | genuine site fact, additive |
+| source Lmod init for a clean `bash -l` job shell | glue |
+| sources `scripts/common.sh` — **so the activator needs the repo** — then saves and restores `WORKING_DIR` because `common.sh` forces it to Stage 1's shared stage | second-order symptom |
+
+The last row is its own small indictment: a "thin activator" that requires the repo on
+disk and then has to undo a side effect of the file it just sourced is not thin. The
+two middle rows are defensible as facts about *this machine* that a modulefile could
+just as well carry — they are additive, so nothing breaks either way, but they are
+things the user must currently *know*.
+
+So the honest statement of the contract as it stands is: **`module load`, plus two
+site facts, plus a defensive save/restore, plus Lmod glue.** Whether the right response
+is to shrink the modulefile, grow it, or split it is open — see R3, deliberately left
+without a chosen answer.
+
+### 6.4 A second, independent finding from the same report
+
+Denis also removed `platform = 'uoe-isambard3'` from his `flow.cylc` because it errored
+with *unknown platform* — that platform is defined in Edinburgh's `global.cylc`, which
+he does not have. Removing the line does not disable platform selection; it falls back
+to `platform = localhost`, i.e. **every task becomes a background process on the login
+node**. An LFRic compile there hits `ulimit -u` (~900 procs) and dies `fork: Resource
+temporarily unavailable`, and a run task would execute the model on the login node with
+no Slurm, no `srun`, no Slingshot.
+
+He had no way to know. The `isambard3` platform exists only because
+`scripts/setup-cylc.sh` writes it into `~/.cylc`, and he had not run it — nothing in a
+bare `module load` reveals that a platform is required, or what it is called. This is
+the same gap as §6.2 seen from the other side: the environment ships a toolchain but
+not the site knowledge needed to use it.
+
+### 6.5 `~/.cylc/flow/global.cylc` — how it actually gets there
+
+**The answer to "remind me how a user sets this up":**
+
+```bash
+bash scripts/setup-cylc.sh          # or: pixi run setup-cylc
+```
+
+Idempotent, opt-in, and it is not part of building the environment (Stage 1 must not
+touch `$HOME`). It creates `~/.cylc/flow/global.cylc` if absent and maintains two
+*managed blocks* in it, delimited by `# BEGIN/END LFRIC_*` sentinels — replaced in
+place if present, appended if not, so hand-written config around them survives:
+
+```cylc
+# BEGIN LFRIC_CYLC_RUN_DIR
+[install]
+    [[symlink dirs]]
+        [[[localhost]]]
+            run = $PROJECTDIR/$USER/cylc-run      # ← the doubling bug, R8
+# END LFRIC_CYLC_RUN_DIR
+
+# BEGIN LFRIC_ISAMBARD3_PLATFORM
+[platforms]
+    [[isambard3]]
+        hosts = localhost
+        job runner = slurm
+        install target = localhost
+# END LFRIC_ISAMBARD3_PLATFORM
+```
+
+Nobody following the documented science-suite path runs it by hand:
+`examples/science-suites/run-suite.sh:116` invokes it before `cylc vip`. It is
+documented at `README.md:165` and `examples/science-suites/README.md:348`.
+
+The platform block **must** live in `global.cylc` itself, not in
+`~/.cylc/flow/platforms.d/`: the drop-in directory is only read by cylc ≥ 8.5 and the
+environment ships 8.4.2. `setup-cylc.sh` deletes a stale `platforms.d/isambard3.cylc`
+left by older revisions of itself — which is why its own header comment, still
+advertising that it *writes* that file, is wrong (R8, §8 item).
+
+**Your judgement — mandatory but one-time, therefore probably fine — is reasonable,
+and there is a sharper way to put the smell.** What is in that file is not user
+preference; it is two *facts about Isambard 3*. Cylc's own hierarchy is
+`$CYLC_SITE_CONF_PATH/flow/<ver>/global.cylc` (default `/etc/cylc`) → then the user's,
+user overriding. So this is site config that we currently write into every user's home
+directory, one user at a time.
+
+**On upstreaming it:** not to the Met Office — Isambard 3 is not an MO machine, and
+their site config describes theirs. The two plausible homes are (i) a system-wide
+`/etc/cylc/flow/` on Isambard 3, owned by BriCS, which would make the platform
+available to every user of the machine whether or not they use this environment; or
+(ii) shipped inside the environment under `$PREFIX` with `CYLC_SITE_CONF_PATH` exported
+by the modulefile, which would fold it into the `module load` and keep it versioned
+with the env (R4). They are not exclusive, and (i) is not ours to decide. Either way
+the user's `~/.cylc` remains an override, so nobody loses control — which is the test
+of whether a change is closer to business as usual or further from it.
+
+---
+
+## 7. What writes to `$HOME` — and how much of it is negotiable
 
 Stage 1 touches `$HOME` **not at all**, by design: `SPACK_USER_CONFIG_PATH` and
 `SPACK_USER_CACHE_PATH` are redirected under `PREFIX`, so not even `~/.spack` appears.
@@ -369,7 +560,7 @@ not less: a site config is exactly what a Met Office user's workstation already 
 
 ---
 
-## 7. Documentation inconsistencies found
+## 8. Documentation inconsistencies found
 
 A sweep of every `*.md` plus the comment headers in `scripts/`, `examples/`,
 `patches/` and `pixi.toml`. None of these are load-bearing; they are drift, and the
@@ -429,7 +620,7 @@ them. That is a smell the refactor should resolve by picking one. **R7.**
 
 ---
 
-## 8. Refactoring TODO
+## 9. Refactoring TODO
 
 Ordered by value, not by effort.
 
@@ -447,20 +638,50 @@ both variants) and re-run `bash scripts/gen-modulefile.sh` (both variants, with 
 PE loaded) so the baked `include:` and `repo_root` follow. Check the `umask` leaves
 `brics.u35v` group-readable. Do it *after* R3, or the move has to be redone.
 
-### R3 — Make the runtime contract genuinely repo-independent
-Two known leaks (§5): the Spack env's `include:` back into `$REPO/spack-env/common.yaml`
-(and the relative `repos:` under it), and `APPS_ROOT_DIR`/`CORE_ROOT_DIR` in the
-modulefile. Fix 1: copy `common.yaml` + the three package repos into `$PREFIX` at
-instantiate time. Fix 2: drop them from the modulefile and have
-`examples/minimal-compile/build.sh` set them itself — it already defaults them
-(`build.sh:78-79`), and `site/activate-env.sh` already fights to override them, which
-is the tell. Then delete the qualification from the docs instead of adding it.
+### R3 — Decide what the `module load` contract actually is
+**Now has field evidence, not just a code smell — see §6.** Two distinct problems that
+happen to share a cause (the modulefile knowing about the repo):
+
+*Repo-independence (§5).* The Spack env's manifest `include:`s
+`$REPO/spack-env/common.yaml`, whose `repos:` are relative into the repo. So any `spack`
+command against the loaded env needs the repo readable, while compiling and running do
+not. Narrow and mechanical; the docs' unqualified "the repo can move or be deleted" is
+what needs to change, one way or the other.
+
+*Contract scope (§6) — the open design question.* The modulefile `setenv`s four
+variables a science suite owns (`APPS_ROOT_DIR`, `CORE_ROOT_DIR`,
+`LFRIC_TARGET_PLATFORM`, `FPP`), cylc's fixed phase order means a suite cannot defend
+itself against that, and `site/activate-env.sh:65-75` exists solely to undo it. Denis's
+u-dr932 failure is what that costs a user who follows the documented contract instead of
+using our activator.
+
+Directions, none chosen — this is the decision to make, and the options differ in
+philosophy, not just in code:
+
+- **Shrink the modulefile** to a pure toolchain and push source-tree variables to the
+  consumer. `examples/minimal-compile/build.sh:78-79` already defaults them, so the
+  only in-repo consumer loses nothing, and `activate-env.sh`'s save/restore becomes
+  dead code. Cheapest, and the most literal reading of "module load is the contract".
+- **Grow the modulefile** to carry the rest of the site knowledge instead — the two
+  additive site facts in §6.3, and possibly `CYLC_SITE_CONF_PATH` (R4) and the
+  `isambard3` platform. Makes `module load` genuinely sufficient, at the cost of a
+  modulefile that knows about suites.
+- **Split it** — `lfric-env` (toolchain) plus a separate `lfric-site` — so the two
+  kinds of knowledge are selectable independently, and a user who wants only a compiler
+  is not handed suite defaults.
+
+Whichever is chosen, the test is §6.2: is there any hook in a cylc job where a user can
+load the module without either losing `cylc` from `PATH` or overriding their own
+`[[[environment]]]`? Today there is not. Also decide whether `30-lfric_apps-local-sources`
+should be on the suite path at all (§3) — same question about how much Stage 1's
+reproducibility machinery should reach into a user's suite.
 
 ### R4 — Ship the cylc site config inside the environment
 Write `global.cylc` (isambard3 platform + run-dir redirect) into `$PREFIX` at build
 time and `setenv CYLC_SITE_CONF_PATH` from the modulefile. Users need no `~/.cylc` at
 all, can still override in their own, and `setup-cylc.sh` demotes to a fallback for
-people not using the module. Strictly closer to business-as-usual. See §6.
+people not using the module. Strictly closer to business-as-usual. See §7, and §6.5
+for the site-versus-user framing.
 
 ### R5 — Upstream the patches
 Each has a named target and they should go out as separate PRs, not one heap:
@@ -493,7 +714,7 @@ Something like **"the environment"** and **"using the environment"** matches the
 structure. Whatever is chosen, do it as one mechanical pass.
 
 ### R8 — Clear the drift
-Fix items 1-12 in §7. Plus: `run = $PROJECTDIR/$USER` in `setup-cylc.sh` to kill the
+Fix items 1-12 in §8. Plus: `run = $PROJECTDIR/$USER` in `setup-cylc.sh` to kill the
 doubled `cylc-run/cylc-run`; delete the stale unversioned
 `$BASE/modulefiles/lfric-env/{cray,spack}.lua`; widen the static check to every
 shell script in the repo (and add `shellcheck` to `pixi.toml` if it isn't there).
