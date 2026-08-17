@@ -17,10 +17,12 @@
 # the relative order of aclocal.m4 vs configure down to readdir() ordering —
 # it happened to work for a while, then a rebuild put aclocal.m4 last and make
 # duly re-ran autoconf. Stamping explicit, increasing mtimes is deterministic.
+#
+# Applied to the vendored spack-packages submodule by lib.sh's lfric_apply_patches
+# before every solve, install and fetch, so there is no "forgot to patch" state.
+# Idempotent. To revert: git -C stage1/vendor/spack-packages checkout .
 set -o pipefail
-_here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
-REPO_ROOT="${PIXI_PROJECT_ROOT:-$(cd "$_here/.." && pwd)}"
-GDBM_PKG="$REPO_ROOT/vendor/spack-packages/repos/spack_repo/builtin/packages/gdbm/package.py"
+GDBM_PKG="$STAGE1_DIR/vendor/spack-packages/repos/spack_repo/builtin/packages/gdbm/package.py"
 
 if [ ! -f "$GDBM_PKG" ]; then
   echo "INFO: gdbm package.py not found; skipping"
