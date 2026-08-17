@@ -17,7 +17,7 @@ examples are **siblings**, not later "stages" — each depends only on Stage 1.
 
 ```
 Stage 1  —  BUILD the environment            (run once; heavy; on a compute node)
-  pinned sources ─▶ Spack builds everything ─▶ a loadable module under $LFRIC_PREFIX
+  stage1/ :  pinned sources ─▶ Spack ─▶ a loadable module under $LFRIC_BASE
 
 Example: minimal-compile  —  USE the env to compile a target   (lightweight)
   module load lfric-env/<version>/<variant> ─▶ rose / cylc / psyclone / spack …
@@ -27,10 +27,13 @@ Example: science-suites   —  RUN a real suite   (cylc on the login node ─▶
   cylc vip a Rose/Cylc LFRic suite on the built env (examples/science-suites/)
 ```
 
-- **Stage 1** is the reproducible core of this repo — the one true prerequisite. It
-  needs the repo + a Python in [3.7, 3.12). It produces a self-contained Lmod
-  modulefile under `$LFRIC_PREFIX`. (We keep the name "Stage 1"; the examples below
-  build on it rather than following it as stages.)
+- **Stage 1** lives entirely in [`stage1/`](stage1/) and is the reproducible core of
+  this repo — the one true prerequisite. It is self-contained: its own submodules,
+  its own version, its own pixi workspace (the one place pixi is required, because
+  it supplies the Python that runs Spack). It produces a self-contained Lmod
+  modulefile under `$LFRIC_BASE`. **Everything you need to build it is in
+  [`stage1/README.md`](stage1/README.md).** (We keep the name "Stage 1"; the
+  examples below build on it rather than following it as stages.)
 - **The minimal-compile example** (`examples/minimal-compile/`) is the smallest thing
   you do *with* the built env: compile the `lfric_atm` target, no science run. It needs
   only the modulefile — no Spack, no pixi, and the repo can even have moved or been
@@ -66,64 +69,43 @@ example} × {`cray`, `spack`}.
   to an exact commit). All six LFRic source repos — `lfric_apps`, `lfric_core`,
   `casim`, `jules`, `socrates`, `ukca` — are **public** and clone anonymously over
   HTTPS, so no credentials are needed for them. The one exception is
-  `vendor/mo-spack-packages`, which is still a private Met Office repo used by the
-  Stage-1 build: it is on a `git@github.com:` URL and needs an SSH key registered
+  `stage1/vendor/mo-spack-packages`, which is still a private Met Office repo used
+  by the Stage-1 build: it is on a `git@github.com:` URL and needs an SSH key registered
   with GitHub **and** authorised for the `MetOffice` organisation's SSO (GitHub →
   Settings → SSH keys → Configure SSO). If a `submodule update` fails, it is almost
   always that one.
 
 ---
 
-## Stage 1 — build the environment (without pixi)
+## Stage 1 — build the environment
 
-Run this **session** from a login node. The two `git submodule` lines fetch only
-the Stage‑1 (core) sources; the heavy build itself runs on a compute node.
+Stage 1 is self-contained in [`stage1/`](stage1/), which has its **own README with
+the full procedure, diagrams and maintenance notes**:
+**[`stage1/README.md`](stage1/README.md)**. The short version:
 
 ```bash
-# 1. Clone the repo and fetch the Stage-1 (core) submodules.
 git clone <repo-url> lfric-env-isambard
-cd lfric-env-isambard
-git submodule update --init --recursive --jobs 4 -- \
-  vendor/spack vendor/spack-packages vendor/lfric_apps vendor/lfric_core vendor/mo-spack-packages
+cd lfric-env-isambard/stage1
 
-# 2. Build on a compute node. The config block at the top of scripts/build.sbatch
-#    sets WHERE to build (edit it if your paths differ) — see "Configuration".
-sbatch scripts/build.sbatch                                  # cray variant (default)
-sbatch --export=ALL,LFRIC_STACK=spack scripts/build.sbatch   # spack variant
+pixi run submodules      # the pinned Spack + package repos (one-time)
+pixi run concretize      # cheap login-node check that it still solves
+pixi run fetch           # optional: pre-download every source
+sbatch build.sbatch      # the build itself, 2-4 h -> BUILD_OK
 ```
 
-The job writes its log to `logs/build-<jobid>.out`; a successful run ends with
-`BUILD_OK`. From scratch the build takes roughly 1–3 hours; re-runs are incremental
-(Spack skips already-built packages). The two variants **share one install tree**,
-so building the second one only rebuilds the MPI-dependent part.
+Everything installs **outside the repo**, under a versioned prefix
+`$LFRIC_BASE/<version>` (default base `$PROJECTDIR/$USER/opt/Linux-aarch64`,
+version read from `stage1/VERSION`). The version keeps independent builds in
+distinct trees, so a rebuild never silently overwrites an environment others are
+loading.
 
-Everything installs under a **versioned** prefix `$LFRIC_PREFIX/<version>` (default
-base `$PROJECTDIR/$USER/opt/Linux-aarch64`, version read from the repo's `VERSION`
-file, e.g. `v2026.07.21`), which is **outside the repo** — see
-[Configuration](#configuration). The version keeps independent builds in distinct
-trees, so a rebuild never silently overwrites an environment others are loading.
+Unlike everything else in this repo, Stage 1 **requires pixi** — it is what
+supplies the Python that Spack must run under (Spack 1.0 needs CPython
+< 3.12). That requirement stops at the modulefile: nothing below needs pixi.
 
 > **Why a compute node?** The login nodes cap the number of processes per user, so
 > a full parallel build fails there with `fork: Resource temporarily unavailable`.
 > `sbatch` runs it on a Grace compute node with enough cores and memory.
-
-### Optional: pre-fetch the sources on the login node
-
-Spack downloads each package's source the first time it builds it — including a
-git clone of **XIOS** from `gitlab.in2p3.fr`. To do all the network + disk I/O up
-front (and make the compute-node build robust to an intermittent source-host
-outage), pre-fetch everything on the **login node** first:
-
-```bash
-bash scripts/fetch.sh                          # cray variant (default)
-LFRIC_STACK=spack bash scripts/fetch.sh        # spack variant
-```
-
-This clones any missing Stage-1 submodules, concretizes the variant, then
-downloads every source into the shared cache under `$LFRIC_PREFIX`. The subsequent
-`sbatch` build reuses that cache and fetches nothing. Like the build, it needs a
-Python in [3.7, 3.12) (`module load cray-python/3.11.7`, or use `pixi run fetch`).
-Concurrency is capped for the login node's process limit (`FETCH_JOBS`, default 4).
 
 ---
 
@@ -133,15 +115,15 @@ Once Stage 1 has finished, load the environment in any shell — no pixi, no Spa
 
 ```bash
 # Point at the base you built into (the default is shown):
-export LFRIC_PREFIX="$PROJECTDIR/$USER/opt/$(uname -sm | tr ' ' -)"
+export LFRIC_BASE="$PROJECTDIR/$USER/opt/$(uname -sm | tr ' ' -)"
 
-module use "$LFRIC_PREFIX/modulefiles"
+module use "$LFRIC_BASE/modulefiles"
 module avail lfric-env              # list every built version × variant
-module load lfric-env/v2026.07.21/cray     # or: .../v2026.07.21/spack
+module load lfric-env/v2026.08.17/cray     # or: .../v2026.08.17/spack
 rose --version; cylc --version; psyclone --version
 ```
 
-The modulefiles live in ONE shared tree (`$LFRIC_PREFIX/modulefiles`) keyed by
+The modulefiles live in ONE shared tree (`$LFRIC_BASE/modulefiles`) keyed by
 `lfric-env/<version>/<variant>`, so `module avail lfric-env` shows every build —
 pick the version you want. Expected (exact versions track the pinned sources):
 
@@ -151,10 +133,13 @@ cylc 8.4.2
 PSyclone version: 3.3.1
 ```
 
-The modulefile carries absolute paths, so this keeps working even if the repo
-moves or is deleted. Loading one variant/version swaps out the other; bare
-`module load lfric-env` resolves to the most-recently-built version's `cray`, and
-`module load lfric-env/<version>` to that version's `cray`.
+The modulefile carries absolute paths and its logic is snapshotted next to it, so
+loading, compiling and running keep working even if this repo moves or is deleted.
+(One qualification: `spack` commands against the loaded environment still read its
+manifest, which `include:`s `stage1/spack-env/common.yaml` — so *those* need the
+repo readable. Compiling and running do not.) Loading one variant/version swaps
+out the other; bare `module load lfric-env` resolves to the most-recently-built
+version's `cray`, and `module load lfric-env/<version>` to that version's `cray`.
 
 ### Optional: configure cylc (only if you will run rose/cylc suites)
 
@@ -168,10 +153,11 @@ bash scripts/setup-cylc.sh
 ### Optional: compile the `lfric_atm` example
 
 A worked example of building a science target on the environment. It needs the
-**Stage‑2 physics submodules** (private Met Office repos — same SSH access as above):
+LFRic source and physics submodules — all public, no credentials:
 
 ```bash
 git submodule update --init --jobs 4 -- \
+  vendor/lfric_apps vendor/lfric_core \
   vendor/physics/casim vendor/physics/jules vendor/physics/socrates vendor/physics/ukca
 
 sbatch examples/minimal-compile/build.sbatch                                  # cray
@@ -245,59 +231,50 @@ into real suites — `site/activate-env.sh` (a thin module-load activator) and e
 
 ## Using pixi instead (optional)
 
-[pixi](https://pixi.sh) is **only a convenience for Stage 1**: it supplies the
-Python that runs Spack and gives you task shortcuts, and it auto-loads the built
-module on every `pixi run`. Nothing below is required — each task just wraps the
-script the no-pixi sections above already use.
+Stage 1 requires pixi and documents its own tasks in
+[`stage1/README.md`](stage1/README.md). For the **examples**, pixi is purely a
+convenience — each task below wraps the script the sections above already use,
+and it auto-loads the built module on every `pixi run`:
 
 ```bash
-pixi run submodule-init     # = the Stage-1 `git submodule update` above
-pixi run fetch              # = scripts/fetch.sh (cray)   — pre-fetch sources on a login node
-pixi run fetch-spack        # = scripts/fetch.sh (spack)
-pixi run concretize         # = scripts/concretize.sh (cray)  — solve only (cheap login-node check)
-pixi run concretize-spack   # = scripts/concretize.sh (spack)
-pixi run build              # = scripts/build.sh (cray)   — run on a compute node
-pixi run build-spack        # = scripts/build.sh (spack)
-pixi run activate           # report rose / cylc / psyclone versions
-
-# minimal-compile example:
-pixi run init-physics       # = the physics `git submodule update` above
+pixi run init-sources       # = the lfric_apps/lfric_core `git submodule update`
+pixi run init-physics       # = the physics `git submodule update`
+pixi run init-suites        # = the u-dr932 suite submodule
 pixi run build-lfric-atm    # = examples/minimal-compile/build.sh
+pixi run run-suite u-dr932  # = examples/science-suites/run-suite.sh
 pixi run setup-cylc         # = scripts/setup-cylc.sh
+pixi run activate           # report rose / cylc / psyclone versions
 ```
-
-The heavy build still needs a compute node: either submit `scripts/build.sbatch`
-(its last line shows how to switch it to `exec pixi run build`), or use `pixi run
-concretize` interactively for a quick solve-only check before submitting.
 
 Inside pixi you can skip the explicit `module load`: after a build, every
 `pixi run …` / `pixi shell` auto-loads the `LFRIC_STACK` variant, so
-`pixi run rose --version` / `pixi run spack find` work directly.
+`pixi run rose --version` works directly.
 
 ---
 
 ## Configuration
 
-The build is configured entirely through a few environment variables. The sbatch
-scripts set them explicitly in a config block at the top — read or edit that block
-to see/change exactly where things go.
+Stage 1's configuration is one file — [`stage1/env.sh`](stage1/env.sh) — which is
+also where the defaults below are set. The examples read only the last few.
 
 | Variable | Default | What it controls |
 |----------|---------|------------------|
 | `LFRIC_STACK` | `cray` | Dependency variant: `cray` or `spack`. |
-| `LFRIC_ENV_VERSION` | contents of `./VERSION` (e.g. `v2026.07.21`) | **Environment version** (CalVer). Selects the versioned install prefix `$LFRIC_PREFIX/<version>` and the module name `lfric-env/<version>/<variant>`. Read from the committed `VERSION` file; bump it with `bash scripts/bump-env-version.sh` (`pixi run bump-env-version`). Distinct from any LFRic apps/core version. |
-| `LFRIC_PREFIX` | `$PROJECTDIR/$USER/opt/<arch>` | **Base** install location (the per-arch container, shared across versions). The actual install goes into the **versioned** prefix `$LFRIC_PREFIX/$LFRIC_ENV_VERSION`: the Spack install tree, the per-variant environment + view. The shared modulefiles tree (`$LFRIC_PREFIX/modulefiles`) and the source/misc download caches sit at this base and are version-independent. Outside the repo. |
-| `LFRIC_WORKING_DIR` | `$LFRIC_PREFIX/<version>/stage` | **Transient** Spack build/compile scratch. On a compute node the sbatch points this at node‑local NVMe (`$LOCALDIR/…`) so the build stays off the shared Lustre. Safe to delete anytime. |
+| `LFRIC_ENV_VERSION` | contents of `stage1/VERSION` (e.g. `v2026.08.17`) | **Environment version** (CalVer). Selects the versioned install prefix `$LFRIC_BASE/<version>` and the module name `lfric-env/<version>/<variant>`. Bump it by editing `stage1/VERSION`. Distinct from any LFRic apps/core version. The root `VERSION` must be kept in step — it is what the examples use to name the module they load. |
+| `LFRIC_BASE` | `$PROJECTDIR/$USER/opt/<arch>` | The per-arch container, shared across versions. The shared modulefiles tree (`$LFRIC_BASE/modulefiles`) and the source/misc download caches sit here and are version-independent. Outside the repo. |
+| `LFRIC_PREFIX` | `$LFRIC_BASE/<version>` | The versioned install: the Spack install tree, and the per-variant environment + view. Derived, not set. |
+| `LFRIC_WORKING_DIR` | `$LOCALDIR/lfric-build-<variant>` | **Transient** Spack build/compile scratch, on node-local NVMe so the build stays off the shared Lustre. Safe to delete anytime. |
+| `PROJECTDIR`, `LOCALDIR` | *(required)* | Site paths. Stage 1 checks them rather than guessing — a wrong guess installs gigabytes in the wrong filesystem. |
 | `SPACK_JOBS` | `$SLURM_CPUS_PER_TASK` | Parallel build jobs (Stage 1). |
 | `MAKE_JOBS` | `$SLURM_CPUS_PER_TASK` | Parallel make jobs (minimal-compile example). |
-| `FETCH_JOBS` | `4` | Concurrency cap for the optional login-node pre-fetch (`scripts/fetch.sh`); kept small for the login node's process limit. |
+| `FETCH_JOBS` | `4` | Concurrency cap for the optional login-node pre-fetch; kept small for the login node's process limit. |
 
-The versioned prefix is what makes the minimal-compile example repo-independent: the build records absolute
-paths into it, so once built you can move or delete the repo and `module load`
-still works. To publish a rebuilt environment without disturbing the one already in
-use, `pixi run bump-env-version` (or `bash scripts/bump-env-version.sh`), commit
-`VERSION`, then rebuild — the new build lands in a fresh `$LFRIC_PREFIX/<version>`
-and shows up alongside the old one in `module avail lfric-env`.
+The versioned prefix is what makes the examples repo-independent: the build records
+absolute paths into it, so once built you can move or delete the repo and
+`module load` still works. To publish a rebuilt environment without disturbing the
+one already in use, edit `stage1/VERSION` (and the root `VERSION` to match), commit,
+then rebuild — the new build lands in a fresh `$LFRIC_BASE/<version>` and shows up
+alongside the old one in `module avail lfric-env`.
 
 ## Cleaning up
 
@@ -305,8 +282,8 @@ There is no clean task — removal is a plain `rm`. To remove **one** built vers
 delete its versioned prefix; to remove **all** versions, delete the base:
 
 ```bash
-rm -rf "$LFRIC_PREFIX/$(cat VERSION)"   # just this version's install tree + env
-rm -rf "$LFRIC_PREFIX"                  # ALL versions + the shared modulefiles/caches
+rm -rf "$LFRIC_BASE/$(cat stage1/VERSION)"   # just this version's install tree + env
+rm -rf "$LFRIC_BASE"                         # ALL versions + shared modulefiles/caches
 ```
 
 The transient stage (`$LFRIC_WORKING_DIR`, on node-local disk) is disposable and
@@ -315,23 +292,24 @@ generally cleared with the node; delete it directly if you want it gone sooner.
 ## Troubleshooting
 
 - **`submodule update` fails / "Permission denied (publickey)".** This is
-  `vendor/mo-spack-packages`, the one remaining private submodule: your SSH key is
+  `stage1/vendor/mo-spack-packages`, the one private submodule: your SSH key is
   not authorised for Met Office SSO (see [Prerequisites](#prerequisites)). The six
   LFRic source submodules are public and clone anonymously over HTTPS.
 - **`fork: Resource temporarily unavailable` during a build.** You are building on
-  a login node — submit `scripts/build.sbatch` to a compute node instead.
+  a login node — submit `stage1/build.sbatch` to a compute node instead.
 - **`Killed signal terminated program cc1plus` (out of memory).** Give the job
   more memory; the sbatch scripts already request a node's full per-core share. See
   the memory note in [`MAINTAINER.md`](MAINTAINER.md).
 - **`Unable to clone XIOS …` / a source download fails mid-build.** Usually a
   transient source-host blip. Re-running resumes from the cache; to avoid it
-  entirely, pre-fetch on the login node first (see
-  [Optional: pre-fetch the sources](#optional-pre-fetch-the-sources-on-the-login-node)).
+  entirely, pre-fetch on the login node first (`pixi run fetch` in `stage1/`).
 
 ## More documentation
 
-- [`MAINTAINER.md`](MAINTAINER.md) — how it works inside, and how to maintain it
-  (variants, patches, bumping pinned versions, the modulefile, tuning).
+- [`stage1/README.md`](stage1/README.md) — **building the environment**: the whole
+  procedure, what every file is for, and how to change it safely.
+- [`MAINTAINER.md`](MAINTAINER.md) — how the examples work inside, and how to
+  maintain them (patches, bumping pinned versions, tuning).
 - [`examples/minimal-compile/README.md`](examples/minimal-compile/README.md) — the
   minimal-compile example and how to adapt it.
 - [`examples/science-suites/README.md`](examples/science-suites/README.md) — the

@@ -280,7 +280,54 @@ the gitlink here. Re-concretize both variants afterwards.
 
 ---
 
-## 8. Gotchas
+## 8. Where the pinned versions come from
+
+The versions in `lfric-apps-isambard/package.py` are not free choices. They are
+dictated upstream, and after any bump of the LFRic sources you re-derive them
+from these, in priority order:
+
+1. **`lfric_core/documentation/source/getting_started/installation/software_dependencies.rst`**
+   — the Met Office reference software stack for a release: Python, HDF5, netCDF,
+   mpich, PSyclone, fparser, YAXT, XIOS, blitz, rose-picker, Rose/Cylc, pFUnit.
+   This is the list our bundle spec should track. It is per-release prose and
+   **can lag the tag** — cross-check it against 2 and 3.
+2. **`lfric_apps/rose-stem/site/*/common/suite_config_*.cylc`** — the module
+   versions the Met Office actually loads in CI. A reality check on the prose.
+   The `meto` entries load opaque site modules (`lfric/vn3.2`), so for library
+   versions the other sites are the informative ones.
+3. **The optimisation scripts themselves** (`applications/*/optimisation/*/psykal/`
+   in apps, `infrastructure/build/psyclone/psyclone_tools.py` in core) — the
+   *executable* statement of which PSyclone API is required, and the one that
+   settles disagreements. `psyclone_tools.py` guards moved imports with
+   `try/except`; the apps-side scripts do not. At 2026.07.1 the `.rst` still said
+   PSyclone 3.2.2 while `lfric_atm/optimisation/meto-ex1a/psykal/algorithm/
+   casim_alg_mod.py` did a bare `from psyclone.psyir.transformations import
+   OMPParallelTrans`, which exists only from 3.3 — which is why the pin is 3.3.1.
+   **Grep the optimisation scripts for `from psyclone` after every apps bump.**
+
+**XIOS is the highest-risk single bump in the stack — read this before touching
+it.** `xios@2701` is what current LFRic wants (the core docs and the MetO CI
+configs both say XIOS2 r2701, and `mo-spack-packages` ships `xios@2.2701` at the
+same commit; it also ships `xios@3.0.4.0` if a move to XIOS 3 is ever wanted). We
+build r2701 from the migrated Git history: former SVN r2701 is git `2eb572f0` on
+the `XIOS2` branch. That commit restores most of the STL includes older revisions
+lacked, but `earcut.hpp` *still* comments out `<tuple>`/`<cstddef>` while using
+`std::tuple_element`/`std::get`/`std::size_t`, which current libstdc++ no longer
+exposes transitively — hence the minimal `gcc_remap_standard_headers.patch`
+(`when @2701`) that uncomments them. Bumping XIOS therefore means: add the new
+revision and commit to `spack-repo/lfric-isambard/packages/xios/package.py`;
+**regenerate** the header patch from the new checkout rather than assuming it
+still applies (the `earcut.hpp` context drifts between revisions); then confirm
+lfric still links against it.
+
+**The compiler** is an explicit external in `spack-env/common.yaml`
+(`gcc@14.3.0` → `/usr/bin/{gcc,g++,gfortran}-14`) with per-language `require`s.
+The build deliberately never runs `spack compiler find`, which would rewrite the
+manifest and could drift to a stray gcc. 14.3.0 is the newest complete
+cray-native C/C++/Fortran toolchain on the system; to target another, edit the
+external and the `require`s together.
+
+## 9. Gotchas
 
 **Never run a full build on a login node.** They cap you at ~900 processes
 (`ulimit -u`) and the build forks past that, failing with `fork: Resource
