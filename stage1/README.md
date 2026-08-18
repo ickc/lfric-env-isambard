@@ -96,8 +96,13 @@ flowchart LR
 * **`LFRIC_PREFIX`** = `$LFRIC_BASE/$(cat VERSION)` is per-version and
   persistent. Bumping `VERSION` means the next build lands in a *fresh* tree
   rather than overwriting an environment somebody is loading right now. Both
-  variants share its `opt/`: Spack's store is content-addressed, so the large
-  MPI-independent subtree (python, rose, cylc, psyclone) is built once.
+  variants install into its `opt/`, but do not expect much sharing: measured on
+  this build, only **43 of 187** specs (22%) have an identical hash across the
+  two variants. Even python, boost, perl and the whole rose/cylc/psyclone stack
+  rebuild, because the two environments are solved independently and a
+  difference low in the graph re-hashes everything above it. Sharing one `opt/`
+  is still right — it keeps one Spack database and one place to delete — but
+  the second variant costs roughly a second full build, not a quick increment.
 * **`LFRIC_WORKING_DIR`** is transient and disposable. It is on node-local NVMe
   because compiling is metadata-heavy and doing it on contended Lustre makes the
   install phase crawl.
@@ -154,8 +159,10 @@ $FC --version                 # GNU Fortran 14.3.0, via the Cray wrapper
 already exists.
 
 To also build the portable variant (see §6), repeat the last step with
-`sbatch --export=ALL,LFRIC_STACK=spack build.sbatch`. It is much faster the
-second time round, because it reuses everything MPI-independent from the first.
+`sbatch --export=ALL,LFRIC_STACK=spack build.sbatch`. Budget about as long as
+the first: the two variants share far less than their common dependency list
+suggests (see §2). Chain it rather than running the two concurrently — they
+write to one install tree.
 
 Measured on 2026-08-18: **1 h 08 m** on 24 cores with a warm source cache, peak
 RSS 8 GB. Expect longer the first time on a machine, when `fetch` has nothing

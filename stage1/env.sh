@@ -79,7 +79,8 @@ export LFRIC_ENV_VERSION
 #                      version reuses already-downloaded sources.
 #   LFRIC_PREFIX       this version's install: $LFRIC_BASE/$LFRIC_ENV_VERSION.
 #                      Both variants share its opt/ (Spack's store is content-
-#                      addressed, so the MPI-independent subtree is built once).
+#                      addressed — though in practice the two variants share
+#                      only about a fifth of their specs; see README §2).
 #   LFRIC_WORKING_DIR  transient Spack build stage, node-local. Disposable —
 #                      point LOCALDIR elsewhere if a node has no local disk.
 export LFRIC_BASE="${LFRIC_BASE:-$PROJECTDIR/$USER/opt/$(uname -sm | tr ' ' -)}"
