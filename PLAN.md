@@ -1,5 +1,16 @@
 # PLAN — orientation for the refactor
 
+> **Status, 2026-08-17.** The first half of this plan is done: Stage 1 has been
+> extracted into a self-contained `stage1/` directory (its own submodules, its own
+> `VERSION`, pixi mandatory there and nowhere else) and documented in
+> `stage1/README.md`. That closed **R2** (the repo now lives under `$PROJECTDIR`),
+> the modulefile half of **R3** (`lfric-env.lua` no longer sets `APPS_ROOT_DIR` /
+> `CORE_ROOT_DIR` — §6's leak), and most of **R8** for the Stage-1 documentation.
+> **R1, R4, R5, R6** and the Stage-2 side of **R3** and **R7** are untouched, and
+> the sections below still describe the examples accurately. The examples
+> themselves have not been ported: they still work, still read the root
+> `scripts/common.sh`, and are the next piece of work.
+
 **What this is.** A high-level, current-state map of the repo written to be the base
 for a refactoring plan: how the workflow actually runs, where every byte lands on
 disk, what the `module load` contract really covers, what writes to `$HOME`, the

@@ -1,0 +1,76 @@
+[workspace]
+name = "lfric-env-isambard-stage1"
+version = "0.1.0"
+description = "Stage 1: build the LFRic Apps Spack environment for Isambard 3 (Cray EX, Grace/aarch64, GCC 14.3)."
+channels = ["conda-forge"]
+platforms = ["linux-aarch64"]
+
+[dependencies]
+# The ONLY thing pixi provides: the Python that runs Spack. It must be < 3.12,
+# because Spack 1.0 parses package sources with ast.Str, which 3.12 removed.
+# (The environment we build contains its own Python 3.12 — unrelated to this one.)
+python = "3.11.*"
+
+# Sourced before every task, so each script starts from the same fully-resolved
+# environment and never has to derive a path. Read stage1/env.sh to see where
+# anything lands — that file is the whole configuration surface.
+[activation]
+scripts = ["env.sh"]
+
+[tasks]
+# ---------------------------------------------------------------------------
+# The three things you actually run. Each is a thin wrapper; the phases they
+# compose live in lib.sh.
+# ---------------------------------------------------------------------------
+
+# Solve the dependency graph and assert the result matches the variant. Cheap
+# (~1 min), login-node-safe, and idempotent — a no-op when the lock is already
+# current. Run it after any change to spack-env/ or spack-repo/, before
+# spending a compute node on the install. FORCE_CONCRETIZE=1 forces a re-solve.
+concretize = "bash concretize.sh"
+
+# Download every from-source package (xios, mpich, python, rust, ...) into
+# the shared source cache, on the LOGIN node. Optional but recommended: it
+# moves all network I/O off the compute node and out of the build's critical
+# path, which matters because the XIOS clone host (gitlab.in2p3.fr) is flaky.
+fetch = "bash fetch.sh"
+
+# The build itself: prepare, solve, install, link the view, write the
+# modulefile, smoke-test. About an hour on 24 cores, incremental afterwards.
+# MUST run on a compute node — see build.sbatch, which is how you should invoke it.
+build = "bash build.sh"
+
+# ---------------------------------------------------------------------------
+# The same three for the portable from-source variant. Only the build invariant
+# needs these: `spack` has no working multi-node MPI here, so nothing real runs
+# on it. Keeping it building is what stops the cray variant from quietly
+# depending on the Cray PE in ways we did not intend.
+# ---------------------------------------------------------------------------
+#
+# The variant is passed inline rather than through pixi's per-task `env`,
+# because a task's env is applied AFTER the activation scripts run — env.sh
+# would have already resolved every path for the default variant. Setting it on
+# the command line puts it in the driver's own environment, where the driver's
+# re-source of env.sh picks it up. Same reason `LFRIC_STACK=spack pixi run
+# build` works: it is in the environment before activation.
+concretize-spack = "LFRIC_STACK=spack bash concretize.sh"
+fetch-spack = "LFRIC_STACK=spack bash fetch.sh"
+build-spack = "LFRIC_STACK=spack bash build.sh"
+
+# ---------------------------------------------------------------------------
+# Maintenance
+# ---------------------------------------------------------------------------
+
+# Clone the three pinned submodules (Spack + the two package repos). One-time.
+# mo-spack-packages is private: it needs an SSH key authorized for Met Office
+# SSO. The other two clone anonymously over HTTPS.
+submodules = "git -C .. submodule update --init --recursive --jobs 4 -- stage1/vendor"
+
+# Regenerate the Lmod modulefile from an already-installed environment, without
+# rebuilding. Use it after editing lfric-env.lua. For the cray variant this must
+# run with the Cray PE modules loaded, so prefer re-running `build` (which is
+# incremental and does the loading itself) unless you know why you are not.
+modulefile = "bash gen-modulefile.sh"
+
+# Where did everything go, and is it built?
+where = "bash where.sh"
