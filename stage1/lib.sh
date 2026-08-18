@@ -220,10 +220,23 @@ lfric_install() {
   info "Installing yaxt (serial: it has a parallel-make race)"
   spack -e "$SPACK_ENV_DIR" install -j 1 yaxt || die "install yaxt failed"
 
+  # Only pre-build the heavy packages this environment actually contains. Match
+  # the lock's key WITHOUT assuming whitespace: Spack writes it compactly, as
+  # `"name":"xios"`. A pattern with a space after the colon silently matches
+  # nothing, which disables this cap entirely and lets xios compile at full
+  # width — the exact OOM this function exists to avoid. Say what is skipped
+  # rather than dropping it quietly.
+  #
+  # There is deliberately no "is it already installed?" pre-check: `spack
+  # install` on an installed package is a fast no-op, and the obvious check
+  # (`spack find`) reports an environment's concretized specs whether or not
+  # they are installed.
   local hp
   for hp in $HEAVY_PKGS; do
-    spack -e "$SPACK_ENV_DIR" find "$hp" >/dev/null 2>&1 && continue
-    grep -q "\"name\": \"$hp\"" "$SPACK_ENV_DIR/spack.lock" || continue
+    if ! grep -qE "\"name\":[[:space:]]*\"$hp\"" "$SPACK_ENV_DIR/spack.lock"; then
+      info "$hp is not in this environment — skipping its capped pre-build"
+      continue
+    fi
     info "Installing $hp (-j $HEAVY_JOBS; multi-GB translation units)"
     spack -e "$SPACK_ENV_DIR" install -j "$HEAVY_JOBS" "$hp" || die "install $hp failed"
   done
