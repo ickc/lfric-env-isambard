@@ -253,6 +253,10 @@ lfric_smoke_test() {
   info "rose:     $(rose --version 2>&1 || echo MISSING)"
   info "cylc:     $(cylc --version 2>&1 || echo MISSING)"
   info "psyclone: $(psyclone --version 2>&1 || echo MISSING)"
-  info "FC=$FC  CXX=$CXX  LDMPI=$LDMPI"
+  info "FC=${FC:-UNSET}  CXX=${CXX:-UNSET}  LDMPI=${LDMPI:-UNSET}"
+  # The toolchain is the contract, so treat a missing compiler as a build failure
+  # rather than something the first consumer discovers.
+  [ -n "${FC:-}" ] || die "$MODULE_NAME did not set FC — the module is not a usable toolchain"
   command -v "$FC" >/dev/null 2>&1 || die "FC=$FC is not on PATH after loading $MODULE_NAME"
+  "$FC" --version 2>&1 | head -1
 }

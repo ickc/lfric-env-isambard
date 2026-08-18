@@ -89,8 +89,14 @@ export LFRIC_WORKING_DIR="$LOCALDIR/lfric-build-$LFRIC_STACK"
 # Spack. The CLI is the vendored submodule; its user config and caches are
 # redirected under our own prefix so the build never reads or writes ~/.spack.
 # The download caches sit at LFRIC_BASE (version-independent, content-addressed).
+#
+# The config scope is PER-VARIANT because the config.yaml lib.sh writes into it
+# names a variant-specific build_stage. Sharing one scope means a login-node
+# `pixi run fetch-spack` rewrites the build_stage out from under a cray build
+# running on a compute node — the two disagree about where LOCALDIR is. The
+# cache scope is Spack's own (bootstrap, etc.) and is fine to share.
 export SPACK_ROOT="$STAGE1_DIR/vendor/spack"
-export SPACK_USER_CONFIG_PATH="$LFRIC_PREFIX/spack-config"
+export SPACK_USER_CONFIG_PATH="$LFRIC_PREFIX/spack-config/$LFRIC_STACK"
 export SPACK_USER_CACHE_PATH="$LFRIC_PREFIX/spack-cache"
 export LFRIC_SOURCE_CACHE="${LFRIC_SOURCE_CACHE:-$LFRIC_BASE/source-cache}"
 export LFRIC_MISC_CACHE="${LFRIC_MISC_CACHE:-$LFRIC_BASE/misc-cache}"
