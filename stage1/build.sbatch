@@ -4,7 +4,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=24
 #SBATCH --mem-per-cpu=1600M
-#SBATCH --time=04:00:00
+#SBATCH --time=06:00:00
 #SBATCH --output=logs/build-%j.out
 #
 # Build the environment on a Grace compute node. Submit from stage1/:
@@ -22,6 +22,11 @@
 #
 # Why not exclusive: a small, short, non-exclusive job backfills much sooner,
 # and the build is not wide enough to need a whole node.
+#
+# Why 6 h for a build that takes less: rust and xios are deliberately built at a
+# capped -j (see lfric_install), which trades wall-clock for not being OOM-killed.
+# Running out of time here is not costly — the install tree persists, so
+# resubmitting resumes — but it wastes a scheduling slot, so leave the headroom.
 set -uo pipefail
 cd "${SLURM_SUBMIT_DIR:-$(pwd)}" || exit 1
 
