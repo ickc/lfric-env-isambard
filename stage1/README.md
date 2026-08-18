@@ -5,7 +5,7 @@ LFRic Apps toolchain on Isambard 3.
 
 ```
 module use $PROJECTDIR/$USER/opt/Linux-aarch64/modulefiles
-module load lfric-env/v2026.08.17/cray
+module load lfric-env/v2026.08.18/cray
 ```
 
 Those two lines are the entire product. Everything else in this repo — compiling
@@ -36,7 +36,7 @@ flowchart TB
         P1["prepare<br/><i>patch · load Cray modules<br/>write Spack config · instantiate env</i>"]
         P2["concretize<br/><i>solve, then ASSERT the solution<br/>matches the variant</i>"]
         P3["fetch<br/><i>optional, login node</i>"]
-        P4["install<br/><i>compute node, 2-4 h</i>"]
+        P4["install<br/><i>compute node, ~1 h</i>"]
         P5["view + modulefile"]
         P1 --> P2 --> P3 --> P4 --> P5
     end
@@ -58,7 +58,7 @@ long apiece:
 |---|---|---|---|
 | `pixi run concretize` | prepare, concretize | login node | ~1 min |
 | `pixi run fetch` | prepare, concretize, fetch | login node | ~20 min |
-| `pixi run build` | prepare, concretize, install, modulefile | **compute node** | 2–4 h cold |
+| `pixi run build` | prepare, concretize, install, modulefile | **compute node** | ~1 h |
 
 Concretize is the one you run often. It is the cheap check that a change to
 `spack-env/` or `spack-repo/` still solves, and it runs the variant assertions —
@@ -79,7 +79,7 @@ flowchart LR
         direction TB
         M["modulefiles/<br/><b>the product</b><br/><i>one module use lists every build</i>"]
         C["source-cache/ misc-cache/<br/><i>shared across versions</i>"]
-        V["v2026.08.17/ = LFRIC_PREFIX<br/>├── opt/  <i>install tree, both variants</i><br/>└── spack-env/{cray,spack}/  <i>env + view</i>"]
+        V["v2026.08.18/ = LFRIC_PREFIX<br/>├── opt/  <i>install tree, both variants</i><br/>└── spack-env/{cray,spack}/  <i>env + view</i>"]
     end
     subgraph L["$LOCALDIR = node-local NVMe"]
         W["lfric-build-&lt;variant&gt;<br/><i>Spack build stage only</i>"]
@@ -136,7 +136,7 @@ pixi run concretize-spack     # -> CONCRETIZE_OK      the portable variant
 pixi run fetch                # -> FETCH_OK           (~20 min; optional)
 
 # --- compute node: the build ------------------------------------------------
-sbatch build.sbatch                                    # -> BUILD_OK, 2-4 h
+sbatch build.sbatch                                    # -> BUILD_OK, ~1 h
 tail -f logs/build-<jobid>.out
 
 # --- the result: this is all Stage 2 ever needs -----------------------------
@@ -156,6 +156,12 @@ already exists.
 To also build the portable variant (see §6), repeat the last step with
 `sbatch --export=ALL,LFRIC_STACK=spack build.sbatch`. It is much faster the
 second time round, because it reuses everything MPI-independent from the first.
+
+Measured on 2026-08-18: **1 h 08 m** on 24 cores with a warm source cache, peak
+RSS 8 GB. Expect longer the first time on a machine, when `fetch` has nothing
+cached and the sources are still being downloaded. The job asks for 6 h because
+`rust` and `xios` are deliberately built at a capped `-j` (`lfric_install` in
+`lib.sh`) and the headroom is free.
 
 Re-running the build is safe and cheap — Spack skips what is already installed —
 so the fix for an interrupted or failed build is normally to submit it again.

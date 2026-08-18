@@ -29,15 +29,15 @@ scripts = ["env.sh"]
 # spending a compute node on the install. FORCE_CONCRETIZE=1 forces a re-solve.
 concretize = "bash concretize.sh"
 
-# Download every from-source package (xios, mpich, python, node-js, ...) into
+# Download every from-source package (xios, mpich, python, rust, ...) into
 # the shared source cache, on the LOGIN node. Optional but recommended: it
 # moves all network I/O off the compute node and out of the build's critical
 # path, which matters because the XIOS clone host (gitlab.in2p3.fr) is flaky.
 fetch = "bash fetch.sh"
 
 # The build itself: prepare, solve, install, link the view, write the
-# modulefile, smoke-test. 2-4 hours from cold, incremental afterwards. MUST run
-# on a compute node — see build.sbatch, which is how you should invoke this.
+# modulefile, smoke-test. About an hour on 24 cores, incremental afterwards.
+# MUST run on a compute node — see build.sbatch, which is how you should invoke it.
 build = "bash build.sh"
 
 # ---------------------------------------------------------------------------

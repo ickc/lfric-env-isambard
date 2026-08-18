@@ -90,7 +90,7 @@ cd lfric-env-isambard/stage1
 pixi run submodules      # the pinned Spack + package repos (one-time)
 pixi run concretize      # cheap login-node check that it still solves
 pixi run fetch           # optional: pre-download every source
-sbatch build.sbatch      # the build itself, 2-4 h -> BUILD_OK
+sbatch build.sbatch      # the build itself, ~1 h -> BUILD_OK
 ```
 
 Everything installs **outside the repo**, under a versioned prefix
@@ -119,7 +119,7 @@ export LFRIC_BASE="$PROJECTDIR/$USER/opt/$(uname -sm | tr ' ' -)"
 
 module use "$LFRIC_BASE/modulefiles"
 module avail lfric-env              # list every built version × variant
-module load lfric-env/v2026.08.17/cray     # or: .../v2026.08.17/spack
+module load lfric-env/v2026.08.18/cray     # or: .../v2026.08.18/spack
 rose --version; cylc --version; psyclone --version
 ```
 
@@ -260,7 +260,7 @@ also where the defaults below are set. The examples read only the last few.
 | Variable | Default | What it controls |
 |----------|---------|------------------|
 | `LFRIC_STACK` | `cray` | Dependency variant: `cray` or `spack`. |
-| `LFRIC_ENV_VERSION` | contents of `stage1/VERSION` (e.g. `v2026.08.17`) | **Environment version** (CalVer). Selects the versioned install prefix `$LFRIC_BASE/<version>` and the module name `lfric-env/<version>/<variant>`. Bump it by editing `stage1/VERSION`. Distinct from any LFRic apps/core version. The root `VERSION` must be kept in step — it is what the examples use to name the module they load. |
+| `LFRIC_ENV_VERSION` | contents of `stage1/VERSION` (e.g. `v2026.08.18`) | **Environment version** (CalVer). Selects the versioned install prefix `$LFRIC_BASE/<version>` and the module name `lfric-env/<version>/<variant>`. Bump it by editing `stage1/VERSION`. Distinct from any LFRic apps/core version. The root `VERSION` must be kept in step — it is what the examples use to name the module they load. |
 | `LFRIC_BASE` | `$PROJECTDIR/$USER/opt/<arch>` | The per-arch container, shared across versions. The shared modulefiles tree (`$LFRIC_BASE/modulefiles`) and the source/misc download caches sit here and are version-independent. Outside the repo. |
 | `LFRIC_PREFIX` | `$LFRIC_BASE/<version>` | The versioned install: the Spack install tree, and the per-variant environment + view. Derived, not set. |
 | `LFRIC_WORKING_DIR` | `$LOCALDIR/lfric-build-<variant>` | **Transient** Spack build/compile scratch, on node-local NVMe so the build stays off the shared Lustre. Safe to delete anytime. |
