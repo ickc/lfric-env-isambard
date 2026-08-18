@@ -50,10 +50,25 @@ lua_list() {
 }
 
 # --- Resolve this build's hash-addressed prefixes --------------------------
-shumlib_prefix="$(spack -e "$SPACK_ENV_DIR" location -i shumlib 2>/dev/null || true)"
-python_prefix="$(spack -e "$SPACK_ENV_DIR" location -i python 2>/dev/null || true)"
-psyclone_prefix="$(spack -e "$SPACK_ENV_DIR" location -i py-psyclone 2>/dev/null || true)"
-rose_picker_prefix="$(spack -e "$SPACK_ENV_DIR" location -i rose-picker 2>/dev/null || true)"
+# A spec that does not resolve is REPORTED, not silently turned into nil. These
+# names drift: Spack 1.0 renamed the Met Office Python packages with a py-
+# prefix, and because this script kept asking for "rose-picker" it resolved to
+# nothing in every modulefile generated since, with no sign that anything was
+# wrong. Two of these (shumlib -> SHUMLIB_ROOT, py-psyclone -> PSYCLONE_CONFIG)
+# are load-bearing, so a silent miss would surface much later as a confusing
+# build failure.
+resolve_prefix() {
+  local p
+  if p="$(spack -e "$SPACK_ENV_DIR" location -i "$1" 2>/dev/null)" && [ -n "$p" ]; then
+    printf '%s' "$p"
+  else
+    warn "spec '$1' did not resolve in $ENV_NAME — the modulefile will omit it"
+  fi
+}
+shumlib_prefix="$(resolve_prefix shumlib)"
+python_prefix="$(resolve_prefix python)"
+psyclone_prefix="$(resolve_prefix py-psyclone)"
+rose_picker_prefix="$(resolve_prefix py-rose-picker)"
 
 shumlib_lib=""
 for d in "$shumlib_prefix/lib" "$shumlib_prefix/lib64"; do
