@@ -4,10 +4,17 @@
 # The modulefile is deliberately in two halves:
 #
 #   lfric-env.lua      the LOGIC — what goes on PATH, which variables are set,
-#                      in what order. Version-controlled, reviewable, identical
-#                      for every build. Snapshotted next to the modulefiles at
-#                      build time, and loaded from THERE, so `module load` never
-#                      needs this repo on disk.
+#                      in what order. Version-controlled and reviewable.
+#                      Snapshotted into LFRIC_PREFIX at build time, and loaded
+#                      from THERE, so `module load` never needs this repo on
+#                      disk. The snapshot is PER-VERSION, and must stay that
+#                      way: it used to be one shared copy next to the
+#                      modulefiles, which meant building a new version rewrote
+#                      the logic of every version already published. That is
+#                      exactly what versioning exists to prevent, and it bites
+#                      the moment the logic changes in a way old builds did not
+#                      expect — as it did when APPS_ROOT_DIR/CORE_ROOT_DIR were
+#                      dropped.
 #   <version>/<variant>.lua   the DATA — the hash-addressed paths this
 #                      particular build resolved to. Generated here, nothing else.
 #
@@ -27,7 +34,7 @@ cd -- "$(dirname -- "${BASH_SOURCE[0]}")" || exit 1
 
 logic="$STAGE1_DIR/lfric-env.lua"
 view="$SPACK_ENV_DIR/.spack-env/view"
-installed_logic="$MODULEFILES_DIR/lfric-env.lua"
+installed_logic="$LFRIC_PREFIX/lfric-env.lua"
 
 [ -f "$logic" ] || die "missing $logic"
 [ -d "$view/bin" ] || die "no Spack view at $view — build the environment first (sbatch build.sbatch)"
@@ -91,7 +98,7 @@ pythonpath_lua='{}'; [ ${#pythonpath[@]} -gt 0 ] && pythonpath_lua="$(lua_list "
 cray_libs_lua='{}';  [ ${#cray_libs[@]}  -gt 0 ] && cray_libs_lua="$(lua_list "${cray_libs[@]}")"
 
 # --- Emit ------------------------------------------------------------------
-mkdir -p "$(dirname "$MODULEFILE")" "$MODULEFILES_DIR"
+mkdir -p "$(dirname "$MODULEFILE")" "$MODULEFILES_DIR" "$LFRIC_PREFIX"
 cp -f "$logic" "$installed_logic" || die "failed to snapshot the logic to $installed_logic"
 
 # The Cray module loads MUST be literal load()/try_load() calls at the top level
