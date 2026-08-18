@@ -159,9 +159,11 @@ $FC --version                 # GNU Fortran 14.3.0, via the Cray wrapper
 already exists.
 
 To also build the portable variant (see §6), repeat the last step with
-`sbatch --export=ALL,LFRIC_STACK=spack build.sbatch`. Budget about as long as
-the first: the two variants share far less than their common dependency list
-suggests (see §2). Chain it rather than running the two concurrently — they
+`sbatch --export=ALL,LFRIC_STACK=spack build.sbatch`. Budget *longer* than the
+first, not shorter — it measured 1 h 53 m against cray's 1 h 08 m, because it
+builds MPI, HDF5 and netCDF from source and shares far less with the first
+variant than their common dependency list suggests (see §2). Chain it with
+`--dependency=afterok:<jobid>` rather than running the two concurrently: they
 write to one install tree.
 
 Measured on 2026-08-18: **1 h 08 m** on 24 cores with a warm source cache, peak
