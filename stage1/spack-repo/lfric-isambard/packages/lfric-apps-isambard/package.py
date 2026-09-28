@@ -55,8 +55,9 @@ class LfricAppsIsambard(Package):
     depends_on("py-stylist@0.4.1")
     depends_on("py-fortitude@0.9.0")
     # Also run there: macro_chains_checker imports networkx; python_unit_tests
-    # and test_launch-exe run pytest.
-    depends_on("py-networkx")
+    # and test_launch-exe run pytest. networkx ~default: its default variant
+    # pulls in numpy/scipy/pandas/matplotlib/numba, and through numba LLVM.
+    depends_on("py-networkx~default")
     depends_on("py-pytest")
     depends_on("py-ansimarkup")
     depends_on("py-colorama")
