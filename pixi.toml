@@ -1,126 +1,66 @@
 [workspace]
 name = "lfric-env-isambard"
 version = "0.1.0"
-description = "Pixi-driven, submodule-based reproducible build of the LFRic Apps Spack environment for Isambard 3 (GCC 14.3)."
+description = "Examples built on the LFRic Apps environment for Isambard 3: a minimal lfric_atm compile, and three real Rose/Cylc science suites."
 channels = ["conda-forge"]
 platforms = ["linux-aarch64"]
 
 [dependencies]
-# Pixi bootstraps Python. This Python RUNS Spack, so it must be < 3.12: Spack
-# 1.0 uses ast.Str, removed in Python 3.12. (The LFRic environment itself builds
-# its own Python 3.12 via Spack — that is independent of this one.)
+# A python for the odd helper script. The examples themselves use the python
+# that `module load lfric-env/...` puts on PATH, not this one.
 python = "3.11.*"
 
-# Auto-activate the built Spack environment on every `pixi run` / `pixi shell`,
-# in two sourced steps:
-#   common.sh    puts the vendored `spack` on PATH + the generated modulefiles on
-#                MODULEPATH (so `pixi run spack ...` and `module load` both work).
-#   activate.sh  `module load`s lfric-env/<LFRIC_STACK> (the generated modulefile
-#                $PREFIX/modulefiles/lfric-env/<variant>.lua).
-# Both are a NO-OP until `pixi run build` has produced the modulefile, so this is
-# safe before the first build. Order matters: common.sh sets the MODULEPATH that
-# activate.sh relies on.
+# BUILDING the environment does NOT live here — it is stage1/, which has its own
+# pixi workspace and is the only place pixi is required. See stage1/README.md.
 #
-# This whole block is a CONVENIENCE for working inside pixi, not a requirement:
-# pixi only matters for *building* the environment (Stage 1, where it supplies the
-# Python above). The build's product is a self-contained Lmod modulefile, so the
-# environment is loaded — and the examples built on top of it — with nothing but
-# `module load lfric-env/<variant>`, no pixi. See README "Architecture".
+# Nothing below needs pixi either: every task is a one-line wrapper around a
+# script you can run directly, and the examples need only `module load`. This
+# file is a convenience, and it is on the list of things to reconsider when the
+# examples are ported (see PLAN.md).
+
+# common.sh works out which built environment to load; activate.sh module-loads
+# it. Both are no-ops until Stage 1 has been built.
 [activation]
 scripts = ["scripts/common.sh", "scripts/activate.sh"]
 
 [tasks]
-# One-time: clone the pinned Stage-1 (core) submodules — Spack, the package repos
-# and the LFRic sources. All of these clone anonymously over HTTPS except
-# mo-spack-packages, which is still private: that one needs an SSH key authorized
-# for Met Office SSO; see the README note. The physics submodules (used by the
-# examples, not Stage 1) are SEPARATE — see
-# `init-physics`.
-submodule-init = "git submodule update --init --recursive --jobs 4 -- vendor/spack vendor/spack-packages vendor/lfric_apps vendor/lfric_core vendor/mo-spack-packages"
-
-# Examples only (not Stage 1): clone the pinned physics submodules (casim/jules/
-# socrates/ukca), needed to compile lfric_atm (examples/minimal-compile/ and the
-# science-suites extract them per-suite). All four are public — no credentials.
+# --- Sources the examples compile from --------------------------------------
+# The LFRic source repos. All public, cloned anonymously over HTTPS. These are
+# NOT needed to build the environment — Stage 1's own submodules are under
+# stage1/vendor/ and are initialised by `pixi run submodules` in there.
+init-sources = "git submodule update --init --jobs 4 -- vendor/lfric_apps vendor/lfric_core"
 init-physics = "git submodule update --init --jobs 4 -- vendor/physics/casim vendor/physics/jules vendor/physics/socrates vendor/physics/ukca"
 
-# Science-suite examples only: clone the pinned upstream suite repo. This covers u-dr932,
-# which lives on GitHub. u-dn704 and u-dt000 are Met Office rose suites in MOSRS
-# subversion and are fetched with `rosie checkout` instead (needs a MOSRS account) --
-# nothing to vendor, see examples/science-suites/README.md. Each suite is staged by its
-# patch script; none is copied into this repo.
+# The u-dr932 science suite (Denis Sergeev's repo). u-dn704 and u-dt000 are Met
+# Office rose suites in MOSRS subversion, fetched with `rosie checkout` instead —
+# nothing to vendor. See examples/science-suites/README.md.
 init-suites = "git submodule update --init -- vendor/lfric_egp_bench"
 
-# Stage/update the pinned physics + lfric_core submodules to the refs in
-# vendor/lfric_apps/dependencies.yaml, then commit the gitlinks. This is the
-# explicit, reproducible way to pull in new science: local_build.py no longer
-# auto-clones (patches/30-lfric_apps-local-sources-patch.sh), so the build only
-# reads what you stage. See scripts/stage-physics.sh.
+# Stage/update the physics + lfric_core submodules to the refs declared in
+# vendor/lfric_apps/dependencies.yaml, then commit the gitlinks. The explicit,
+# reproducible way to pull in new science.
 stage-physics = "bash scripts/stage-physics.sh"
 
-# Apply every patches/*-patch.sh, in sorted order (idempotent). `build` runs
-# this automatically; this task is for applying patches on their own.
+# --- Patches ----------------------------------------------------------------
+# Apply every patches/*-patch.sh in sorted order (idempotent). These are the
+# LFRic-source and suite patches; Stage 1's own patch lives in stage1/patches/.
 patch = "bash scripts/patch-all.sh"
-
-# Revert all patches by resetting the patched submodules to their pinned commit.
 unpatch = "bash scripts/unpatch.sh"
 
-# Bump the ENVIRONMENT version (CalVer in ./VERSION) so the next build lands in a
-# fresh, distinct prefix ($BASE/<version>) + module (lfric-env/<version>/<variant>)
-# instead of overwriting the current install. No arg -> today's date; or pass an
-# explicit version. Commit ./VERSION afterwards. See scripts/bump-env-version.sh.
-bump-env-version = "bash scripts/bump-env-version.sh"
-
-# Build the Spack environment — the bulk of the work (~2-4 h from scratch;
-# re-runs are incremental). Run it on a compute node (see scripts/build.sbatch).
-# Applies patches first, then concretizes and installs into PREFIX.
-#
-# Two dependency variants share one install tree ($PREFIX/opt), selected by
-# LFRIC_STACK (default "cray"; see scripts/common.sh):
-#   pixi run build                     # cray: system cray-mpich + Cray HDF5/netCDF
-#   pixi run build-spack               # spack: mpich + HDF5/netCDF from source
-# The convenience tasks below just set LFRIC_STACK; equivalently prefix any task,
-# e.g. `LFRIC_STACK=spack pixi run build-lfric-atm`.
-build = "bash scripts/build.sh"
-build-spack = "LFRIC_STACK=spack bash scripts/build.sh"
-
-# Concretize ONLY — the dependency solve + variant assertions, then stop. This is
-# the cheap, login-node-safe check that a manifest/variant change still solves
-# (no multi-hour install). Idempotent: a no-op when the lock already matches the
-# manifest; set FORCE_CONCRETIZE=1 to force a fresh re-solve. `build` and `fetch`
-# both run this same phase first (scripts/lib.sh).
-concretize = "bash scripts/concretize.sh"
-concretize-spack = "LFRIC_STACK=spack bash scripts/concretize.sh"
-
-# Login-node pre-fetch: clone the pinned Stage-1 submodules (if missing), then
-# download every from-source Spack package (xios, mpich, hdf5, ...) into
-# $PREFIX/source-cache, so the compute-node `build` runs offline and survives an
-# intermittent source-host blip (e.g. the gitlab.in2p3.fr XIOS clone). Run this on
-# a LOGIN NODE before `build`. Concurrency is capped (FETCH_JOBS, default 4) for
-# the login node's small `ulimit -u`. As with `build`, repeat for the spack variant:
-#   pixi run fetch                     # cray variant's sources
-#   pixi run fetch-spack               # spack variant's sources
-fetch = "bash scripts/fetch.sh"
-fetch-spack = "LFRIC_STACK=spack bash scripts/fetch.sh"
-
-# MINIMAL-COMPILE EXAMPLE: compile lfric_atm and run its bundled example on the
-# built environment. The smallest worked example of building a science target
-# (copy/adapt it — see examples/minimal-compile/). Needs the physics submodules
-# (`init-physics`).
+# --- The examples -----------------------------------------------------------
+# Compile lfric_atm on the built environment: the smallest worked example of
+# building a science target. Needs init-sources + init-physics.
 build-lfric-atm = "bash examples/minimal-compile/build.sh"
 
-# SCIENCE-SUITE EXAMPLE: run a real Rose/Cylc LFRic science suite on the built env.
-# Pass the suite id, e.g. `pixi run run-suite u-dr932` (cray env by default). Drives
-# cylc on the login node -> Slurm (not sbatch); see examples/science-suites/README.md.
+# Run a real Rose/Cylc science suite, e.g. `pixi run run-suite u-dr932`. Drives
+# cylc on the login node, which submits to Slurm itself — not an sbatch wrapper.
 run-suite = "bash examples/science-suites/run-suite.sh"
 
-# Optional, opt-in: configure cylc (a run dir + an isambard3 Slurm platform) for
-# running rose/cylc suites. NOT part of `build` — building must not touch ~/.cylc.
+# Configure cylc (a run dir + the isambard3 Slurm platform) in ~/.cylc. Opt-in,
+# idempotent, and deliberately not part of building anything.
 setup-cylc = "bash scripts/setup-cylc.sh"
 
-# Activate the environment and report tool versions (rose / cylc / psyclone).
-# activate-spack reports the from-source variant; either is a no-op until built.
+# --- Checks -----------------------------------------------------------------
+# Load the environment and report tool versions; a no-op until Stage 1 is built.
 activate = "bash scripts/print-versions.sh"
 activate-spack = "LFRIC_STACK=spack bash scripts/print-versions.sh"
-
-# Verify the migrated XIOS source matches the pinned commit (network check).
-verify-xios = "bash scripts/xios-verification.sh"

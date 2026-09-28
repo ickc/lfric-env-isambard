@@ -14,9 +14,8 @@ _here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
 if [ ! -f "$MODULEFILE" ]; then
   echo "Environment '$LFRIC_STACK' is not built yet (no modulefile at $MODULEFILE)."
   echo "  Build it on a compute node (from the repo root):"
-  echo "    sbatch scripts/build.sbatch                                 # cray (default)"
-  echo "    sbatch --export=ALL,LFRIC_STACK=spack scripts/build.sbatch  # spack"
-  echo "  (with pixi: pixi run build / pixi run build-spack)"
+  echo "    cd stage1 && sbatch build.sbatch                           # cray (default)"
+  echo "    sbatch --export=ALL,LFRIC_STACK=spack build.sbatch  # spack"
   exit 1
 fi
 

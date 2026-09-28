@@ -1,0 +1,6 @@
+# pixi's resolved environment (pixi.lock IS tracked; the env itself is not)
+/.pixi/
+
+# sbatch stdout (#SBATCH --output=logs/...); the directory is tracked, not its contents
+/logs/*
+!/logs/.gitkeep
