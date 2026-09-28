@@ -263,9 +263,11 @@ lfric_smoke_test() {
   command -v module >/dev/null 2>&1 || . /opt/cray/pe/lmod/lmod/init/bash
   module use "$MODULEFILES_DIR"
   module load "$MODULE_NAME" || die "could not load the modulefile we just wrote ($MODULE_NAME)"
-  info "rose:     $(rose --version 2>&1 || echo MISSING)"
-  info "cylc:     $(cylc --version 2>&1 || echo MISSING)"
-  info "psyclone: $(psyclone --version 2>&1 || echo MISSING)"
+  local tool ver
+  for tool in rose cylc psyclone; do
+    ver="$("$tool" --version 2>&1)" || die "$tool --version failed after loading $MODULE_NAME: $ver"
+    info "$tool: $ver"
+  done
   info "FC=${FC:-UNSET}  CXX=${CXX:-UNSET}  LDMPI=${LDMPI:-UNSET}"
   # The toolchain is the contract, so treat a missing compiler as a build failure
   # rather than something the first consumer discovers.
