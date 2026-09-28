@@ -61,7 +61,7 @@ process limit), set the variant + prefix to match what you built, then run:
 export LFRIC_STACK=cray                              # or spack
 export LFRIC_PREFIX="$PROJECTDIR/$USER/opt/Linux-aarch64"   # the prefix you built into
 module use "$LFRIC_PREFIX/modulefiles"
-module load "lfric-env/$LFRIC_STACK"
+module load "lfric-env/$(cat VERSION)/$LFRIC_STACK"
 bash examples/minimal-compile/build.sh
 ```
 

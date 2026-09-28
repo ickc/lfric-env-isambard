@@ -13,9 +13,9 @@
 # does NOT know which Cray modules or compiler wrappers back a given variant; that
 # is the modulefile's job (stage1/lfric-env.lua), baked in by Stage 1.
 #
-# It needs the private Met Office physics repos (casim, jules, socrates, ukca),
-# vendored as pinned submodules under vendor/physics/ and fed to the LFRic extract
-# step via PHYSICS_ROOT, so the compile clones nothing over SSH once those are
+# It needs the Met Office physics repos (casim, jules, socrates, ukca; public,
+# HTTPS), vendored as pinned submodules under vendor/physics/ and fed to the LFRic
+# extract step via PHYSICS_ROOT, so the compile clones nothing once those are
 # initialised (see README). It uses an already-built environment for the
 # variant you select; it does NOT build one.
 #

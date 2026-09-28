@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/common.sh — shared context for the examples (Stage 2). SOURCE it.
+# scripts/common.sh — shared context for the examples. SOURCE it.
 #
 # Its whole job is to work out WHICH built environment to load and where its
 # modulefiles are, so an example can `module load` it. It does not know how that
