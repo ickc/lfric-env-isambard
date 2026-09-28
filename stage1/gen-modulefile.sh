@@ -38,6 +38,9 @@ installed_logic="$LFRIC_PREFIX/lfric-env.lua"
 # The Rose site config (the rosie prefix map), installed per version.
 rose_site_src="$STAGE1_DIR/site/rose.conf"
 rose_site_dir="$LFRIC_PREFIX/etc/rose"
+# Small site helpers (mosrs-cache-password), put on PATH by the module.
+site_bin_src="$STAGE1_DIR/site/bin"
+site_bin_dir="$LFRIC_PREFIX/bin"
 
 [ -f "$logic" ] || die "missing $logic"
 [ -d "$view/bin" ] || die "no Spack view at $view — build the environment first (sbatch build.sbatch)"
@@ -120,6 +123,8 @@ mkdir -p "$(dirname "$MODULEFILE")" "$MODULEFILES_DIR" "$LFRIC_PREFIX"
 cp -f "$logic" "$installed_logic" || die "failed to snapshot the logic to $installed_logic"
 mkdir -p "$rose_site_dir" && cp -f "$rose_site_src" "$rose_site_dir/rose.conf" \
   || die "failed to install the Rose site config to $rose_site_dir"
+mkdir -p "$site_bin_dir" && cp -f "$site_bin_src"/* "$site_bin_dir"/ \
+  || die "failed to install the site helpers to $site_bin_dir"
 
 # The Cray module loads MUST be literal load()/try_load() calls at the top level
 # of this generated file — not inside lfric-env.lua. Lmod resolves module
@@ -153,6 +158,8 @@ ${cray_loads}local data = {
   psyclone_cfg    = $(lua_qn "$psyclone_cfg"),
   rose_picker     = $(lua_qn "$rose_picker_prefix"),
   rose_site_conf  = $(lua_q  "$rose_site_dir"),
+  site_bin        = $(lua_q  "$site_bin_dir"),
+  modulefiles_dir = $(lua_q  "$MODULEFILES_DIR"),
   pythonpath      = $pythonpath_lua,
   cray_libs       = $cray_libs_lua,
   target_platform = $(lua_q  "${LFRIC_TARGET_PLATFORM:-meto-spice}"),
