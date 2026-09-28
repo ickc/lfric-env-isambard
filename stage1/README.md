@@ -363,6 +363,16 @@ external and the `require`s together.
 (`ulimit -u`) and the build forks past that, failing with `fork: Resource
 temporarily unavailable`. Concretize and fetch are fine there.
 
+**A re-solve rewrites the live view.** `pixi run concretize` with
+`FORCE_CONCRETIZE=1`, or after a manifest change, regenerates the view of an
+environment that is already built. Anything the new solve has not installed yet
+drops out of it until the next `build`, and that includes `rose` and `cylc` if
+their hashes move. Anyone who has the module loaded at that moment, such as a
+running suite, loses them mid-run. When an environment is in use, add packages
+to a new `VERSION`, or re-solve inside the build job
+(`sbatch --export=ALL,FORCE_CONCRETIZE=1 build.sbatch`) timed for when nothing
+is running.
+
 **Spack 1.0 needs CPython in [3.7, 3.12).** It parses package sources with
 `ast.Str`, which 3.12 removed. This is the single reason pixi is here — it pins
 3.11. (The environment being built contains its own Python 3.12; unrelated.)
