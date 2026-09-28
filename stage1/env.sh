@@ -71,6 +71,12 @@ esac
 if [ -z "${LFRIC_ENV_VERSION:-}" ]; then
   LFRIC_ENV_VERSION="$(tr -d '[:space:]' < "$STAGE1_DIR/VERSION")"
 fi
+# It becomes a path component below, so it must be a single safe token.
+case "$LFRIC_ENV_VERSION" in
+  ''|*[[:space:]]*|*/*|*\\*|*..*)
+     echo "ERROR: LFRIC_ENV_VERSION must be a single token with no '/', '\\' or '..' (got '$LFRIC_ENV_VERSION')" >&2
+     return 1 2>/dev/null || exit 1 ;;
+esac
 export LFRIC_ENV_VERSION
 
 # Where everything lands.
