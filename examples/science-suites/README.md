@@ -170,9 +170,10 @@ change to propose upstream.
 
 ### Getting a suite from MOSRS
 
-`rosie` ships in the environment Stage 1 builds, and
-[`site/rose.conf`](site/rose.conf) gives it the `u-` prefix map that a Met Office site
-install would normally supply. You need a **MOSRS account** — `roses-u` is not
+`rosie` ships in the environment Stage 1 builds, with the `u-` prefix map that a Met
+Office site install would normally supply: the module (v2026.09.28 on) points
+`ROSE_SITE_CONF_PATH` at its own copy, and [`site/rose.conf`](site/rose.conf) does the
+same for older environments via `activate-env.sh`. You need a **MOSRS account** — `roses-u` is not
 anonymously readable.
 
 ```bash
@@ -188,11 +189,21 @@ deliberately, re-cut the patch and say so with `LFRIC_SUITE_REV=<rev>`.
 
 `rosie checkout` shells out to `svn checkout`; stock `/usr/bin/svn` on the login nodes is
 enough (the Met Office's patched svn matters for FCM keywords and commits, not for
-reading). If svn asks for your password on every command, there is no usable password
-store configured — point it at gpg-agent (`password-stores = gpg-agent` in
-`~/.subversion/config`, a `pinentry-program` in `~/.gnupg/gpg-agent.conf`, and
-`export GPG_TTY=$(tty)` in your shell rc). That caches for the agent's TTL, per login
-node.
+reading). To stop svn asking for your password on every command, cache it in gpg-agent
+with `mosrs-cache-password`, which the environment (v2026.09.28 on) puts on `PATH`:
+
+```bash
+mosrs-cache-password        # asks once; checks it against roses-u
+```
+
+It needs three one-off settings and names any that is missing, with the line to add:
+your MOSRS `username` for `code*.metoffice.gov.uk` in `~/.subversion/servers`,
+`password-stores = gpg-agent` under `[auth]` in `~/.subversion/config`, and
+`allow-preset-passphrase` in `~/.gnupg/gpg-agent.conf`. **The cache is per login node**:
+gpg-agent's socket is node-local and login nodes are assigned at random, so run it again
+when `hostname` changes. Jobs on compute nodes never see it, so do svn and rosie work on
+a login node. (The shared `/projects/u35v/sw/mosrsgpgagentcaching/` script predates
+this: it hard-codes `/usr/lib64/gpg-preset-passphrase`, which is `/usr/lib/...` here.)
 
 `run-suite.sh` looks in `~/roses/<suite>` by default; set `LFRIC_SUITE_DIR` to use a
 checkout elsewhere. It prints the exact command above if the checkout is missing.

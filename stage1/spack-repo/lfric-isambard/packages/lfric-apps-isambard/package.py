@@ -50,10 +50,14 @@ class LfricAppsIsambard(Package):
     depends_on("py-cylc-flow@8.6.6")
     depends_on("py-cylc-rose@1.7.2")
     depends_on("py-cylc-uiserver@1.9.4")
-    # The Fortran checkers lfric_apps' rose-stem runs in its `scripts` group:
+    # The checkers lfric_apps' rose-stem runs in its `scripts` group:
     # style_checker (stylist) and fortitude_linter. Both from mo-spack-packages.
     depends_on("py-stylist@0.4.1")
     depends_on("py-fortitude@0.9.0")
+    # Also run there: macro_chains_checker imports networkx; python_unit_tests
+    # and test_launch-exe run pytest.
+    depends_on("py-networkx")
+    depends_on("py-pytest")
     depends_on("py-ansimarkup")
     depends_on("py-colorama")
 
