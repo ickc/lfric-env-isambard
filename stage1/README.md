@@ -5,7 +5,7 @@ LFRic Apps toolchain on Isambard 3.
 
 ```
 module use $PROJECTDIR/$USER/opt/Linux-aarch64/modulefiles
-module load lfric-env/v2026.08.18/cray
+module load lfric-env/v2026.09.28/cray
 ```
 
 Those two lines are the entire product. Everything else in this repo — compiling
@@ -79,7 +79,7 @@ flowchart LR
         direction TB
         M["modulefiles/<br/><b>the product</b><br/><i>one module use lists every build</i>"]
         C["source-cache/ misc-cache/<br/><i>shared across versions</i>"]
-        V["v2026.08.18/ = LFRIC_PREFIX<br/>├── opt/  <i>install tree, both variants</i><br/>└── spack-env/{cray,spack}/  <i>env + view</i>"]
+        V["v2026.09.28/ = LFRIC_PREFIX<br/>├── opt/  <i>install tree, both variants</i><br/>└── spack-env/{cray,spack}/  <i>env + view</i>"]
     end
     subgraph L["$LOCALDIR = node-local NVMe"]
         W["lfric-build-&lt;variant&gt;<br/><i>Spack build stage only</i>"]
@@ -149,7 +149,7 @@ module use "$PROJECTDIR/$USER/opt/Linux-aarch64/modulefiles"
 module load lfric-env/"$(cat VERSION)"/cray
 
 rose --version                # all three come from the module, nothing else
-cylc --version                # 8.4.2
+cylc --version                # 8.6.6
 psyclone --version            # 3.3.1 (pinned in the bundle spec)
 echo "$FC $CXX $LDMPI"        # ftn CC ftn
 $FC --version                 # GNU Fortran 14.3.0, via the Cray wrapper
@@ -203,7 +203,9 @@ stage1/
 │                       I/O). Templates — instantiated under LFRIC_PREFIX.
 ├── spack-repo/         our own Spack packages: xios (pinned commit), foxml,
 │                       and lfric-apps-isambard, the has_code=False bundle spec
-│                       that names every dependency of the environment.
+│                       that names every dependency of the environment. Plus
+│                       py-* overrides that only add versions upstream lacks
+│                       (the cylc 8.6 set, rose-picker); each says when to drop it.
 ├── patches/            applied to the vendored trees before every phase, so
 │                       there is no "forgot to patch" state. One patch: gdbm
 │                       1.26 ships mismatched autotools timestamps.
@@ -272,6 +274,19 @@ need to pin against.
 `spack-repo/lfric-isambard/packages/lfric-apps-isambard/package.py`, then
 `pixi run concretize` (both variants) before building. That package builds
 nothing — it is purely the list of what the environment contains.
+
+**Add a version upstream does not have yet.** Put a package of the same name
+in `spack-repo/lfric-isambard/packages/` that subclasses the upstream one and
+adds only `version(...)` plus any requirements that differ. `lfric` is first on
+the repo path, so it shadows the upstream package without copying it. Say in
+the file when to drop it. The cylc 8.6 set and `py-rose-picker` are done this way.
+
+**Bump spack-packages.** It is normally pinned to a `releases/vYYYY.MM` tag. It
+can sit on a `develop` commit when a needed package is not in a release yet,
+as `v2026.09.28` does: cylc-flow 8.6 needs graphene 3.4 and friends, which
+landed after `v2026.06.0`. Move back to a release tag at the next bump once one
+contains them. After any move, `pixi run concretize` both variants, and check
+the gdbm patch still reports as applied.
 
 **Bump the Cray libraries.** The module versions in `lib.sh`
 (`HDF5_MODULE`, `NETCDF_MODULE`) and the external prefixes in
