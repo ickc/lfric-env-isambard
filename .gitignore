@@ -1,15 +1,10 @@
 # pixi-managed conda environment (pixi.lock IS tracked)
 /.pixi/
 
-# All build output lands OUTSIDE the repo under PREFIX (LFRIC_PREFIX; default
-# $PROJECTDIR/$USER/opt/<arch>, see scripts/common.sh) and the transient stage
-# under WORKING_DIR (LFRIC_WORKING_DIR; default $PREFIX/stage) — so nothing build-
-# related is tracked. The rules below are a safety net only, in case an older
-# build (or a repo-relative LFRIC_PREFIX) ever wrote state into the repo.
-/working_dir/
-/stage/
-/spack-env/*/.spack-env/
-/spack-env/*/spack.lock
+# All build output lands OUTSIDE the repo, under LFRIC_BASE/LFRIC_PREFIX
+# (default $PROJECTDIR/$USER/opt/<arch>; see stage1/env.sh), so nothing
+# build-related is tracked. The spack-env templates live in stage1/spack-env/
+# and are instantiated under LFRIC_PREFIX, never in place.
 
 # sbatch stdout (#SBATCH --output=logs/...). The dir is tracked via .gitkeep so a
 # fresh clone has it; the *.out/*.log files in it are ignored by the rules below.

@@ -3,7 +3,7 @@
 Self-contained investigations: enough committed material to **reproduce** a reported
 problem from scratch, plus the evidence and the conclusion. Neither the reproducible
 core (Stage 1) nor a science-suite example — nothing here is on the build invariant,
-and `scripts/`, `spack-env/` and `examples/` never depend on it.
+and `stage1/`, `scripts/` and `examples/` never depend on it.
 
 Each subdirectory is one investigation and stands alone: a `README.md` stating what was
 reported, what was measured and what the cause turned out to be, alongside the scripts

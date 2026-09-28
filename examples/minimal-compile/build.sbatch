@@ -12,10 +12,10 @@
 #   sbatch examples/minimal-compile/build.sbatch                                # cray (default)
 #   sbatch --export=ALL,LFRIC_STACK=spack examples/minimal-compile/build.sbatch # spack
 #
-# Prerequisites: Stage 1 is built for this variant (scripts/build.sbatch) and the
+# Prerequisites: Stage 1 is built for this variant (stage1/build.sbatch) and the
 # physics submodules are initialised (see README). build.sh loads the env via
 # Lmod itself (it also puts the env's Python on PATH for local_build.py), so no
-# cray-python module is needed here. Resource rationale: see scripts/build.sbatch.
+# cray-python module is needed here. Resource rationale: see stage1/build.sbatch.
 set -uo pipefail
 cd "${SLURM_SUBMIT_DIR:-$(pwd)}" || exit 1
 
