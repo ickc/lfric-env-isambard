@@ -268,6 +268,13 @@ lfric_smoke_test() {
     ver="$("$tool" --version 2>&1)" || die "$tool --version failed after loading $MODULE_NAME: $ver"
     info "$tool: $ver"
   done
+  # `cylc gui` needs cylc-uiserver; without it cylc aborts "unknown utility".
+  cylc gui --help >/dev/null 2>&1 \
+    || die "'cylc gui' is not available after loading $MODULE_NAME (cylc-uiserver missing?)"
+  # rosie needs the site prefix map the module points ROSE_SITE_CONF_PATH at.
+  ver="$(rose config rosie-id prefix-location.u 2>&1)" \
+    || die "rose has no rosie prefix map after loading $MODULE_NAME: $ver"
+  info "rosie u -> $ver"
   info "FC=${FC:-UNSET}  CXX=${CXX:-UNSET}  LDMPI=${LDMPI:-UNSET}"
   # The toolchain is the contract, so treat a missing compiler as a build failure
   # rather than something the first consumer discovers.
