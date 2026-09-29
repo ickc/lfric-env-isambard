@@ -1,3 +1,107 @@
+diff --git a/applications/adjoint_tests/optimisation/isambard3-isambard3 b/applications/adjoint_tests/optimisation/isambard3-isambard3
+new file mode 120000
+index 00000000..e5b7210c
+--- /dev/null
++++ b/applications/adjoint_tests/optimisation/isambard3-isambard3
+@@ -0,0 +1 @@
++meto-ex1a
+\ No newline at end of file
+diff --git a/applications/gravity_wave/optimisation/isambard3-isambard3 b/applications/gravity_wave/optimisation/isambard3-isambard3
+new file mode 120000
+index 00000000..e5b7210c
+--- /dev/null
++++ b/applications/gravity_wave/optimisation/isambard3-isambard3
+@@ -0,0 +1 @@
++meto-ex1a
+\ No newline at end of file
+diff --git a/applications/gungho_model/optimisation/isambard3-isambard3 b/applications/gungho_model/optimisation/isambard3-isambard3
+new file mode 120000
+index 00000000..e5b7210c
+--- /dev/null
++++ b/applications/gungho_model/optimisation/isambard3-isambard3
+@@ -0,0 +1 @@
++meto-ex1a
+\ No newline at end of file
+diff --git a/applications/jedi_lfric_tests/optimisation/isambard3-isambard3 b/applications/jedi_lfric_tests/optimisation/isambard3-isambard3
+new file mode 120000
+index 00000000..e5b7210c
+--- /dev/null
++++ b/applications/jedi_lfric_tests/optimisation/isambard3-isambard3
+@@ -0,0 +1 @@
++meto-ex1a
+\ No newline at end of file
+diff --git a/applications/jules/optimisation/isambard3-isambard3 b/applications/jules/optimisation/isambard3-isambard3
+new file mode 120000
+index 00000000..e5b7210c
+--- /dev/null
++++ b/applications/jules/optimisation/isambard3-isambard3
+@@ -0,0 +1 @@
++meto-ex1a
+\ No newline at end of file
+diff --git a/applications/lfric2lfric/optimisation/isambard3-isambard3 b/applications/lfric2lfric/optimisation/isambard3-isambard3
+new file mode 120000
+index 00000000..e5b7210c
+--- /dev/null
++++ b/applications/lfric2lfric/optimisation/isambard3-isambard3
+@@ -0,0 +1 @@
++meto-ex1a
+\ No newline at end of file
+diff --git a/applications/lfric_atm/optimisation/isambard3-isambard3 b/applications/lfric_atm/optimisation/isambard3-isambard3
+new file mode 120000
+index 00000000..e5b7210c
+--- /dev/null
++++ b/applications/lfric_atm/optimisation/isambard3-isambard3
+@@ -0,0 +1 @@
++meto-ex1a
+\ No newline at end of file
+diff --git a/applications/lfricinputs/optimisation/isambard3-isambard3 b/applications/lfricinputs/optimisation/isambard3-isambard3
+new file mode 120000
+index 00000000..e5b7210c
+--- /dev/null
++++ b/applications/lfricinputs/optimisation/isambard3-isambard3
+@@ -0,0 +1 @@
++meto-ex1a
+\ No newline at end of file
+diff --git a/applications/name_transport/optimisation/isambard3-isambard3 b/applications/name_transport/optimisation/isambard3-isambard3
+new file mode 120000
+index 00000000..e5b7210c
+--- /dev/null
++++ b/applications/name_transport/optimisation/isambard3-isambard3
+@@ -0,0 +1 @@
++meto-ex1a
+\ No newline at end of file
+diff --git a/applications/ngarch/optimisation/isambard3-isambard3 b/applications/ngarch/optimisation/isambard3-isambard3
+new file mode 120000
+index 00000000..e5b7210c
+--- /dev/null
++++ b/applications/ngarch/optimisation/isambard3-isambard3
+@@ -0,0 +1 @@
++meto-ex1a
+\ No newline at end of file
+diff --git a/applications/shallow_water/optimisation/isambard3-isambard3 b/applications/shallow_water/optimisation/isambard3-isambard3
+new file mode 120000
+index 00000000..e5b7210c
+--- /dev/null
++++ b/applications/shallow_water/optimisation/isambard3-isambard3
+@@ -0,0 +1 @@
++meto-ex1a
+\ No newline at end of file
+diff --git a/applications/solver/optimisation/isambard3-isambard3 b/applications/solver/optimisation/isambard3-isambard3
+new file mode 120000
+index 00000000..e5b7210c
+--- /dev/null
++++ b/applications/solver/optimisation/isambard3-isambard3
+@@ -0,0 +1 @@
++meto-ex1a
+\ No newline at end of file
+diff --git a/applications/transport/optimisation/isambard3-isambard3 b/applications/transport/optimisation/isambard3-isambard3
+new file mode 120000
+index 00000000..e5b7210c
+--- /dev/null
++++ b/applications/transport/optimisation/isambard3-isambard3
+@@ -0,0 +1 @@
++meto-ex1a
+\ No newline at end of file
 diff --git a/rose-stem/lib/python/read_sources.py b/rose-stem/lib/python/read_sources.py
 index 50287162..d14e1819 100644
 --- a/rose-stem/lib/python/read_sources.py
@@ -81,12 +185,40 @@ index 00000000..819bba51
 +  echo "launch-exe: srun $EXEC $NAMELIST  (XIOS attached, no dedicated server)"
 +  exec srun "$EXEC" "$NAMELIST"
 +fi
+diff --git a/rose-stem/site/isambard3/common/bin/mpiexec b/rose-stem/site/isambard3/common/bin/mpiexec
+new file mode 100755
+index 00000000..af4aa8ec
+--- /dev/null
++++ b/rose-stem/site/isambard3/common/bin/mpiexec
+@@ -0,0 +1,22 @@
++#!/bin/bash
++# mpiexec for Isambard 3: translate to srun.
++#
++# The cray environment has cray-mpich, which ships no mpiexec; srun is its launcher,
++# and it is what binds cray-mpich to Slingshot through the Cray PMI. Several things
++# rose-stem runs call `mpiexec -n N <cmd> [args]` directly, not through launch-exe: the
++# mesh apps (`mpiexec -n 1 ..._mesh_generator`) and lfric_core's test framework
++# (tests.mk LAUNCHER, testframework/test.py). This accepts that form and runs
++# `srun --ntasks=N <cmd> [args]` inside the job's own allocation.
++set -eu
++n=1
++while [ $# -gt 0 ]; do
++  case "$1" in
++    -n|-np) n="$2"; shift 2 ;;
++    -n=*|-np=*) n="${1#*=}"; shift ;;
++    --) shift; break ;;
++    -*) echo "mpiexec (isambard3 shim): unsupported option '$1'; use srun directly" >&2; exit 2 ;;
++    *) break ;;
++  esac
++done
++[ $# -gt 0 ] || { echo "mpiexec (isambard3 shim): no command given" >&2; exit 2; }
++exec srun --ntasks="$n" "$@"
 diff --git a/rose-stem/site/isambard3/common/default_directives.cylc b/rose-stem/site/isambard3/common/default_directives.cylc
 new file mode 100644
-index 00000000..0f1a7499
+index 00000000..c0dea88a
 --- /dev/null
 +++ b/rose-stem/site/isambard3/common/default_directives.cylc
-@@ -0,0 +1,35 @@
+@@ -0,0 +1,40 @@
 +{# ########################################################################### #}
 +{# (c) Crown copyright 2024 Met Office. All rights reserved. #}
 +{# The file LICENCE, distributed with this code, contains details of the terms #}
@@ -94,7 +226,11 @@ index 00000000..0f1a7499
 +{# ########################################################################### #}
 +{% do LOG.debug("Entered site/isambard3/common/default_directives.cylc") %}
 +
-+{# Grace nodes: 144 cores, 230400 MB, allocated pro rata (1600 MB/core). #}
++{# Grace nodes: 144 cores, 230400 MB, allocated pro rata (1600 MB/core).
++   tech-tests_cpus is 6, not 1, and at platform level so the integration tests get it
++   too (they are application `gungho`, not `tech-tests`): lfric_core's test framework
++   launches its MPI tests as `mpiexec -n 6`, and srun cannot fit six ranks in a one-task
++   allocation. #}
 +
 +{% do default_directives.update({
 +    "isambard3": {
@@ -103,6 +239,7 @@ index 00000000..0f1a7499
 +        "build_memory": [40, "GB"],
 +        "build_wallclock": 25,
 +        "build_cpus": 24,
++        "tech-tests_cpus": 6,
 +
 +        "mesh": {
 +            "mesh_wallclock": 20,
@@ -112,7 +249,7 @@ index 00000000..0f1a7499
 +        "tech-tests": {
 +            "tech-tests_wallclock": 15,
 +            "tech-tests_memory": [6, "GB"],
-+            "tech-tests_cpus": 1,
++            "tech-tests_cpus": 6,
 +        },
 +        "lfric_atm": {
 +            "wallclock": 39,
@@ -124,10 +261,10 @@ index 00000000..0f1a7499
 +{% do LOG.debug("Finished in site/isambard3/common/default_directives.cylc") %}
 diff --git a/rose-stem/site/isambard3/common/suite_config_isambard3.cylc b/rose-stem/site/isambard3/common/suite_config_isambard3.cylc
 new file mode 100644
-index 00000000..33d07050
+index 00000000..92fa9510
 --- /dev/null
 +++ b/rose-stem/site/isambard3/common/suite_config_isambard3.cylc
-@@ -0,0 +1,107 @@
+@@ -0,0 +1,114 @@
 +{% do LOG.debug("Entered site/isambard3/common/suite_config_isambard3.cylc") %}
 +
 +{# Isambard 3 (Cray EX, Grace/aarch64, Slurm). The toolchain and the rose/cylc/
@@ -143,8 +280,10 @@ index 00000000..33d07050
 +
 +{% set isambard3_base = 'umask 0022' %}
 +
-+{# A login shell resets Lmod, so each job loads the module itself. #}
-+{% set isambard3_env = '. /opt/cray/pe/lmod/lmod/init/bash; module use ' ~ lfric_env_modulepath ~ '; module load ' ~ lfric_env_module %}
++{# A login shell resets Lmod, so each job loads the module itself. The site bin goes on
++   PATH for its mpiexec, which turns the `mpiexec -n N` that the mesh apps and the
++   test framework call into srun: the cray environment has no mpiexec. #}
++{% set isambard3_env = '. /opt/cray/pe/lmod/lmod/init/bash; module use ' ~ lfric_env_modulepath ~ '; module load ' ~ lfric_env_module ~ '; export PATH=$CYLC_WORKFLOW_RUN_DIR/site/isambard3/common/bin:$PATH' %}
 +
 +{% set isambard3_run = 'ulimit -s unlimited; export HDF5_USE_FILE_LOCKING=FALSE' %}
 +
@@ -153,8 +292,10 @@ index 00000000..33d07050
 +        platform = localhost
 +        init-script = {{ isambard3_env }}
 +
++    {# No platform here: this family comes FIRST in every inherit list, and in Cylc the
++       first parent wins, so a platform set here would override ISAMBARD3_SLURM and put
++       the builds, tests and model runs on the login node. #}
 +    [[ISAMBARD3_BASE]]
-+        platform = localhost
 +        init-script = {{ isambard3_env }}
 +        [[[environment]]]
 +            SITE = 'isambard3'
@@ -213,10 +354,12 @@ index 00000000..33d07050
 +    {# The light script checks run on the login node, where the scheduler is. #}
 +    [[ISAMBARD3_TECH]]
 +        inherit=ISAMBARD3_TECH_BASE
++        platform = localhost
 +        {{ generate_script("pre-script", [isambard3_base]) }}
 +
 +    [[ISAMBARD3_PLOT]]
 +        inherit=ISAMBARD3_TECH_BASE
++        platform = localhost
 +
 +    [[ISAMBARD3_CHECK]]
 +        inherit=ISAMBARD3_TECH
@@ -233,18 +376,20 @@ index 00000000..33d07050
 +
 +    [[ISAMBARD3_HOUSEKEEPING]]
 +        inherit=ISAMBARD3_TECH_BASE
++        platform = localhost
 +
 +{% do LOG.debug("Finished in site/isambard3/common/suite_config_isambard3.cylc") %}
 diff --git a/rose-stem/site/isambard3/groups.cylc b/rose-stem/site/isambard3/groups.cylc
 new file mode 100644
-index 00000000..e43ff659
+index 00000000..794ba534
 --- /dev/null
 +++ b/rose-stem/site/isambard3/groups.cylc
 @@ -0,0 +1,38 @@
 +{% do LOG.debug("Entered site/isambard3/groups.cylc") %}
 +
 +{# The script checks run anywhere the module is loaded. The model groups mirror
-+   site/uoe's and are untested here. #}
++   site/uoe's. The gungho unit tests are left out: they need pFUnit, which the
++   lfric-env module does not provide yet. #}
 +
 +{%- do site_groups.update({
 +    "all": [
@@ -264,7 +409,6 @@ index 00000000..e43ff659
 +        "macro_chains_checker",
 +    ],
 +    "gungho_isambard3_unitandintegration_tests": [
-+        "gungho_unit_tests_isambard3_gnu_64bit",
 +        "gungho_integration_tests_isambard3_gnu_64bit",
 +    ],
 +    "gungho_model_isambard3_exoplanet": [
@@ -281,7 +425,7 @@ index 00000000..e43ff659
 +{% do LOG.debug("Finished in site/isambard3/groups.cylc") %}
 diff --git a/rose-stem/site/isambard3/gungho_model/tasks_gungho_model.cylc b/rose-stem/site/isambard3/gungho_model/tasks_gungho_model.cylc
 new file mode 100644
-index 00000000..1a2afbd3
+index 00000000..85efa7df
 --- /dev/null
 +++ b/rose-stem/site/isambard3/gungho_model/tasks_gungho_model.cylc
 @@ -0,0 +1,15 @@
@@ -294,10 +438,10 @@ index 00000000..1a2afbd3
 +
 +{% include 'site/'+SITE+'/gungho_model/tasks_gungho_model_'~task_ns.platform~'.cylc' %}
 +
-+{% if "perftools" in task_ns.compiler %}
-+    {% do task_dict.update({
-+        "kgo_checks": [], }) %}
-+{% endif %}
++{# No KGO checks: there are no Isambard 3 known-good answers (site/isambard3/kgos/)
++   yet. A first validated run's checksums can seed them. #}
++{% do task_dict.update({
++    "kgo_checks": [], }) %}
 +
 +{% do LOG.debug("Finised in site/isambard3/gungho_model/tasks_gungho_model.cylc") %}
 diff --git a/rose-stem/site/isambard3/gungho_model/tasks_gungho_model_isambard3.cylc b/rose-stem/site/isambard3/gungho_model/tasks_gungho_model_isambard3.cylc
@@ -325,7 +469,7 @@ index 00000000..28930442
 +{% do LOG.debug("Finised in site/isambard3/gungho_model/tasks_gungho_model_isambard3.cylc") %}
 diff --git a/rose-stem/site/isambard3/lfric_atm/tasks_lfric_atm.cylc b/rose-stem/site/isambard3/lfric_atm/tasks_lfric_atm.cylc
 new file mode 100644
-index 00000000..8919cfc6
+index 00000000..b864a2b2
 --- /dev/null
 +++ b/rose-stem/site/isambard3/lfric_atm/tasks_lfric_atm.cylc
 @@ -0,0 +1,15 @@
@@ -338,10 +482,10 @@ index 00000000..8919cfc6
 +
 +{% include 'site/'+SITE+'/lfric_atm/tasks_lfric_atm_'~task_ns.platform~'.cylc' %}
 +
-+{% if "perftools" in task_ns.compiler %}
-+    {% do task_dict.update({
-+        "kgo_checks": [], }) %}
-+{% endif %}
++{# No KGO checks: there are no Isambard 3 known-good answers (site/isambard3/kgos/)
++   yet. A first validated run's checksums can seed them. #}
++{% do task_dict.update({
++    "kgo_checks": [], }) %}
 +
 +{% do LOG.debug("Finised in site/isambard3/lfric_atm/tasks_lfric_atm.cylc") %}
 diff --git a/rose-stem/site/isambard3/lfric_atm/tasks_lfric_atm_isambard3.cylc b/rose-stem/site/isambard3/lfric_atm/tasks_lfric_atm_isambard3.cylc
@@ -368,10 +512,10 @@ index 00000000..625f14d7
 +{% do LOG.debug("Finised in site/isambard3/lfric_atm/tasks_lfric_atm_isambard3.cylc") %}
 diff --git a/rose-stem/site/isambard3/macros/macros_isambard3.cylc b/rose-stem/site/isambard3/macros/macros_isambard3.cylc
 new file mode 100644
-index 00000000..fd6d097d
+index 00000000..5c2ec0c1
 --- /dev/null
 +++ b/rose-stem/site/isambard3/macros/macros_isambard3.cylc
-@@ -0,0 +1,37 @@
+@@ -0,0 +1,38 @@
 +{% do LOG.debug("Entered site/isambard3/macros/macros_isambard3.cylc") %}
 +
 +{# Macro to set wallclock, input is in minutes #}
@@ -399,6 +543,7 @@ index 00000000..fd6d097d
 +        [[[directives]]]
 +            --ntasks={{mpi_ranks|int + xios_nodes|int}}
 +            --cpus-per-task={{threads|int}}
++{{ set_memory(memory) }}
 +{% endmacro %}
 +
 +

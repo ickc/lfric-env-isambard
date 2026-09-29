@@ -15,8 +15,13 @@ cylc vip -z group=scripts -n myfeature.scripts ./rose-stem
 `SITE=isambard3` comes from the module's Rose site config
 (`rose config rose-stem automatic-options`), so no `-S SITE=...` is needed. Leave
 the patch uncommitted: rose-stem copies your working tree, uncommitted changes
-included, and `git apply -R` takes it out again. It applies to 2026.07.1 and to
-`main` as of 2026-09-28.
+included, and `git apply -R` takes it out again.
+
+**It is for `main`, not 2026.07.1.** rose-stem is the developer tool, run on a branch
+of `main`, and the site follows `main`'s rose-stem templates. After 2026.07.1 those
+changed `set_task_resources` to take a family name, inherit list and wallclock. On a
+2026.07.1 checkout the patch applies, but validation fails with `parameter 'wallclock'
+was not provided`. Validated against `main` @ `801edbfa` (2026-09-28).
 
 ## What it changes, and why
 
@@ -35,12 +40,32 @@ included, and `git apply -R` takes it out again. It applies to 2026.07.1 and to
    the plain path, so neither step needs SSH. On a site where the path is not
    local, nothing changes.
 
+3. **`mpiexec` for the things that call it directly** (`site/isambard3/common/bin/
+   mpiexec`, on every job's PATH). The mesh apps run `mpiexec -n 1 <generator>`, and
+   lfric_core's test framework launches its MPI tests as `mpiexec -n 6`. The cray
+   environment has no `mpiexec`: cray-mpich's launcher is `srun`. The shim turns
+   `mpiexec -n N cmd` into `srun --ntasks=N cmd` inside the job's allocation.
+   `tech-tests_cpus` is 6 for the same reason.
+4. **`applications/*/optimisation/isambard3-isambard3` → `meto-ex1a`**, 13 symlinks.
+   A rose-stem build uses the PSyclone transformation directory `<SITE>-<platform>`,
+   and every application needs one. This follows `uoe-epic`, which links to
+   `meto-ex1a` in the same way: the Met Office's Cray EX set, which the science suites
+   here already build with.
+5. **No KGO checks.** There are no Isambard 3 known-good answers yet
+   (`site/isambard3/kgos/`). A first validated run's checksums can seed them.
+
 ## Validated
 
-`group=scripts` on 2026-09-28, lfric_apps `main` @ `801edbfa`, env v2026.09.28/cray.
-The group is the Met Office's own `scripts` list minus `local_build_test`, which
-needs the Met Office Intel build family. The model groups are copied from `uoe`
-and have not been run here.
+On lfric_apps `main` @ `801edbfa`, env v2026.09.28/cray, 2026-09-29:
+
+| Group | Result |
+|---|---|
+| `scripts` (Practical 3) | all 11 tasks pass. The Met Office's own list minus `local_build_test`, which needs the Met Office Intel build family. |
+| `gungho_isambard3_unitandintegration_tests` | the gungho build and **integration tests pass**. The **unit tests are left out**: they need pFUnit, which the environment does not ship yet (#37). |
+| `lfric_atm_isambard3_exoplanets`, `gungho_model_isambard3_exoplanet` | the `lfric_atm`, `gungho_model` and mesh builds pass, all four meshes generate, and the single-column `scm_hd209458b` model runs. **The four 3D model runs crash in XIOS** during the UGRID header write (#38). |
+
+So Practical 3's `scripts` group works. The Met Office `developer` group is not defined
+for this site, because it would inherit both gaps above.
 
 ## Upstream
 
