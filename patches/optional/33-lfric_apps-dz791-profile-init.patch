@@ -208,10 +208,10 @@ index fcc91d2c..fc73fff8 100644
      else
 diff --git a/science/gungho/source/kernel/initialisation/vert_balance_kernel_mod.F90 b/science/gungho/source/kernel/initialisation/vert_balance_kernel_mod.F90
 new file mode 100644
-index 00000000..afb556ae
+index 00000000..4975295d
 --- /dev/null
 +++ b/science/gungho/source/kernel/initialisation/vert_balance_kernel_mod.F90
-@@ -0,0 +1,344 @@
+@@ -0,0 +1,348 @@
 +!-----------------------------------------------------------------------------
 +! Copyright (c) 2026,  Met Office, on behalf of HMSO and Queen's Printer
 +! For further details please refer to the file LICENCE.original which you
@@ -243,11 +243,13 @@ index 00000000..afb556ae
 +                                  profile_variable_mr,                 &
 +                                  profile_variable_rh
 +use kernel_mod,             only: kernel_type
++use base_mesh_config_mod,   only: geometry, topology
 +use extrusion_config_mod,   only: planet_radius
++use finite_element_config_mod, only: coord_system
 +use fs_continuity_mod,      only: Wtheta, W3
 +use formulation_config_mod, only: shallow
 +use planet_config_mod,      only: gravity, Rd, cp, p_zero, kappa, &
-+                                  recip_epsilon
++                                  recip_epsilon, scaled_radius
 +use physics_common_mod,     only: qsaturation
 +
 +use log_mod,                only: log_event, log_scratch_space, &
@@ -390,7 +392,9 @@ index 00000000..afb556ae
 +    coords(3) = coords(3) + chi_3_e(dfc)*basis_chi_on_wt(1,dfc,wt_dof)
 +  end do
 +
-+  call chi2xyz(coords(1), coords(2), coords(3), ipanel, xyz(1), xyz(2), xyz(3))
++  call chi2xyz(coords(1), coords(2), coords(3), ipanel,         &
++               geometry, topology, coord_system, scaled_radius, &
++               xyz(1), xyz(2), xyz(3))
 +
 +  ! Exner at the model surface
 +  exner_itn(0) = analytic_pressure( xyz, test, 0.0_r_def)

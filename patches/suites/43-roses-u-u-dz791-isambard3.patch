@@ -1,6 +1,6 @@
 diff -ruN a/app/extract/rose-app.conf b/app/extract/rose-app.conf
 --- a/app/extract/rose-app.conf	2026-09-29 16:32:38.000000000 +0000
-+++ b/app/extract/rose-app.conf	2026-09-29 16:34:03.000000000 +0000
++++ b/app/extract/rose-app.conf	2026-09-29 16:35:12.000000000 +0000
 @@ -1,4 +1,29 @@
 +# [isambard3] EXTENDED, not replaced. The extract is upstream's: merge_sources.py from
 +# MetOffice/SimSys_Scripts reads this suite's dependencies.yaml and clones each declared
@@ -34,9 +34,27 @@ diff -ruN a/app/extract/rose-app.conf b/app/extract/rose-app.conf
 +tokens=merge_sources.py -d $CYLC_WORKFLOW_RUN_DIR --tokens && \
 +       =bash "$REPO_ROOT/examples/science-suites/site/patch-sources.sh" "$SOURCE_ROOT" && \
 +       =LFRIC_SRC_ROOT="$SOURCE_ROOT" bash "$REPO_ROOT/patches/optional/33-lfric_apps-dz791-profile-init-patch.sh"
+diff -ruN a/app/lfric_atm/rose-app.conf b/app/lfric_atm/rose-app.conf
+--- a/app/lfric_atm/rose-app.conf	2026-09-29 16:32:45.000000000 +0000
++++ b/app/lfric_atm/rose-app.conf	2026-09-29 17:07:27.000000000 +0000
+@@ -108,9 +108,13 @@
+ mode=auto
+ source=$CYLC_WORKFLOW_RUN_DIR/app/lfric_atm/file/iodef_idealised.xml
+ 
++# [isambard3] CHANGED: off `fcm:socrates.xm_tr/...@um13.7`, a Met Office FCM keyword into
++# MOSRS subversion that does not resolve here, onto the same GA9 spectra in the socrates
++# tree the extract task already cloned -- which is what upstream u-dn704 does. Rose
++# installs every [file:] entry, so this is needed even with radiation='none'.
+ [file:spec]
+ mode=auto
+-source=fcm:socrates.xm_tr/data/spectra/ga9@um13.7
++source=$SOURCE_ROOT/socrates/data/spectra/ga9
+ 
+ [!!namelist:aerosol]
+ !!aclw_file='lut/nml_ac_lw'
 diff -ruN a/app/mesh/rose-app.conf b/app/mesh/rose-app.conf
 --- a/app/mesh/rose-app.conf	2026-09-29 16:32:46.000000000 +0000
-+++ b/app/mesh/rose-app.conf	2026-09-29 16:33:47.000000000 +0000
++++ b/app/mesh/rose-app.conf	2026-09-29 16:35:12.000000000 +0000
 @@ -1,7 +1,9 @@
  meta=lfric-mesh_tools/vn3.2
  
@@ -50,7 +68,7 @@ diff -ruN a/app/mesh/rose-app.conf b/app/mesh/rose-app.conf
  OMP_NUM_THREADS=1
 diff -ruN a/dependencies.yaml b/dependencies.yaml
 --- a/dependencies.yaml	2026-09-29 16:32:38.000000000 +0000
-+++ b/dependencies.yaml	2026-09-29 16:34:06.000000000 +0000
++++ b/dependencies.yaml	2026-09-29 16:35:12.000000000 +0000
 @@ -23,13 +23,18 @@
  #
  # It is up to the user to ensure these merge cleanly
@@ -119,7 +137,7 @@ diff -ruN a/dependencies.yaml b/dependencies.yaml
 +    ref: 2026.07.1
 diff -ruN a/flow.cylc b/flow.cylc
 --- a/flow.cylc	2026-09-29 16:32:38.000000000 +0000
-+++ b/flow.cylc	2026-09-29 16:33:47.000000000 +0000
++++ b/flow.cylc	2026-09-29 16:42:32.000000000 +0000
 @@ -6,11 +6,33 @@
  {# ==================================== #}
  {# Set lfric_atm compute resources      #}
@@ -199,7 +217,7 @@ diff -ruN a/flow.cylc b/flow.cylc
  
      [[EX1A]]
      {% if COMPILER == 'cce' %}
-@@ -110,10 +161,45 @@
+@@ -110,10 +161,50 @@
              RUN_METHOD = mpiexec
              TOTAL_RANKS_REQ = {{TOTAL_RANKS_REQ}}
  
@@ -214,7 +232,12 @@ diff -ruN a/flow.cylc b/flow.cylc
 +                        """
 +        platform = isambard3
 +        [[[environment]]]
-+            BUILD_ROOT = ${TMPDIR}
++            {# [isambard3] CHANGED: ${TMPDIR} -> the task's own work dir. TMPDIR on a Grace
++               node is /local/user/<uid>, which OUTLIVES the job: a later run landing on
++               the same node finds the previous build's tree, and the dependency analyser
++               aborts on a module the old source had at another path ("UNIQUE constraint
++               failed: fortran_program_unit.unit"). The task work dir is fresh per run. #}
++            BUILD_ROOT = $CYLC_TASK_WORK_DIR
 +            CORES_PER_NODE = {{LPPN}}
 +            HYPERTHREADS = 1
 +            NUMA_REGIONS_PER_NODE = 2
@@ -245,7 +268,7 @@ diff -ruN a/flow.cylc b/flow.cylc
              COMPILER = {{COMPILER}}
              PROFILE = 'production'
              TARGET = build
-@@ -128,13 +214,33 @@
+@@ -128,13 +219,33 @@
              R_PHYS_PRECISION = 64
              PRE_PROCESS_MACROS = ""
          [[[directives]]]
@@ -279,7 +302,7 @@ diff -ruN a/flow.cylc b/flow.cylc
          script = "rose task-run --app-key=extract"
          [[[environment]]]
              MIRROR_LOC = {{ MIRROR_LOC }}
-@@ -143,10 +249,12 @@
+@@ -143,10 +254,12 @@
  {% elif USE_TOKENS %}
              ROSE_APP_COMMAND_KEY = tokens
  {% endif %}
@@ -292,7 +315,7 @@ diff -ruN a/flow.cylc b/flow.cylc
  
  
      [[build_mesh]]
-@@ -168,21 +276,44 @@
+@@ -168,21 +281,44 @@
  
  
      [[generate_mesh]]
@@ -337,7 +360,7 @@ diff -ruN a/flow.cylc b/flow.cylc
          script = """
              echo "====Forecast times===="
              echo "Forecast start date="${STARTDATE}
-@@ -225,6 +356,33 @@
+@@ -225,6 +361,33 @@
              {# xios_nodes = 1 #}
              {# mpi_parts_xios = 32 #}
  
@@ -373,7 +396,7 @@ diff -ruN a/flow.cylc b/flow.cylc
 +{% endif %}
 diff -ruN a/rose-suite.conf b/rose-suite.conf
 --- a/rose-suite.conf	2026-09-29 16:32:38.000000000 +0000
-+++ b/rose-suite.conf	2026-09-29 16:34:03.000000000 +0000
++++ b/rose-suite.conf	2026-09-29 16:35:12.000000000 +0000
 @@ -1,28 +1,47 @@
 +# [isambard3] CHANGED: the three sources off `git:localmirrors:`. `localmirrors:` is a git
 +# alias a Met Office site sets up (`git config --global url."<host>:/path/".insteadOf

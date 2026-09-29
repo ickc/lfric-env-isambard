@@ -61,8 +61,14 @@
 #    rose-meta.conf conflicts where mainline added the theta_pert_* items next to
 #    the branch's profile_variable: keep both. For CONTRIBUTORS.md, versions.py and the
 #    unit tests take 2026.07.1's (`git checkout 2026.07.1 -- <file>`).
-# 2. `git merge corbopy/qsaturation-use-epsilon` -- clean.
-# 3. git diff 2026.07.1 HEAD -- science ':!*unit-test*' > patches/optional/33-lfric_apps-dz791-profile-init.patch
+# 2. One non-conflicting API change the merge cannot see: the branch's NEW
+#    vert_balance_kernel_mod.F90 calls chi2xyz( chi1, chi2, chi3, panel, x, y, z ), and on
+#    2026.07.1 chi2xyz also takes geometry, topology, coord_system and scaled_radius
+#    (gfortran: "Type mismatch in argument 'geometry'"). Pass them as the sibling
+#    initial_theta_kernel_mod does, from base_mesh_config_mod, finite_element_config_mod
+#    and planet_config_mod.
+# 3. `git merge corbopy/qsaturation-use-epsilon` -- clean.
+# 4. git diff 2026.07.1 HEAD -- science ':!*unit-test*' > patches/optional/33-lfric_apps-dz791-profile-init.patch
 #
 # When Alex's branches are rebased onto a current LFRic (or reach mainline), u-dz791's
 # dependencies.yaml goes back to declaring them and this patch is deleted.
