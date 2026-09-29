@@ -23,6 +23,7 @@ shared machinery.
 | Patch | Opted into by | Why it cannot be in the shared stack |
 |---|---|---|
 | `32-lfric_apps-ice-giants-forcing` | `u-dt000` | It adds three **compulsory** `namelist:external_forcing` items (`theta_relax_time_scale`, `wind_relax_time_scale`, `held_suarez_sigma_b`). Every gungho app config would then have to set them, so u-dr932 and u-dn704 would abort reading their namelists. |
+| `33-lfric_apps-dz791-profile-init` | `u-dz791` | It adds two **compulsory** `profile_variable` items (`namelist:initial_temperature`, `namelist:initial_vapour`) and changes how every `test='specified_profiles'` configuration is initialised — a science change the other suites did not ask for. |
 
 Numbering continues the top-level series (`3x` = `lfric_apps`), so the family a
 patch belongs to is still readable at a glance.

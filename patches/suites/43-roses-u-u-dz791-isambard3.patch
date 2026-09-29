@@ -1,0 +1,431 @@
+diff -ruN a/app/extract/rose-app.conf b/app/extract/rose-app.conf
+--- a/app/extract/rose-app.conf	2026-09-29 16:32:38.000000000 +0000
++++ b/app/extract/rose-app.conf	2026-09-29 16:34:03.000000000 +0000
+@@ -1,4 +1,29 @@
++# [isambard3] EXTENDED, not replaced. The extract is upstream's: merge_sources.py from
++# MetOffice/SimSys_Scripts reads this suite's dependencies.yaml and clones each declared
++# repo@ref into $SOURCE_ROOT.
++#
++# Two [isambard3] steps are APPENDED to each key rather than replacing the clone:
++#
++#   patch-sources.sh applies THIS repo's LFRic-source patch stack (patches/*-lfric_*) to
++#   the freshly cloned tree. Without it the apps build re-fetches its own science sources
++#   mid-compile, undoing the pin the suite just declared.
++#
++#   33-lfric_apps-dz791-profile-init-patch.sh adds THIS suite's science: Alex Corbett's
++#   t-and-rh-init-clean and qsaturation-use-epsilon branches, forward-ported to vn3.2. It
++#   is invoked BY PATH, from here, because it must not apply to any other suite -- see
++#   patches/optional/README.md and the note in dependencies.yaml.
++#
++# `&&`, not `;`: rose runs the command through a shell without `-e`, so with `;` the
++# task's exit status would be the LAST command's and a failed clone or patch would still
++# report SUCCESS to cylc, leaving build_lfric_atm to compile a missing or half-patched tree.
++
+ [command]
+-default=merge_sources.py -d $CYLC_WORKFLOW_RUN_DIR
+-mirrors=merge_sources.py -d $CYLC_WORKFLOW_RUN_DIR --mirrors --mirror_loc=$MIRROR_LOC
+-tokens=merge_sources.py -d $CYLC_WORKFLOW_RUN_DIR --tokens
++default=merge_sources.py -d $CYLC_WORKFLOW_RUN_DIR && \
++       =bash "$REPO_ROOT/examples/science-suites/site/patch-sources.sh" "$SOURCE_ROOT" && \
++       =LFRIC_SRC_ROOT="$SOURCE_ROOT" bash "$REPO_ROOT/patches/optional/33-lfric_apps-dz791-profile-init-patch.sh"
++mirrors=merge_sources.py -d $CYLC_WORKFLOW_RUN_DIR --mirrors --mirror_loc=$MIRROR_LOC && \
++       =bash "$REPO_ROOT/examples/science-suites/site/patch-sources.sh" "$SOURCE_ROOT" && \
++       =LFRIC_SRC_ROOT="$SOURCE_ROOT" bash "$REPO_ROOT/patches/optional/33-lfric_apps-dz791-profile-init-patch.sh"
++tokens=merge_sources.py -d $CYLC_WORKFLOW_RUN_DIR --tokens && \
++       =bash "$REPO_ROOT/examples/science-suites/site/patch-sources.sh" "$SOURCE_ROOT" && \
++       =LFRIC_SRC_ROOT="$SOURCE_ROOT" bash "$REPO_ROOT/patches/optional/33-lfric_apps-dz791-profile-init-patch.sh"
+diff -ruN a/app/mesh/rose-app.conf b/app/mesh/rose-app.conf
+--- a/app/mesh/rose-app.conf	2026-09-29 16:32:46.000000000 +0000
++++ b/app/mesh/rose-app.conf	2026-09-29 16:33:47.000000000 +0000
+@@ -1,7 +1,9 @@
+ meta=lfric-mesh_tools/vn3.2
+ 
+ [command]
+-default=mkdir -p $MESH_DIR ; mpiexec -n 1 $BIN_DIR/planar_mesh_generator mesh_generation.nml
++# [isambard3] `mpiexec -n 1` -> `srun --ntasks=1`: the cray environment is cray-mpich
++# and ships no mpiexec; srun is its native launcher. Still one rank.
++default=mkdir -p $MESH_DIR ; srun --ntasks=1 $BIN_DIR/planar_mesh_generator mesh_generation.nml
+ 
+ [env]
+ OMP_NUM_THREADS=1
+diff -ruN a/dependencies.yaml b/dependencies.yaml
+--- a/dependencies.yaml	2026-09-29 16:32:38.000000000 +0000
++++ b/dependencies.yaml	2026-09-29 16:34:06.000000000 +0000
+@@ -23,13 +23,18 @@
+ #
+ # It is up to the user to ensure these merge cleanly
+ 
++# [isambard3] CHANGED: every `ref:` 2026.03.1 -> 2026.07.1, the LFRic release this repo's
++# environment was built against (vn3.2), matching the app configs' `meta=` after the
++# stager's `rose app-upgrade`. See the lfric_apps note for why the suite cannot stay on
++# 2026.03.1.
++
+ casim:
+     source: git@github.com:MetOffice/casim.git
+-    ref: 2026.03.1
++    ref: 2026.07.1
+ 
+ jules:
+     source: git@github.com:MetOffice/jules.git
+-    ref: 2026.03.1
++    ref: 2026.07.1
+ 
+ lfric_apps:
+     # - source: git@github.com:MetOffice/lfric_apps.git
+@@ -37,10 +42,24 @@
+     # source: /home/users/alexander.corbett.ext/lfric_apps
+     # ref: fix_planar_init
+     # git@github.com:corbopy/lfric_apps.git
+-    - source: /home/users/alexander.corbett.ext/local_lfric/lfric_apps
+-      ref: t_and_rh_init_clean
+-    - source: /home/users/alexander.corbett.ext/local_lfric/lfric_apps
+-      ref: qsaturation-use-epsilon
++    # [isambard3] CHANGED: mainline 2026.07.1 alone, instead of the two branches upstream
++    # merges here from /home/users/alexander.corbett.ext/local_lfric/lfric_apps -- a clone
++    # on a Met Office machine that nothing outside it can read. The same two branches are
++    # public in Alex Corbett's fork (corbopy/lfric_apps: vn3.1-feat/t-and-rh-init-clean
++    # and qsaturation-use-epsilon), and they are this suite's science: the absolute-
++    # temperature / relative-humidity initialisation and the saturation fix.
++    #
++    # They cannot be declared here, because both are based on 2026.03.1 (vn3.1), and the
++    # environment's toolchain cannot build that release: its PSyclone 3.3 has dropped the
++    # Dynamo0p3* transformations 2026.03.1's optimisation scripts import. Merged onto
++    # 2026.07.1 instead, t-and-rh-init-clean conflicts, and merge_sources.py auto-resolves
++    # conflicts only under rose-stem/. So the forward-port is carried as a patch --
++    # patches/optional/33-lfric_apps-dz791-profile-init-patch.sh, applied by the extract
++    # task -- where the resolution is visible and reviewable. When the branches are rebased
++    # onto a current LFRic (or reach mainline), this goes back to upstream's form and that
++    # patch is deleted.
++    - source: git@github.com:MetOffice/lfric_apps.git
++      ref: 2026.07.1
+     # - source: git@github.com:dennissergeev/lfric_apps.git
+     #   ref: ice_giants_tf
+     # - source: git@github.com:mo-cjsmith/lfric_apps.git
+@@ -48,12 +67,12 @@
+ 
+ lfric_core:
+     source: git@github.com:MetOffice/lfric_core.git
+-    ref: 2026.03.1
++    ref: 2026.07.1
+ 
+ socrates:
+     source: git@github.com:MetOffice/socrates.git
+-    ref: 2026.03.1
++    ref: 2026.07.1
+ 
+ ukca:
+     source: git@github.com:MetOffice/ukca.git
+-    ref: 2026.03.1
++    ref: 2026.07.1
+diff -ruN a/flow.cylc b/flow.cylc
+--- a/flow.cylc	2026-09-29 16:32:38.000000000 +0000
++++ b/flow.cylc	2026-09-29 16:33:47.000000000 +0000
+@@ -6,11 +6,33 @@
+ {# ==================================== #}
+ {# Set lfric_atm compute resources      #}
+ {# ==================================== #}
+-{% set LPPN = 128 %}
++{# [isambard3] CHANGED: LPPN 128 -> 144, on Isambard 3 only. A Grace node is 2 sockets
++   x 72 cores; 128 is the Met Office EX number. Under-counting it makes LFRIC_NODES too
++   large and splits the job over the fabric for no reason. Guarded on EX_HOST, since LPPN
++   also feeds CORES_PER_NODE and the PBS `-l select=` in the EX branches. #}
++{% if EX_HOST == 'isambard3' %}{% set LPPN = 144 %}{% else %}{% set LPPN = 128 %}{% endif %}
+ {% set LFRIC_NODES = (TOTAL_RANKS_REQ/LPPN) | round(0, 'ceil') | int %}
++{# [isambard3] ADDED: ranks per node, spread evenly over the nodes asked for. Slurm needs
++   this stated: given only --ntasks it is free to take a handful of ranks from each of a
++   dozen partially-free nodes, turning intra-node halo swaps into network ones. See
++   staging/dr932-mpi-scaling/README.md. #}
++{% set LFRIC_PPN = (TOTAL_RANKS_REQ/LFRIC_NODES) | round(0, 'ceil') | int %}
++{# [isambard3] ADDED: this repo's env + source selection, injected by run-suite.sh
++   (`cylc vip -S ...`). Each defaults to empty, which keeps the EX branches as upstream. #}
++{% if ACTIVATE_ENV is not defined %}{% set ACTIVATE_ENV = '' %}{% endif %}
++{% if LFRIC_STACK is not defined %}{% set LFRIC_STACK = '' %}{% endif %}
++{% if LFRIC_PREFIX is not defined %}{% set LFRIC_PREFIX = '' %}{% endif %}
++{% if LFRIC_ENV_VERSION is not defined %}{% set LFRIC_ENV_VERSION = '' %}{% endif %}
++{% if REPO_ROOT is not defined %}{% set REPO_ROOT = '' %}{% endif %}
+ 
+ # Machine specific settings
+-{% if EX_HOST == 'ex' %}
++{% if EX_HOST == 'isambard3' %}
++# [isambard3] ADDED: Isambard 3. No spack module tree of its own -- the root init-script
++# sources ACTIVATE_ENV, which `module load`s the environment Stage 1 built.
++  {% set SPACK = '' %}
++  {% set SHARED_QUEUE = ISAMBARD3_SHARED_PARTITION %}
++  {% set RUN_QUEUE = ISAMBARD3_RUN_PARTITION %}
++{% elif EX_HOST == 'ex' %}
+ # Monsoon
+   {% set SPACK = '/projects/metoff/spackadmin.mon/releases/2025.12.18/ngms' %}
+   {% set SHARED_QUEUE = 'collabshared' %}
+@@ -54,6 +76,24 @@
+ 
+ [runtime]
+     [[root]]
++{% if EX_HOST == 'isambard3' %}
++        {# [isambard3] ADDED: re-activate the built environment for EVERY task. Cylc runs
++           each job under a login shell (`bash -l`), which resets Lmod and PURGES the
++           lfric-env module the scheduler had loaded, so the job dies with
++           `rose: command not found` before any family pre-script runs. init-script is the
++           only hook early enough -- it runs before cylc's first `cylc message`, before
++           `rose task-env`, and before the task [[[environment]]] block, which is why the
++           module selection is exported here rather than inherited. #}
++        init-script = """
++            {% if LFRIC_STACK %}export LFRIC_STACK="{{ LFRIC_STACK }}"{% endif %}
++            {% if LFRIC_PREFIX %}export LFRIC_PREFIX="{{ LFRIC_PREFIX }}"{% endif %}
++            {% if LFRIC_ENV_VERSION %}export LFRIC_ENV_VERSION="{{ LFRIC_ENV_VERSION }}"{% endif %}
++            activate_env="{{ ACTIVATE_ENV }}"
++            if [ -n "$activate_env" ] && [ -f "$activate_env" ]; then
++              source "$activate_env"
++            fi
++            """
++{% endif %}
+         env-script = eval $(rose task-env)
+         script = "rose task-run --verbose"
+         [[[events]]]
+@@ -73,6 +113,17 @@
+             CORE_ROOT_DIR = $SOURCE_ROOT/lfric_core
+             LAUNCH_SCRIPT = $APPS_ROOT_DIR/rose-stem/site/meto/common/bin
+             VN = {{ VN }}
++{% if EX_HOST == 'isambard3' %}
++            {# [isambard3] ADDED: where this repo lives, so the extract task can apply its
++               LFRic-source patch stack to the freshly cloned tree; and the env selection
++               read by site/activate-env.sh.
++               LAUNCH_SCRIPT above is deliberately NOT changed: with RUN_METHOD=srun the
++               stock Met Office launch-exe emits exactly `srun <exe> configuration.nml`,
++               which is what this single-node, XIOS-attached run wants. #}
++            REPO_ROOT = {{ REPO_ROOT }}
++            LFRIC_STACK = {{ LFRIC_STACK }}
++            LFRIC_PREFIX = {{ LFRIC_PREFIX }}
++{% endif %}
+ 
+     [[EX1A]]
+     {% if COMPILER == 'cce' %}
+@@ -110,10 +161,45 @@
+             RUN_METHOD = mpiexec
+             TOTAL_RANKS_REQ = {{TOTAL_RANKS_REQ}}
+ 
++{% if EX_HOST == 'isambard3' %}
++    {# [isambard3] ADDED: the Isambard 3 analogue of [[EX1A]]. No module loads of its own;
++       the root init-script has already sourced ACTIVATE_ENV, and that one module supplies
++       the whole toolchain. #}
++    [[ISAMBARD3]]
++        pre-script = """
++                        ulimit -s unlimited -c unlimited
++                        ulimit -a
++                        """
++        platform = isambard3
++        [[[environment]]]
++            BUILD_ROOT = ${TMPDIR}
++            CORES_PER_NODE = {{LPPN}}
++            HYPERTHREADS = 1
++            NUMA_REGIONS_PER_NODE = 2
++            {# srun, not mpiexec: srun binds cray-mpich to Slingshot's cxi provider through
++               the Cray PMI, and the cray environment ships no mpiexec. Under it the stock
++               Met Office launch-exe emits plain `srun <exe> configuration.nml`. #}
++            RUN_METHOD = srun
++            TOTAL_RANKS_REQ = {{TOTAL_RANKS_REQ}}
++{% endif %}
++
+     [[BUILD]]
++{% if EX_HOST == 'isambard3' %}
++        inherit = ISAMBARD3
++{% else %}
+         inherit = EX1A
++{% endif %}
+         script = "rose task-run --app-key=build"
+         [[[environment]]]
++{% if EX_HOST == 'isambard3' %}
++            {# [isambard3] ADDED: take the compiler from the loaded module instead of
++               letting the build guess. FC/LDMPI/FPP resolve to Cray ftn/CC on the cray
++               variant and to the view's mpif90/mpic++ on spack, so switching LFRIC_STACK
++               needs no edit here. This is THE Stage-1 contract. #}
++            FC = $FC
++            LDMPI = $LDMPI
++            FPP = $FPP
++{% endif %}
+             COMPILER = {{COMPILER}}
+             PROFILE = 'production'
+             TARGET = build
+@@ -128,13 +214,33 @@
+             R_PHYS_PRECISION = 64
+             PRE_PROCESS_MACROS = ""
+         [[[directives]]]
++{% if EX_HOST == 'isambard3' %}
++            {# [isambard3] the PBS `-l select=` below, as Slurm. `make -j6` is six THREADS
++               in one task, so one task with many cpus -- as six tasks Slurm may scatter
++               them over six nodes and confine each to one core. #}
++            --nodes=1
++            --ntasks=1
++            --cpus-per-task=24
++            --mem=40G
++            --time=01:00:00
++            --partition={{SHARED_QUEUE}}
++{% else %}
+             -l select=1:ncpus=24:mem=40GB:tmpsize=12GB
+             -l walltime=01:00:00
+             -q={{SHARED_QUEUE}}
++{% endif %}
+ 
+ 
+     [[extract]]
++{% if EX_HOST == 'isambard3' %}
++        {# [isambard3] CHANGED: the extract runs on the scheduler host rather than being
++           submitted. It is a `git clone` of six repositories plus a patch stack -- no
++           compute -- and the login nodes have the outbound network. #}
++        inherit = root
++        platform = localhost
++{% else %}
+         inherit = EX1A
++{% endif %}
+         script = "rose task-run --app-key=extract"
+         [[[environment]]]
+             MIRROR_LOC = {{ MIRROR_LOC }}
+@@ -143,10 +249,12 @@
+ {% elif USE_TOKENS %}
+             ROSE_APP_COMMAND_KEY = tokens
+ {% endif %}
++{% if EX_HOST != 'isambard3' %}
+         [[[directives]]]
+             -l select=1:ncpus=1:mem=6GB:tmpsize=6GB
+             -l walltime=00:10:00
+             -q={{SHARED_QUEUE}}
++{% endif %}
+ 
+ 
+     [[build_mesh]]
+@@ -168,21 +276,44 @@
+ 
+ 
+     [[generate_mesh]]
++{% if EX_HOST == 'isambard3' %}
++        inherit = ISAMBARD3
++{% else %}
+         inherit = EX1A
++{% endif %}
+         script = "rose task-run --app-key=mesh"
+         execution time limit = PT10M
+         [[[environment]]]
+             BIN_DIR = $OUTPUT_ROOT/bin/mesh
+             ROSE_APP_OPT_CONF_KEYS = {{LFRIC_RES}}
+             OUTPUT_FILE_PREFIX = $MESH_DIR/mesh_{{LFRIC_RES}}
++{% if EX_HOST == 'isambard3' %}
++            {# [isambard3] the mesh app calls srun itself (app/mesh/rose-app.conf), so the
++               family's RUN_METHOD must not put a second launcher in front of it. #}
++            RUN_METHOD =
++            OMP_NUM_THREADS = 1
++{% endif %}
+         [[[directives]]]
++{% if EX_HOST == 'isambard3' %}
++            --nodes=1
++            --ntasks=1
++            --cpus-per-task=1
++            --mem=6G
++            --time=00:10:00
++            --partition={{SHARED_QUEUE}}
++{% else %}
+             -l select=1:ncpus=1:mem=6GB:tmpsize=6GB
+             -l walltime=00:10:00
+             -q={{SHARED_QUEUE}}
++{% endif %}
+ 
+ 
+     [[lfric_atm]]
++{% if EX_HOST == 'isambard3' %}
++        inherit = ISAMBARD3
++{% else %}
+         inherit = EX1A
++{% endif %}
+         script = """
+             echo "====Forecast times===="
+             echo "Forecast start date="${STARTDATE}
+@@ -225,6 +356,33 @@
+             {# xios_nodes = 1 #}
+             {# mpi_parts_xios = 32 #}
+ 
++{% if EX_HOST == 'isambard3' %}
++            {# [isambard3] ADDED: cray-mpich prints its OFI provider and each rank's NIC
++               into job.out. `provider: cxi` is the one-line proof the run is on Slingshot
++               rather than falling back to TCP. #}
++            MPICH_ENV_DISPLAY = 1
++            MPICH_OFI_NIC_VERBOSE = 2
++{% endif %}
+         [[[directives]]]
++{% if EX_HOST == 'isambard3' %}
++            --nodes={{LFRIC_NODES}}
++            --ntasks={{TOTAL_RANKS_REQ}}
++            {# [isambard3] ADDED: state the placement; never leave it to Slurm. Without
++               --ntasks-per-node it scatters ranks over whatever nodes have room, and any
++               halo swap crossing a node boundary goes to the fabric instead of shared
++               memory. #}
++            --ntasks-per-node={{LFRIC_PPN}}
++            {# [isambard3] ADDED: whole nodes, not slices of shared ones. SelectType here is
++               select/cons_tres (CR_CORE_MEMORY), so without this the job lands on
++               partially-occupied nodes and competes for cores and memory bandwidth -- the
++               source of the 5 h-to-9 h spread on identical work documented in
++               staging/dr932-mpi-scaling. --mem=0 is still needed alongside it: --exclusive
++               gives all the CPUs but memory still follows DefMemPerCPU, and 1 GB/rank
++               OOM-kills lfric_atm. #}
++            --exclusive =
++            --mem=0
++            --partition={{RUN_QUEUE}}
++{% else %}
+             -l select={{LFRIC_NODES}}
+             -q={{RUN_QUEUE}}
++{% endif %}
+diff -ruN a/rose-suite.conf b/rose-suite.conf
+--- a/rose-suite.conf	2026-09-29 16:32:38.000000000 +0000
++++ b/rose-suite.conf	2026-09-29 16:34:03.000000000 +0000
+@@ -1,28 +1,47 @@
++# [isambard3] CHANGED: the three sources off `git:localmirrors:`. `localmirrors:` is a git
++# alias a Met Office site sets up (`git config --global url."<host>:/path/".insteadOf
++# "localmirrors:"`); there is no such mirror host here. All three repositories are public,
++# so https clones anonymously.
+ [file:bin/get_git_sources.py]
+-source=git:localmirrors:MetOffice/SimSys_Scripts.git::github_scripts/get_git_sources.py::main
++source=git:https://github.com/MetOffice/SimSys_Scripts.git::github_scripts/get_git_sources.py::main
+ 
+ [file:bin/merge_sources.py]
+-source=git:localmirrors:MetOffice/SimSys_Scripts.git::github_scripts/merge_sources.py::main
++source=git:https://github.com/MetOffice/SimSys_Scripts.git::github_scripts/merge_sources.py::main
+ 
+ [file:bin/tweak_iodef]
+ mode=auto
+-source=git:localmirrors:MetOffice/lfric_core.git::bin/tweak_iodef::main
++source=git:https://github.com/MetOffice/lfric_core.git::bin/tweak_iodef::main
+ 
+ [template variables]
+ BUILD_LFRIC=true
+-COMPILER='cce'
++# [isambard3] CHANGED: 'cce' -> 'gnu'. This environment is built with GCC 14.3;
++# there is no Cray Compiler Environment build of it.
++COMPILER='gnu'
+ EXPT_DT=10
+ EXPT_RESUB='PT30M'
+ EXPT_RUNLEN='PT1H'
+ EXPT_START='20000101T0000Z'
+-EX_HOST='ex'
++# [isambard3] CHANGED: 'ex' (Monsoon) -> 'isambard3'. This is the switch that selects
++# the ISAMBARD3 family in flow.cylc; any other value renders the file as upstream.
++EX_HOST='isambard3'
++# [isambard3] ADDED: the Slurm partitions the ISAMBARD3 family submits to, and the
++# activation script every task sources. run-suite.sh injects the real ACTIVATE_ENV
++# path via `cylc vip -S`; empty here keeps the file path-independent.
++ISAMBARD3_RUN_PARTITION='grace'
++ISAMBARD3_SHARED_PARTITION='grace'
++ACTIVATE_ENV=''
+ HOUSEKEEPING=true
+ LFRIC_CRUN_WALLCLOCK='PT10M'
+ LFRIC_LEVS='uniform_l200_900km'
+ LFRIC_RES='BiP128x128-2000x2000_MG'
++# [isambard3] CHANGED: USE_MIRRORS true -> false. Upstream extracts through the Met Office
++# git mirror host, which does not exist here, so the extract falls to --tokens: https clones
++# from github, which work anonymously for these public repositories.
+ MIRROR_LOC='localmirrors:'
+ PHYSICS_CONF='gungho'
+ TOTAL_RANKS_REQ=128
+-USE_MIRRORS=true
++USE_MIRRORS=false
+ USE_TOKENS=true
+-VN='3.1'
++# [isambard3] CHANGED: '3.1' -> '3.2', matching dependencies.yaml and the app configs'
++# `meta=` after the upgrade. Nothing in the suite or the build reads it.
++VN='3.2'

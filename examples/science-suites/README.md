@@ -10,8 +10,8 @@ config. So these examples run the suites *that* way, rather than reinventing it.
 > `stage1/build.sh`). These suites are **not** that core — they are things you do
 > *with* it. Treat them as templates to copy and adapt. u-dr932 is
 > [Denis Sergeev's own suite](https://github.com/dennissergeev/lfric_egp_bench) on
-> GitHub; u-dn704 and u-dt000 are Met Office suites in MOSRS subversion
-> (`roses-u/d/n/7/0/4/trunk` and `d/t/0/0/0/trunk`). **None is copied into this repo** —
+> GitHub; u-dn704, u-dt000 and u-dz791 are Met Office suites in MOSRS subversion
+> (`roses-u/d/n/7/0/4/trunk`, `d/t/0/0/0/trunk` and `d/z/7/9/1/trunk`). **None is copied into this repo** —
 > each is fetched from its own upstream and adapted by a patch.
 
 The environment Stage 1 builds already ships `cylc`, `rose` and `rose_picker` in
@@ -152,9 +152,10 @@ Upstream comes in two kinds, because the suites have two kinds of home:
 | u-dr932 | submodule `vendor/lfric_egp_bench` @ `e6ee57a` | `patches/40-lfric_egp_bench-u-dr932-patch.sh` | 419 lines, 5 files |
 | u-dt000 | MOSRS `roses-u/d/t/0/0/0/trunk` @ r348703 | `patches/suites/41-roses-u-u-dt000-patch.sh` | 434 lines, 5 files |
 | u-dn704 | MOSRS `roses-u/d/n/7/0/4/trunk` @ r361458 | `patches/suites/42-roses-u-u-dn704-patch.sh` | 455 lines, 7 files |
+| u-dz791 | MOSRS `roses-u/d/z/7/9/1/trunk` @ r368986 | `patches/suites/43-roses-u-u-dz791-patch.sh` | 431 lines, 5 files |
 
-u-dr932 is Denis Sergeev's, on GitHub, so it is a pinned submodule. **u-dn704 and
-u-dt000 are Met Office rose suites and live in MOSRS subversion** — and are staying
+u-dr932 is Denis Sergeev's, on GitHub, so it is a pinned submodule. **u-dn704,
+u-dt000 and u-dz791 are Met Office rose suites and live in MOSRS subversion** — and are staying
 there: [simulation-systems#566](https://github.com/MetOffice/simulation-systems/discussions/566)
 moved the *source* extraction to git, explicitly *"not where the workflows themselves
 reside"*. There is nothing to vendor, so they are **checked out the way a Met Office
@@ -236,7 +237,7 @@ changes, so it runs against *our* env on Isambard 3:
    metadata it adds is `compulsory=true` and would make every other suite's namelists
    invalid. See [`patches/optional/README.md`](../../patches/optional/README.md).
 
-   All three suites are on this extract now. The bespoke offline extract this repo
+   All four suites are on this extract now. The bespoke offline extract this repo
    used to carry for u-dn704 (`site/extract-sources.sh`, a `git archive` out of the
    vendored submodules) is gone: `USE_MIRRORS=true` with `MIRROR_LOC` pointed at
    `vendor/mirrors/` is the same property using upstream's own mechanism.
@@ -426,7 +427,7 @@ and both are worked examples here:
 
 - **Upstream is git** (u-dr932): pin it as a submodule under `vendor/` and add a
   `patches/NN-<repo>-<suite>-patch.sh`, exactly as Stage 1 pins its LFRic sources.
-- **Upstream is MOSRS `roses-u`** (u-dn704, u-dt000): there is nothing to vendor —
+- **Upstream is MOSRS `roses-u`** (u-dn704, u-dt000, u-dz791): there is nothing to vendor —
   rose workflows are staying in subversion
   ([simulation-systems#566](https://github.com/MetOffice/simulation-systems/discussions/566)
   moved the *source* extraction to git, explicitly *"not where the workflows themselves

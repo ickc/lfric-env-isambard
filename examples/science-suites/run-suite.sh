@@ -13,7 +13,7 @@
 #   1. Activates the built env (rose/cylc/psyclone + view on PATH) for the chosen
 #      variant — so `cylc`/`rose` are the env's, matching what the suite tasks use.
 #   2. Stages the suite where it lives — a pinned submodule (u-dr932) or a MOSRS
-#      checkout (u-dn704, u-dt000): the Isambard 3 site patch, preceded by a
+#      checkout (u-dn704, u-dt000, u-dz791): the Isambard 3 site patch, preceded by a
 #      `rose app-upgrade` for the suites that still lag the environment's LFRic.
 #      Idempotent; needs the env from step 1, hence the order.
 #   3. Installs the Cylc site config (the `isambard3` Slurm platform + a roomy
@@ -47,7 +47,7 @@ shift || true
 #   u-dr932 is on GitHub, so it is a pinned submodule (vendor/lfric_egp_bench) staged
 #   exactly as Stage 1 stages its LFRic sources.
 #
-#   u-dn704 and u-dt000 are Met Office rose suites and live in MOSRS subversion, which
+#   u-dn704, u-dt000 and u-dz791 are Met Office rose suites and live in MOSRS subversion, which
 #   is where rose workflows are staying (simulation-systems#566 moved the SOURCE
 #   extraction to git, "not where the workflows themselves reside"). There is nothing to
 #   vendor, so they are CHECKED OUT the way a Met Office scientist checks them out --
@@ -69,8 +69,13 @@ case "$SUITE" in
     SUITE_PATCH="$REPO_ROOT/patches/suites/42-roses-u-u-dn704-patch.sh"
     SUITE_GET=mosrs
     ;;
+  u-dz791)
+    SUITE_DIR="${LFRIC_SUITE_DIR:-$HOME/roses/$SUITE}"
+    SUITE_PATCH="$REPO_ROOT/patches/suites/43-roses-u-u-dz791-patch.sh"
+    SUITE_GET=mosrs
+    ;;
   *)
-    die "no such suite: $SUITE  (known: u-dn704, u-dr932, u-dt000)"
+    die "no such suite: $SUITE  (known: u-dn704, u-dr932, u-dt000, u-dz791)"
     ;;
 esac
 

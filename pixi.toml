@@ -30,8 +30,8 @@ scripts = ["scripts/common.sh", "scripts/activate.sh"]
 init-sources = "git submodule update --init --jobs 4 -- vendor/lfric_apps vendor/lfric_core"
 init-physics = "git submodule update --init --jobs 4 -- vendor/physics/casim vendor/physics/jules vendor/physics/socrates vendor/physics/ukca"
 
-# The u-dr932 science suite (Denis Sergeev's repo). u-dn704 and u-dt000 are Met
-# Office rose suites in MOSRS subversion, fetched with `rosie checkout` instead —
+# The u-dr932 science suite (Denis Sergeev's repo). u-dn704, u-dt000 and u-dz791 are
+# Met Office rose suites in MOSRS subversion, fetched with `rosie checkout` instead —
 # nothing to vendor. See examples/science-suites/README.md.
 init-suites = "git submodule update --init -- vendor/lfric_egp_bench"
 
