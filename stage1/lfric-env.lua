@@ -14,6 +14,10 @@
 --   * where to find the env    PATH, PYTHONPATH (+ the cylc/rose variants),
 --                              LD_LIBRARY_PATH, LIBRARY_PATH, FFLAGS, LDFLAGS,
 --                              SHUMLIB_ROOT, PSYCLONE_CONFIG, SPACK_ENV
+--   * the Rose site config     ROSE_SITE_CONF_PATH, unless already set
+--   * which module this is     LFRIC_ENV_MODULE, LFRIC_ENV_MODULEPATH, so a
+--                              workflow can load the same one in its jobs
+--   * site helpers on PATH     mosrs-cache-password
 -- and nothing more. In particular it does NOT set APPS_ROOT_DIR or
 -- CORE_ROOT_DIR. Those name a SOURCE TREE, which belongs to whoever is building
 -- — a Rose/Cylc suite declares its own sources and extracts them itself. An
@@ -147,4 +151,30 @@ if d.psyclone then
 end
 if d.rose_picker then
   prepend_path("PATH", d.rose_picker .. "/bin")
+end
+
+-- The Rose site config: just the rosie prefix map, so `rosie checkout u-...`
+-- works after a bare `module load` (#21). A site fact, not a suite setting.
+-- Only claim ROSE_SITE_CONF_PATH when it is unset or already ours: someone with
+-- their own site config keeps it. Checking "already ours" is what makes unload
+-- symmetric — on unload the value is ours, so setenv() runs and removes it.
+if d.rose_site_conf then
+  local cur = os.getenv("ROSE_SITE_CONF_PATH")
+  if cur == nil or cur == "" or cur == d.rose_site_conf then
+    setenv("ROSE_SITE_CONF_PATH", d.rose_site_conf)
+  end
+end
+
+-- Which environment this is, so a workflow launched with it loaded can load the
+-- same one in each job (a login shell resets Lmod): `module use
+-- $LFRIC_ENV_MODULEPATH; module load $LFRIC_ENV_MODULE`. The Isambard 3
+-- rose-stem site reads these.
+setenv("LFRIC_ENV_MODULE", myModuleFullName())
+if d.modulefiles_dir then
+  setenv("LFRIC_ENV_MODULEPATH", d.modulefiles_dir)
+end
+
+-- Site helpers shipped with the environment (mosrs-cache-password).
+if d.site_bin then
+  prepend_path("PATH", d.site_bin)
 end

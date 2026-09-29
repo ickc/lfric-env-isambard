@@ -95,6 +95,36 @@ The authoritative pins are the submodule gitlinks (`git submodule status`).
   reviewable way to pull in new science — `local_build.py` no longer auto-clones
   (patch 30), so the build only reads what you stage.
 
+### Point tags (`YYYY.MM.N`, N > 1) — a judgement call, not a rule
+
+The Met Office cuts a coordinated release as the same `YYYY.MM.1` tag across
+lfric_apps, lfric_core and the physics repos. Later `YYYY.MM.2`, `.3`, … tags are
+not coordinated. They appear on only the repos that needed one, weeks apart, and
+the other repos' `dependencies.yaml` often still name `.1`. The working
+assumption is that a point tag is a fix to that release and stays compatible with
+the `.1` tags of the other repos. So **take a point tag when one exists, even
+if nothing else declares it.** That is why `vendor/lfric_core` can sit at
+`2026.07.2` while `vendor/lfric_apps/dependencies.yaml` says `2026.07.1`.
+`stage-physics.sh` resets it to the declared ref, so re-check out the point tag
+after running it.
+
+The tag name alone doesn't tell you it is a fix, so look before bumping:
+
+- **the tag message** (`git cat-file -p <tag>`) — e.g. apps `2026.07.2` says
+  "Tag to enable JEDI testing";
+- **`*_release_version`** in `lfric_{apps,core}_version_mod.f90` — `.true.` on
+  a release, `.false.` on a snapshot of `main`;
+- **what it contains** (`git log <.1>..<.N>`) — a handful of fixes, or `main`'s
+  new science;
+- **the rose-meta** — any new `vnX.Y` upgrade macro means suite configs must move.
+
+Worked example, 2026-09: core `2026.07.2` is one build-performance commit on
+`2026.07.1` with `release_version = .true.`, so we took it. Apps `2026.07.2` is 14
+commits of `main` (boundary-layer rewrites, a splitting-fraction fix) with
+`release_version = .false.` and the JEDI message. It is a snapshot, not a fix, so
+apps stays at `2026.07.1`. When in doubt, the minimal-compile example and one
+science suite decide.
+
 ## Maintainer-only overrides
 
 Beyond the user-facing vars in the README:

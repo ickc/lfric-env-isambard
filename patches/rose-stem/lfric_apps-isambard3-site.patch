@@ -1,0 +1,447 @@
+diff --git a/rose-stem/lib/python/read_sources.py b/rose-stem/lib/python/read_sources.py
+index 50287162..d14e1819 100644
+--- a/rose-stem/lib/python/read_sources.py
++++ b/rose-stem/lib/python/read_sources.py
+@@ -10,6 +10,23 @@ import os
+ from subprocess import run
+ from shutil import rmtree
+ 
++def local_source(wc_loc):
++    """
++    Return wc_loc as a plain path if it is "host:path" and path is visible on
++    this machine's filesystem, else return it unchanged. Where the launch host's
++    filesystem is shared, reading by path avoids needing SSH back to that host,
++    which some sites (e.g. Isambard 3) do not allow, even to a node itself.
++    """
++
++    try:
++        _, path = wc_loc.split(":", 1)
++    except ValueError:
++        return wc_loc
++    if os.path.isfile(os.path.join(path, "dependencies.yaml")):
++        return path
++    return wc_loc
++
++
+ def get_dependencies_file(wc_loc):
+     """
+     Copy the dependencies file to a temporary directory on the local machine that can be
+@@ -46,6 +63,7 @@ def read_sources(clone_source, repo, use_heads):
+     Load the dependencies.yaml file as a dictionary
+     """
+ 
++    clone_source = local_source(clone_source)
+     dependencies_file = get_dependencies_file(clone_source)
+ 
+     with open(os.path.join(dependencies_file, "dependencies.yaml")) as stream:
+diff --git a/rose-stem/site/isambard3/common/bin/launch-exe b/rose-stem/site/isambard3/common/bin/launch-exe
+new file mode 100755
+index 00000000..819bba51
+--- /dev/null
++++ b/rose-stem/site/isambard3/common/bin/launch-exe
+@@ -0,0 +1,41 @@
++#!/bin/bash
++# Isambard 3 launcher for the science-suite examples (drop-in for the MO meto
++# rose-stem launch-exe; the suite's [command] runs "$LAUNCH_SCRIPT/launch-exe").
++#
++# WHY THIS EXISTS. On Isambard 3 (Cray EX / Slingshot) the model must be launched
++# with srun so it uses cray-mpich + the cxi (Slingshot) OFI provider over the
++# interconnect, and so it scales across nodes. The MO meto launch-exe only wires up
++# the dedicated-XIOS-server MPMD under RUN_METHOD=mpiexec (Hydra colon syntax); its
++# srun path emits a plain `srun <exe>` with no server. Hydra/mpiexec here would use
++# the from-source (spack) mpich over a libfabric without cxi (TCP only) and does not
++# launch cleanly multi-node. So for srun we launch the XIOS server alongside the model
++# with `srun --multi-prog`, which puts client + server in a SINGLE MPI_COMM_WORLD
++# (what XIOS requires) within one job step.
++#
++# Honours the same env the suite already sets:
++#   BIN_DIR, EXEC_NAME, EXTRA_NAMELIST_FILES (default configuration.nml),
++#   XIOS_SERVER_MODE (True/False), TOTAL_RANKS (model ranks), XIOS_SERVER_RANKS.
++# Requires xios_server.exe on PATH (the activated Spack view provides it).
++set -eu
++
++EXEC="${BIN_DIR:?BIN_DIR unset}/${EXEC_NAME:?EXEC_NAME unset}"
++NAMELIST="${EXTRA_NAMELIST_FILES:-configuration.nml}"
++
++if [ "${XIOS_SERVER_MODE:-False}" = "True" ]; then
++  M="${TOTAL_RANKS:?TOTAL_RANKS unset}"        # model (client) ranks
++  S="${XIOS_SERVER_RANKS:?XIOS_SERVER_RANKS unset}"  # dedicated XIOS server ranks
++  XIOS_EXEC="$(command -v xios_server.exe)" \
++    || { echo "launch-exe: xios_server.exe not on PATH" >&2; exit 1; }
++  total=$((M + S))
++  conf="$(pwd)/lfric_xios_mpmd.conf"
++  {
++    printf '%d-%d %s %s\n' 0 "$((M - 1))" "$EXEC" "$NAMELIST"
++    printf '%d-%d %s\n'   "$M" "$((total - 1))" "$XIOS_EXEC"
++  } > "$conf"
++  echo "launch-exe: srun --ntasks=$total --multi-prog $conf  (model=$M xios_server=$S)"
++  cat "$conf"
++  exec srun --ntasks="$total" --multi-prog "$conf"
++else
++  echo "launch-exe: srun $EXEC $NAMELIST  (XIOS attached, no dedicated server)"
++  exec srun "$EXEC" "$NAMELIST"
++fi
+diff --git a/rose-stem/site/isambard3/common/default_directives.cylc b/rose-stem/site/isambard3/common/default_directives.cylc
+new file mode 100644
+index 00000000..0f1a7499
+--- /dev/null
++++ b/rose-stem/site/isambard3/common/default_directives.cylc
+@@ -0,0 +1,35 @@
++{# ########################################################################### #}
++{# (c) Crown copyright 2024 Met Office. All rights reserved. #}
++{# The file LICENCE, distributed with this code, contains details of the terms #}
++{# under which the code may be used. #}
++{# ########################################################################### #}
++{% do LOG.debug("Entered site/isambard3/common/default_directives.cylc") %}
++
++{# Grace nodes: 144 cores, 230400 MB, allocated pro rata (1600 MB/core). #}
++
++{% do default_directives.update({
++    "isambard3": {
++        "memory": [50, "GB"],
++        "wallclock": 20,
++        "build_memory": [40, "GB"],
++        "build_wallclock": 25,
++        "build_cpus": 24,
++
++        "mesh": {
++            "mesh_wallclock": 20,
++            "mesh_memory": [6, "GB"],
++            "mesh_cpus": 6,
++        },
++        "tech-tests": {
++            "tech-tests_wallclock": 15,
++            "tech-tests_memory": [6, "GB"],
++            "tech-tests_cpus": 1,
++        },
++        "lfric_atm": {
++            "wallclock": 39,
++        },
++    },
++    }) %}
++
++
++{% do LOG.debug("Finished in site/isambard3/common/default_directives.cylc") %}
+diff --git a/rose-stem/site/isambard3/common/suite_config_isambard3.cylc b/rose-stem/site/isambard3/common/suite_config_isambard3.cylc
+new file mode 100644
+index 00000000..33d07050
+--- /dev/null
++++ b/rose-stem/site/isambard3/common/suite_config_isambard3.cylc
+@@ -0,0 +1,107 @@
++{% do LOG.debug("Entered site/isambard3/common/suite_config_isambard3.cylc") %}
++
++{# Isambard 3 (Cray EX, Grace/aarch64, Slurm). The toolchain and the rose/cylc/
++   psyclone tools come from the lfric-env module (github.com/ickc/lfric-env-isambard).
++   Load it before launching; every task then loads the same module, found through
++   the two variables it sets: LFRIC_ENV_MODULEPATH and LFRIC_ENV_MODULE. #}
++{% set lfric_env_modulepath = environ.get("LFRIC_ENV_MODULEPATH", "") %}
++{% set lfric_env_module = environ.get("LFRIC_ENV_MODULE", "") %}
++{% if not lfric_env_module %}
++    {{ raise("site isambard3: load the lfric-env module before launching rose-stem "
++             "(module load lfric-env/<version>/cray); LFRIC_ENV_MODULE is unset.") }}
++{% endif %}
++
++{% set isambard3_base = 'umask 0022' %}
++
++{# A login shell resets Lmod, so each job loads the module itself. #}
++{% set isambard3_env = '. /opt/cray/pe/lmod/lmod/init/bash; module use ' ~ lfric_env_modulepath ~ '; module load ' ~ lfric_env_module %}
++
++{% set isambard3_run = 'ulimit -s unlimited; export HDF5_USE_FILE_LOCKING=FALSE' %}
++
++    {# Tasks that run where the scheduler runs, e.g. export-source. #}
++    [[ISAMBARD3_ORIG]]
++        platform = localhost
++        init-script = {{ isambard3_env }}
++
++    [[ISAMBARD3_BASE]]
++        platform = localhost
++        init-script = {{ isambard3_env }}
++        [[[environment]]]
++            SITE = 'isambard3'
++            BUILD_ROOT = $CYLC_WORKFLOW_RUN_DIR/share/lfric_build
++            HYPERTHREADS    = 1
++            CORES_PER_NODE  = 144
++            NUMA_REGIONS_PER_NODE = 4
++            ROSE_LAUNCHER = srun
++
++    [[ISAMBARD3_SLURM]]
++        platform = isambard3
++        [[[directives]]]
++            --partition = grace
++
++    [[ISAMBARD3_BUILD]]
++        inherit = ISAMBARD3_SLURM
++
++    [[ISAMBARD3_RUN]]
++        inherit = ISAMBARD3_SLURM
++        [[[environment]]]
++            ROSE_LAUNCHER_ULIMIT_OPTS = -s unlimited
++            BIG_DATA_DIR = '/projects/u35v/sw/lfricdata'
++            TARGET_PLATFORM = 'isambard3'
++            RUN_METHOD = srun
++            LAUNCH_SCRIPT = $CYLC_WORKFLOW_RUN_DIR/site/isambard3/common/bin
++
++    [[ISAMBARD3_GNU]]
++        [[[environment]]]
++            COMPILER = 'gnu'
++
++    [[ISAMBARD3_BUILD_GNU]]
++        inherit=ISAMBARD3_BASE,ISAMBARD3_BUILD,ISAMBARD3_GNU
++        {{ generate_script("pre-script", [isambard3_base]) }}
++
++    [[ISAMBARD3_RUN_GNU]]
++        inherit=ISAMBARD3_BASE,ISAMBARD3_RUN,ISAMBARD3_GNU
++        {{ generate_script("pre-script", [isambard3_base, isambard3_run]) }}
++
++    [[ISAMBARD3_MESH]]
++        inherit=ISAMBARD3_BASE,ISAMBARD3_SLURM
++
++    [[ISAMBARD3_MESH_GNU]]
++        inherit=ISAMBARD3_GNU,ISAMBARD3_MESH
++        {{ generate_script("pre-script", [isambard3_base]) }}
++
++    [[ISAMBARD3_TECH_BASE]]
++        inherit=ISAMBARD3_BASE
++
++    [[ISAMBARD3_TECH_TESTS]]
++        inherit=ISAMBARD3_TECH_BASE,ISAMBARD3_SLURM
++
++    [[ISAMBARD3_TECH_TESTS_GNU]]
++        inherit=ISAMBARD3_TECH_TESTS,ISAMBARD3_GNU
++        {{ generate_script("pre-script", [isambard3_base]) }}
++
++    {# The light script checks run on the login node, where the scheduler is. #}
++    [[ISAMBARD3_TECH]]
++        inherit=ISAMBARD3_TECH_BASE
++        {{ generate_script("pre-script", [isambard3_base]) }}
++
++    [[ISAMBARD3_PLOT]]
++        inherit=ISAMBARD3_TECH_BASE
++
++    [[ISAMBARD3_CHECK]]
++        inherit=ISAMBARD3_TECH
++
++    [[ISAMBARD3_SCRIPTS]]
++        inherit=ISAMBARD3_TECH
++
++    {# One shared filesystem: nothing to copy to another platform. #}
++    [[ISAMBARD3_EXPORT-SOURCE]]
++        inherit=ISAMBARD3_ORIG
++        [[[environment]]]
++            hostname = {{ ROSE_ORIG_HOST }}
++            PLATFORM_SYNC = false
++
++    [[ISAMBARD3_HOUSEKEEPING]]
++        inherit=ISAMBARD3_TECH_BASE
++
++{% do LOG.debug("Finished in site/isambard3/common/suite_config_isambard3.cylc") %}
+diff --git a/rose-stem/site/isambard3/groups.cylc b/rose-stem/site/isambard3/groups.cylc
+new file mode 100644
+index 00000000..e43ff659
+--- /dev/null
++++ b/rose-stem/site/isambard3/groups.cylc
+@@ -0,0 +1,38 @@
++{% do LOG.debug("Entered site/isambard3/groups.cylc") %}
++
++{# The script checks run anywhere the module is loaded. The model groups mirror
++   site/uoe's and are untested here. #}
++
++{%- do site_groups.update({
++    "all": [
++        "scripts",
++    ],
++    "scripts": [
++        "config_dump_checker",
++        "style_checker",
++        "fortitude_linter",
++        "extract_checker",
++        "site_validator",
++        "validate_rose_meta",
++        "rose-stem_lint_checker",
++        "global_variables_checker",
++        "python_unit_tests",
++        "test_launch-exe",
++        "macro_chains_checker",
++    ],
++    "gungho_isambard3_unitandintegration_tests": [
++        "gungho_unit_tests_isambard3_gnu_64bit",
++        "gungho_integration_tests_isambard3_gnu_64bit",
++    ],
++    "gungho_model_isambard3_exoplanet": [
++        "gungho_model_exo-hs-C24_MG_isambard3_gnu_fast-debug-64bit",
++    ],
++    "lfric_atm_isambard3_exoplanets": [
++        "lfric_atm_camembert_case3_gj1214b-C12_isambard3_gnu_fast-debug-64bit",
++        "lfric_atm_hd209458b-C24_isambard3_gnu_fast-debug-64bit",
++        "lfric_atm_scm_hd209458b-BiP2x2-50000x50000_isambard3_gnu_fast-debug-64bit",
++        "lfric_atm_thai_ben1-C48_MG_isambard3_gnu_fast-debug-64bit",
++    ],
++    }) %}
++
++{% do LOG.debug("Finished in site/isambard3/groups.cylc") %}
+diff --git a/rose-stem/site/isambard3/gungho_model/tasks_gungho_model.cylc b/rose-stem/site/isambard3/gungho_model/tasks_gungho_model.cylc
+new file mode 100644
+index 00000000..1a2afbd3
+--- /dev/null
++++ b/rose-stem/site/isambard3/gungho_model/tasks_gungho_model.cylc
+@@ -0,0 +1,15 @@
++{# ########################################################################### #}
++{# (c) Crown copyright 2024 Met Office. All rights reserved. #}
++{# The file LICENCE, distributed with this code, contains details of the terms #}
++{# under which the code may be used. #}
++{# ########################################################################### #}
++{% do LOG.debug("Entered site/isambard3/gungho_model/tasks_gungho_model.cylc") %}
++
++{% include 'site/'+SITE+'/gungho_model/tasks_gungho_model_'~task_ns.platform~'.cylc' %}
++
++{% if "perftools" in task_ns.compiler %}
++    {% do task_dict.update({
++        "kgo_checks": [], }) %}
++{% endif %}
++
++{% do LOG.debug("Finised in site/isambard3/gungho_model/tasks_gungho_model.cylc") %}
+diff --git a/rose-stem/site/isambard3/gungho_model/tasks_gungho_model_isambard3.cylc b/rose-stem/site/isambard3/gungho_model/tasks_gungho_model_isambard3.cylc
+new file mode 100644
+index 00000000..28930442
+--- /dev/null
++++ b/rose-stem/site/isambard3/gungho_model/tasks_gungho_model_isambard3.cylc
+@@ -0,0 +1,17 @@
++{# ########################################################################### #}
++{# (c) Crown copyright 2024 Met Office. All rights reserved. #}
++{# The file LICENCE, distributed with this code, contains details of the terms #}
++{# under which the code may be used. #}
++{# ########################################################################### #}
++{% do LOG.debug("Entered site/isambard3/gungho_model/tasks_gungho_model_isambard3.cylc") %}
++
++{% if task_ns.conf_name == "exo-hs-C24_MG" %}
++
++    {% do task_dict.update({
++        "tsteps": 1080,
++        "crun": 2,
++    }) %}
++
++{% endif %}
++
++{% do LOG.debug("Finised in site/isambard3/gungho_model/tasks_gungho_model_isambard3.cylc") %}
+diff --git a/rose-stem/site/isambard3/lfric_atm/tasks_lfric_atm.cylc b/rose-stem/site/isambard3/lfric_atm/tasks_lfric_atm.cylc
+new file mode 100644
+index 00000000..8919cfc6
+--- /dev/null
++++ b/rose-stem/site/isambard3/lfric_atm/tasks_lfric_atm.cylc
+@@ -0,0 +1,15 @@
++{# ########################################################################### #}
++{# (c) Crown copyright 2024 Met Office. All rights reserved. #}
++{# The file LICENCE, distributed with this code, contains details of the terms #}
++{# under which the code may be used. #}
++{# ########################################################################### #}
++{% do LOG.debug("Entered site/isambard3/lfric_atm/tasks_lfric_atm.cylc") %}
++
++{% include 'site/'+SITE+'/lfric_atm/tasks_lfric_atm_'~task_ns.platform~'.cylc' %}
++
++{% if "perftools" in task_ns.compiler %}
++    {% do task_dict.update({
++        "kgo_checks": [], }) %}
++{% endif %}
++
++{% do LOG.debug("Finised in site/isambard3/lfric_atm/tasks_lfric_atm.cylc") %}
+diff --git a/rose-stem/site/isambard3/lfric_atm/tasks_lfric_atm_isambard3.cylc b/rose-stem/site/isambard3/lfric_atm/tasks_lfric_atm_isambard3.cylc
+new file mode 100644
+index 00000000..625f14d7
+--- /dev/null
++++ b/rose-stem/site/isambard3/lfric_atm/tasks_lfric_atm_isambard3.cylc
+@@ -0,0 +1,16 @@
++{# ########################################################################### #}
++{# (c) Crown copyright 2024 Met Office. All rights reserved. #}
++{# The file LICENCE, distributed with this code, contains details of the terms #}
++{# under which the code may be used. #}
++{# ########################################################################### #}
++{% do LOG.debug("Entered site/isambard3/lfric_atm/tasks_lfric_atm_isambard3.cylc") %}
++
++{% if task_ns.conf_name == "thai_ben1-C48_MG" %}
++
++    {% do task_dict.update({
++        "kgo_checks": [],
++    }) %}
++
++{% endif %}
++
++{% do LOG.debug("Finised in site/isambard3/lfric_atm/tasks_lfric_atm_isambard3.cylc") %}
+diff --git a/rose-stem/site/isambard3/macros/macros_isambard3.cylc b/rose-stem/site/isambard3/macros/macros_isambard3.cylc
+new file mode 100644
+index 00000000..fd6d097d
+--- /dev/null
++++ b/rose-stem/site/isambard3/macros/macros_isambard3.cylc
+@@ -0,0 +1,37 @@
++{% do LOG.debug("Entered site/isambard3/macros/macros_isambard3.cylc") %}
++
++{# Macro to set wallclock, input is in minutes #}
++{% macro set_wallclock(time) %}
++            --time=00:{{time}}:00
++{% endmacro %}
++
++
++{% macro set_task_resources(family_name,
++                            family_inherits,
++                            wallclock,
++                            mpi_ranks,
++                            memory,
++                            threads=1,
++                            xios_nodes=0,
++                            ocean_nodes=0,
++                            river_nodes=0,
++                            ranks_per_node=0,
++                            ranks_depth_pad=1) %}
++
++    [[{{family_name|upper}}]]
++        inherit = {{family_inherits|upper}}
++        execution time limit = PT{{wallclock}}M
++
++        [[[directives]]]
++            --ntasks={{mpi_ranks|int + xios_nodes|int}}
++            --cpus-per-task={{threads|int}}
++{% endmacro %}
++
++
++{% macro set_memory(mem) %}
++    {% set value = mem[0] %}
++    {% set unit = mem[1] %}
++            --mem={{value}}{{unit[:1]}}
++{% endmacro %}
++
++{% do LOG.debug("Finished in site/isambard3/macros/macros_isambard3.cylc") %}
+diff --git a/rose-stem/site/isambard3/suite_config.cylc b/rose-stem/site/isambard3/suite_config.cylc
+new file mode 100644
+index 00000000..dd5fb07b
+--- /dev/null
++++ b/rose-stem/site/isambard3/suite_config.cylc
+@@ -0,0 +1,5 @@
++{% do LOG.debug("Entered site/isambard3/suite_config.cylc") %}
++
++{% include 'site/isambard3/common/suite_config_isambard3.cylc' %}
++
++{% do LOG.debug("Finished in site/isambard3/suite_config.cylc") %}
+diff --git a/rose-stem/site/isambard3/variables.cylc b/rose-stem/site/isambard3/variables.cylc
+new file mode 100644
+index 00000000..d1392fe7
+--- /dev/null
++++ b/rose-stem/site/isambard3/variables.cylc
+@@ -0,0 +1,19 @@
++{% do LOG.debug("Entered site/isambard3/variables.cylc") %}
++
++{% do site_vars.update({"known_applications": ["gungho_model",
++                                               "lfric_atm",
++                                               "mesh",
++                                               "gungho",
++                                               "socrates",
++                                               "um_physics",
++                                               "linear"]}) %}
++
++{% do site_vars.update({"site_platforms": ["isambard3"]}) %}
++
++{% do site_vars.update({"scripts_platform": "isambard3"}) %}
++
++{% do site_vars.update({"mesh_build": {"isambard3": "gnu_fast-debug-64bit"} }) %}
++
++{% include "site/isambard3/common/default_directives.cylc" %}
++
++{% do LOG.debug("Finished in site/isambard3/variables.cylc") %}

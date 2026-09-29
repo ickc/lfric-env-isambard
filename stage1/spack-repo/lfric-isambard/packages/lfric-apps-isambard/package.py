@@ -37,15 +37,28 @@ class LfricAppsIsambard(Package):
     depends_on("py-psyclone@3.3.1")
     depends_on("py-jinja2")
     depends_on("py-pyyaml")
-    # Spack 1.0 renamed the Met Office Python apps with a py- prefix. rose-picker
-    # comes from mo-spack-packages (py-rose-picker); the cylc/rose workflow tools
-    # now ship in the Spack builtin repo (py-metomi-rose/py-cylc-flow/...).
-    # cylc-uiserver (the Jupyter web GUI) has no Spack 1.0 package in either repo
-    # and is not needed for an HPC build/run environment, so it is dropped.
-    depends_on("py-rose-picker")
-    depends_on("py-metomi-rose")
-    depends_on("py-cylc-flow")
-    depends_on("py-cylc-rose")
+    # The workflow tools, pinned as a matched set. rose-stem in lfric_apps (since
+    # 2025-12, so already at 2026.07.1) needs cylc-flow >= 8.6 for the
+    # CYLC_WORKFLOW_SRC_DIR template variable; cylc-rose 1.7 is the plugin
+    # release for cylc 8.6, and it needs metomi-rose 2.6-2.7. cylc-uiserver
+    # provides `cylc gui`. rose-picker follows the LFRic release tag. The Spack
+    # 1.0 builtin repo does not carry all of these versions yet, so
+    # spack-repo/lfric-isambard/packages/py-* extend the upstream packages with
+    # them.
+    depends_on("py-rose-picker@2026.07.1")
+    depends_on("py-metomi-rose@2.7.1")
+    depends_on("py-cylc-flow@8.6.6")
+    depends_on("py-cylc-rose@1.7.2")
+    depends_on("py-cylc-uiserver@1.9.4")
+    # The checkers lfric_apps' rose-stem runs in its `scripts` group:
+    # style_checker (stylist) and fortitude_linter. Both from mo-spack-packages.
+    depends_on("py-stylist@0.4.1")
+    depends_on("py-fortitude@0.9.0")
+    # Also run there: macro_chains_checker imports networkx; python_unit_tests
+    # and test_launch-exe run pytest. networkx ~default: its default variant
+    # pulls in numpy/scipy/pandas/matplotlib/numba, and through numba LLVM.
+    depends_on("py-networkx~default")
+    depends_on("py-pytest")
     depends_on("py-ansimarkup")
     depends_on("py-colorama")
 

@@ -18,15 +18,17 @@ concretizer:
   unify: when_possible
 # Repo paths are resolved relative to this file. Order matters: the first repo
 # that defines a package wins.
-#   - lfric: the local LFRic bundle + Isambard xios@2701 + foxml.
+#   - lfric: the local LFRic bundle + Isambard xios@2701 + foxml, and py-*
+#     overrides that add versions upstream lacks (cylc 8.6 set, rose-picker).
 #   - metoffice: MetOffice/mo-spack-packages (Spack 1.0 native, namespace
 #     "metoffice", api v2.0). Provides the MO-maintained mpich/hdf5/netcdf/yaxt/
-#     shumlib/pfunit/blitz and build tools (py-psyclone 3.2.2, py-fparser,
+#     shumlib/pfunit/blitz and build tools (py-psyclone, py-fparser,
 #     py-rose-picker). Several of its packages extend their builtin counterparts
 #     via import, so the vendored builtin below must stay on the path.
 #   - builtin: the vendored Spack builtin repo (spack/spack-packages submodule),
 #     pinned so the build does not fetch from the network. Now carries the
-#     workflow tools (py-cylc-flow/py-cylc-rose/py-metomi-rose).
+#     workflow tools (py-cylc-flow/py-cylc-rose/py-metomi-rose), which the
+#     lfric overrides extend.
 repos:
   lfric: ../spack-repo/lfric-isambard
   metoffice: ../vendor/mo-spack-packages/spack_repo/metoffice
