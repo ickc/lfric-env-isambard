@@ -144,7 +144,7 @@ pixi run fetch                # -> FETCH_OK           (~20 min; optional)
 sbatch build.sbatch                                    # -> BUILD_OK, ~1 h
 tail -f logs/build-<jobid>.out
 
-# --- the result: this is all Stage 2 ever needs -----------------------------
+# --- the result: this is all the examples ever need -----------------------
 module use "$PROJECTDIR/$USER/opt/Linux-aarch64/modulefiles"
 module load lfric-env/"$(cat VERSION)"/cray
 

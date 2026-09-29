@@ -1,0 +1,34 @@
+# Static checks on every shell script in the repo: the "Static" step of
+# "How to test a change" in CLAUDE.md. The builds themselves need Isambard 3
+# and run through sbatch, so they are not here.
+name: Static checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  shell:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: List shell scripts
+        # *.sh / *.sbatch, plus extensionless scripts with a sh/bash shebang
+        # (e.g. site/bin/launch-exe). Submodule contents are not checked out.
+        run: |
+          {
+            git ls-files '*.sh' '*.sbatch'
+            git ls-files | while read -r f; do
+              case "$f" in *.*) continue ;; esac
+              [ -f "$f" ] && head -n1 "$f" | grep -qE '^#!.*(ba)?sh' && echo "$f"
+            done
+          } | sort -u > "$RUNNER_TEMP/scripts"
+          cat "$RUNNER_TEMP/scripts"
+      - name: bash -n
+        run: xargs -r -a "$RUNNER_TEMP/scripts" -n1 bash -n
+      - name: shellcheck
+        run: xargs -r -a "$RUNNER_TEMP/scripts" shellcheck -S warning

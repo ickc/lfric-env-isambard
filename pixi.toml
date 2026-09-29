@@ -15,8 +15,7 @@ python = "3.11.*"
 #
 # Nothing below needs pixi either: every task is a one-line wrapper around a
 # script you can run directly, and the examples need only `module load`. This
-# file is a convenience, and it is on the list of things to reconsider when the
-# examples are ported (see PLAN.md).
+# file is a convenience.
 
 # common.sh works out which built environment to load; activate.sh module-loads
 # it. Both are no-ops until Stage 1 has been built.

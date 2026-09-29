@@ -6,7 +6,7 @@ application and runs its small bundled example — no full science run (for that
 the science-suite examples in `../science-suites/`).
 
 > The reproducible *core* of this repo is the **environment** (Stage 1,
-> `scripts/build.sh`). This example is **not** that core — it is the smallest thing
+> `stage1/build.sh`). This example is **not** that core — it is the smallest thing
 > you can do *with* the environment. Treat `build.sh` here as a **template** to copy
 > and adapt for your own science target. For full Rose/Cylc science suites — real Met
 > Office suites, fetched from where they actually live and adapted by a reviewable
@@ -27,7 +27,7 @@ the science-suite examples in `../science-suites/`).
 
 ## Prerequisites
 
-- **Stage 1 built** for the variant you want (`scripts/build.sbatch`). This example
+- **Stage 1 built** for the variant you want (`stage1/build.sbatch`). This example
   uses the environment; it does not build one.
 - **Physics submodules initialised** (needed by the examples, not Stage 1):
   ```bash
@@ -61,7 +61,7 @@ process limit), set the variant + prefix to match what you built, then run:
 export LFRIC_STACK=cray                              # or spack
 export LFRIC_PREFIX="$PROJECTDIR/$USER/opt/Linux-aarch64"   # the prefix you built into
 module use "$LFRIC_PREFIX/modulefiles"
-module load "lfric-env/$LFRIC_STACK"
+module load "lfric-env/$(cat VERSION)/$LFRIC_STACK"
 bash examples/minimal-compile/build.sh
 ```
 

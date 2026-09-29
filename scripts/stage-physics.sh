@@ -12,7 +12,7 @@
 #   3. git add vendor/physics vendor/lfric_core && git commit   # pin the update
 #
 # Idempotent: re-running just re-asserts each submodule at its dependencies.yaml
-# ref. Needs SSH access to the private Met Office repos (same as submodule-init).
+# ref. Needs network access to GitHub; all five repos are public, over HTTPS.
 set -uo pipefail
 
 _here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"

@@ -14,7 +14,7 @@
 # Crucially, ALL of that toolchain setup is supplied by the `module load` alone:
 # this file is a THIN activator, like an end user's. It no longer hand-rolls the
 # Cray module loads / FC-CXX-LDMPI exports / view FFLAGS-LDFLAGS (that moved into
-# the modulefile — scripts/lfric-env.lua); it only initialises Lmod, loads the
+# the modulefile — stage1/lfric-env.lua); it only initialises Lmod, loads the
 # module (preserving the vars a suite OWNS — see below), and adds the one thing
 # the module cannot: the Lustre HDF5 file-locking workaround. The suite inherits
 # the compiler from the module via `FC = $FC` in its flow.cylc (see README.md).

@@ -7,7 +7,7 @@ run) and submits each task to Slurm; `rose` materialises each task's namelist
 config. So these examples run the suites *that* way, rather than reinventing it.
 
 > The reproducible **core** of this repo is the environment (Stage 1,
-> `scripts/build.sh`). These suites are **not** that core — they are things you do
+> `stage1/build.sh`). These suites are **not** that core — they are things you do
 > *with* it. Treat them as templates to copy and adapt. u-dr932 is
 > [Denis Sergeev's own suite](https://github.com/dennissergeev/lfric_egp_bench) on
 > GitHub; u-dn704 and u-dt000 are Met Office suites in MOSRS subversion
@@ -303,7 +303,7 @@ square subdomains — **24, 54, 96** all fit one node; 108 works but gives each 
 
 ## Prerequisites
 
-- **Stage 1 built** for the variant you want (`scripts/build.sbatch`). Run the
+- **Stage 1 built** for the variant you want (`stage1/build.sbatch`). Run the
   suites on the **`cray`** environment (the default): on Isambard 3 only
   cray-mpich + Slingshot + `srun` give RDMA over the interconnect and multi-node
   scaling — the `spack` variant is a single-node/TCP portable fallback. The

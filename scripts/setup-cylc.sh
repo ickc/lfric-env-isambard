@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # setup-cylc.sh — configure cylc for running suites on Isambard 3.
 #
-# This is OPT-IN and OPTIONAL. It writes two files in your HOME, idempotently:
-#   ~/.cylc/flow/global.cylc            a [symlink dirs] run directory
-#   ~/.cylc/flow/platforms.d/isambard3.cylc   an `isambard3` Slurm platform
+# This is OPT-IN and OPTIONAL. It writes two managed blocks into one file in your
+# HOME, idempotently:
+#   ~/.cylc/flow/global.cylc   a [symlink dirs] run directory, and an `isambard3`
+#                              Slurm platform
 #
 # It is NOT part of building the environment (Stage 1) — building must not touch
-# your home dir — and the bundled lfric_atm example does not need it (it runs the
+# your home dir — and the minimal-compile example does not need it (it runs the
 # binary directly). Run it only when you want to drive rose/cylc workflows.
 #
 #   bash scripts/setup-cylc.sh
@@ -49,9 +50,9 @@ EOF
 fi
 info "cylc run dir -> $run_base  (in $conf)"
 
-# isambard3 Slurm platform. This MUST go in global.cylc itself: the `platforms.d/`
-# drop-in directory is only read by cylc >= 8.5, but the environment ships cylc
-# 8.4.2 — which reads platforms ONLY from global.cylc. Write it as a managed block
+# isambard3 Slurm platform, in global.cylc itself. cylc >= 8.5 also reads a
+# `platforms.d/` drop-in, but environments up to v2026.08.18 ship cylc 8.4.2,
+# which reads platforms ONLY from global.cylc — and global.cylc works for both. Write it as a managed block
 # (replace if present, else append), mirroring the run-dir block above.
 if grep -q "$plat_start" "$conf" 2>/dev/null; then
   awk -v s="$plat_start" -v e="$plat_end" '
@@ -74,8 +75,8 @@ fi
 info "isambard3 platform -> $conf"
 
 # Remove a stale platforms.d/isambard3.cylc from older setup-cylc.sh runs: cylc
-# 8.4.2 ignores it, and leaving it is confusing once the platform lives in
-# global.cylc. (Only our managed file; harmless if absent.)
+# 8.4 ignores it, 8.5+ would read it as a second definition of the platform, and
+# either way it is confusing once the platform lives in global.cylc. (Only our managed file; harmless if absent.)
 stale_plat="$conf_dir/platforms.d/isambard3.cylc"
 if [ -f "$stale_plat" ] && grep -q "$plat_start" "$stale_plat" 2>/dev/null; then
   rm -f "$stale_plat"

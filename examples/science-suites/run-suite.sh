@@ -89,7 +89,7 @@ fi
 # common.sh sets PREFIX/MODULE*/LFRIC_STACK and respects LFRIC_PREFIX/LFRIC_STACK.
 # shellcheck source=scripts/common.sh
 . "$REPO_ROOT/scripts/common.sh"
-[ -f "$MODULEFILE" ] || die "environment '$LFRIC_STACK' not built under PREFIX=$PREFIX. Build Stage 1 first: ${LFRIC_STACK:+LFRIC_STACK=$LFRIC_STACK }sbatch scripts/build.sbatch"
+[ -f "$MODULEFILE" ] || die "environment '$LFRIC_STACK' not built under PREFIX=$PREFIX. Build Stage 1 first: cd stage1 && ${LFRIC_STACK:+LFRIC_STACK=$LFRIC_STACK }sbatch build.sbatch"
 
 # 1. Activate the env so the launcher (and the detached scheduler it spawns) use
 #    the env's cylc/rose. The suite tasks re-source this same file (ACTIVATE_ENV).

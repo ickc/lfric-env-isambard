@@ -3,7 +3,7 @@
 # LFRic environment, and run its bundled example.
 #
 # THIS IS THE MINIMAL-COMPILE EXAMPLE. The reproducible core of this repo is the
-# environment itself (Stage 1, scripts/build.sh). Compiling a science target is
+# environment itself (Stage 1, stage1/build.sh). Compiling a science target is
 # the smallest thing you do *with* that environment — copy and adapt this script
 # for your own target. See examples/minimal-compile/README.md.
 #
@@ -11,11 +11,11 @@
 # way an end user does — `module load lfric-env/<version>/<variant>`, nothing
 # more — and relies on that module to supply the whole toolchain. It deliberately
 # does NOT know which Cray modules or compiler wrappers back a given variant; that
-# is the modulefile's job (scripts/lfric-env.lua), baked in by Stage 1.
+# is the modulefile's job (stage1/lfric-env.lua), baked in by Stage 1.
 #
-# It needs the private Met Office physics repos (casim, jules, socrates, ukca),
-# vendored as pinned submodules under vendor/physics/ and fed to the LFRic extract
-# step via PHYSICS_ROOT, so the compile clones nothing over SSH once those are
+# It needs the Met Office physics repos (casim, jules, socrates, ukca; public,
+# HTTPS), vendored as pinned submodules under vendor/physics/ and fed to the LFRic
+# extract step via PHYSICS_ROOT, so the compile clones nothing once those are
 # initialised (see README). It uses an already-built environment for the
 # variant you select; it does NOT build one.
 #
@@ -40,7 +40,7 @@ info() { echo "INFO: $*"; }
 warn() { echo "WARN: $*" >&2; }
 die()  { echo "ERROR: $*" >&2; exit 1; }
 
-[ -f "$MODULEFILE" ] || die "Environment '$LFRIC_STACK' not built under PREFIX=$PREFIX. Build it first (Stage 1): ${LFRIC_STACK:+LFRIC_STACK=$LFRIC_STACK }sbatch scripts/build.sbatch  (set LFRIC_PREFIX to match if you customised it)"
+[ -f "$MODULEFILE" ] || die "Environment '$LFRIC_STACK' not built under PREFIX=$PREFIX. Build it first (Stage 1): cd stage1 && ${LFRIC_STACK:+LFRIC_STACK=$LFRIC_STACK }sbatch build.sbatch  (set LFRIC_PREFIX to match if you customised it)"
 
 # Ensure patches are applied (idempotent) — in particular the lfric_apps
 # local-sources patch, so local_build.py uses the staged submodules in place (no
@@ -60,7 +60,7 @@ export PYTHONDONTWRITEBYTECODE=1
 # FFLAGS/LDFLAGS (XIOS/HDF5/netCDF/shumlib .mod files + libs). This example adds
 # NOTHING to that. It used to hand-roll the Cray module loads, FC/CXX/LDMPI and
 # FFLAGS/LDFLAGS right here — duplicating (and liable to drift from) what the
-# modulefile now owns; see scripts/lfric-env.lua. Removing that is the point of
+# modulefile now owns; see stage1/lfric-env.lua. Removing that is the point of
 # this example: it demonstrates that an end user needs only the `module load`.
 #
 # activate.sh (sourced above) already did the load quietly (the pixi path). Assert
@@ -68,9 +68,9 @@ export PYTHONDONTWRITEBYTECODE=1
 # here, not a cryptic compile failure later; retry loudly to surface the reason.
 if [ -z "${FC:-}" ] && command -v module >/dev/null 2>&1; then
   module load "$MODULE_NAME" \
-    || die "could not 'module load $MODULE_NAME' — is the '$LFRIC_STACK' env built? (Stage 1: ${LFRIC_STACK:+LFRIC_STACK=$LFRIC_STACK }sbatch scripts/build.sbatch)"
+    || die "could not 'module load $MODULE_NAME' — is the '$LFRIC_STACK' env built? (Stage 1: cd stage1 && ${LFRIC_STACK:+LFRIC_STACK=$LFRIC_STACK }sbatch build.sbatch)"
 fi
-: "${FC:?FC unset after loading $MODULE_NAME (the Stage-1 env for '$LFRIC_STACK'). Build it first: ${LFRIC_STACK:+LFRIC_STACK=$LFRIC_STACK }sbatch scripts/build.sbatch}"
+: "${FC:?FC unset after loading $MODULE_NAME (the Stage-1 env for '$LFRIC_STACK'). Build it first: cd stage1 && ${LFRIC_STACK:+LFRIC_STACK=$LFRIC_STACK }sbatch build.sbatch}"
 command -v "$FC" >/dev/null 2>&1 \
   || die "toolchain compiler '$FC' (set by $MODULE_NAME) not on PATH — environment load incomplete"
 info "Toolchain from $MODULE_NAME: FC=$FC LDMPI=${LDMPI:-?} CXX=${CXX:-?} — $("$FC" --version 2>/dev/null | head -1)"
