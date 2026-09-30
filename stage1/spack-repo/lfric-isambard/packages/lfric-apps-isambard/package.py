@@ -61,6 +61,9 @@ class LfricAppsIsambard(Package):
     depends_on("py-pytest")
     depends_on("py-ansimarkup")
     depends_on("py-colorama")
+    # The release's rose-meta, so `rose app-upgrade` of a suite (the science-suite
+    # stagers) needs no source checkout. The module exports it as LFRIC_ROSE_META_PATH.
+    depends_on("lfric-rose-meta@2026.07.1")
 
     def install(self, spec, prefix):
         mkdirp(prefix)

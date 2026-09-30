@@ -16,6 +16,7 @@
 --                              SHUMLIB_ROOT, PSYCLONE_CONFIG, PFUNIT, SPACK_ENV
 --   * the Rose site config     ROSE_SITE_CONF_PATH, unless already set
 --   * the Cylc site config     CYLC_SITE_CONF_PATH, unless already set
+--   * the release's rose-meta  LFRIC_ROSE_META_PATH (NOT ROSE_META_PATH; see below)
 --   * which module this is     LFRIC_ENV_MODULE, LFRIC_ENV_MODULEPATH, so a
 --                              workflow can load the same one in its jobs
 --   * site helpers on PATH     mosrs-cache-password
@@ -195,6 +196,16 @@ if d.cylc_site_conf then
   if cur == nil or cur == "" or cur == d.cylc_site_conf then
     setenv("CYLC_SITE_CONF_PATH", d.cylc_site_conf)
   end
+end
+
+-- The Rose metadata of the LFRic release this environment builds (lfric_apps,
+-- lfric_core, JULES), so staging a science suite (`rose app-upgrade`) needs no source
+-- checkout. Exported under our own name and deliberately NOT as ROSE_META_PATH: that
+-- would put this release's HEAD metadata in front of every rose command, including
+-- rose-stem validating a newer lfric_apps clone against its own HEAD. Opt in with
+-- `export ROSE_META_PATH=$LFRIC_ROSE_META_PATH` (e.g. for `rose edit` on a staged suite).
+if d.rose_meta and #d.rose_meta > 0 then
+  setenv("LFRIC_ROSE_META_PATH", table.concat(d.rose_meta, ":"))
 end
 
 -- Which environment this is, so a workflow launched with it loaded can load the

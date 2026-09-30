@@ -202,9 +202,10 @@ script when the `vendor/lfric_apps` pin moves.
 older copy. Upstream has since done the vn2.2 → vn3.0 leg itself. Sister suite u-dn704
 now needs no upgrade step at all, for the same reason.)
 
-The upgrade needs `vendor/physics` on `ROSE_META_PATH` as well as
-`vendor/lfric_{apps,core}` — the macros reach for `jules-lfric` metadata, which lives in
-the jules submodule. Use ABSOLUTE paths: `rose` runs from inside the app directory, and
+The stager takes the rose-meta from the module (`LFRIC_ROSE_META_PATH`, which includes
+JULES's). Without it, it falls back to the vendored trees, and then needs `vendor/physics`
+on `ROSE_META_PATH` as well as `vendor/lfric_{apps,core}` — the macros reach for
+`jules-lfric` metadata, which lives in the jules submodule. Use ABSOLUTE paths: `rose` runs from inside the app directory, and
 a relative entry fails with the unhelpful `[FAIL] Error: could not find meta flag`.
 
 That this works at all is worth recording, because the previous state of this suite in

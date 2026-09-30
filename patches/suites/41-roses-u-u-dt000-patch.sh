@@ -112,9 +112,15 @@ fi
 
 # --- step 1: version alignment, via the native tool -------------------------
 # rose needs the LFRic rose-meta packages. Honour an existing ROSE_META_PATH; otherwise
-# build it from the vendored LFRic trees. ABSOLUTE paths only: upgrade_app runs `rose`
-# from inside $SUITE_DIR/app, so a relative entry resolves against the wrong directory
-# and rose fails with the unhelpful "[FAIL] Error: could not find meta flag".
+# use the release's, which the environment module exports as LFRIC_ROSE_META_PATH
+# (v2026.09.28 on); otherwise build it from the vendored LFRic trees. ABSOLUTE paths
+# only: upgrade_app runs `rose` from inside $SUITE_DIR/app, so a relative entry
+# resolves against the wrong directory and rose fails with the unhelpful
+# "[FAIL] Error: could not find meta flag".
+if [ -z "${ROSE_META_PATH:-}" ] && [ -n "${LFRIC_ROSE_META_PATH:-}" ]; then
+  export ROSE_META_PATH="$LFRIC_ROSE_META_PATH"
+  info "rose-meta: the environment's (LFRIC_ROSE_META_PATH)"
+fi
 if [ -z "${ROSE_META_PATH:-}" ]; then
   ROSE_META_PATH="$(find "$REPO_ROOT/vendor/lfric_apps" "$REPO_ROOT/vendor/lfric_core" \
                          "$REPO_ROOT/vendor/physics" \
@@ -131,7 +137,8 @@ for _d in "${_meta_dirs[@]}"; do
 done
 if [ "$_have_jules_meta" != true ]; then
   fail "no jules-lfric rose-meta on ROSE_META_PATH; cannot upgrade $SUITE_ID's app configs."
-  fail "  Nothing has been changed. Initialise the LFRic trees the meta comes from:"
+  fail "  Nothing has been changed. Load the environment (module load lfric-env/...), whose"
+  fail "  LFRIC_ROSE_META_PATH supplies it, or initialise the LFRic trees it comes from:"
   fail "    git submodule update --init vendor/lfric_apps vendor/lfric_core vendor/physics/jules"
   fail "  (or point ROSE_META_PATH at your own.)"
   exit 1

@@ -209,7 +209,9 @@ stage1/
 │                       external, python) + one per variant (MPI and parallel
 │                       I/O). Templates — instantiated under LFRIC_PREFIX.
 ├── spack-repo/         our own Spack packages: xios (pinned commit), foxml,
-│                       and lfric-apps-isambard, the has_code=False bundle spec
+│                       lfric-rose-meta (the release's rose-meta, exported as
+│                       LFRIC_ROSE_META_PATH), and lfric-apps-isambard, the
+│                       has_code=False bundle spec
 │                       that names every dependency of the environment. Plus
 │                       py-* overrides that only add versions upstream lacks
 │                       (the cylc 8.6 set, rose-picker); each says when to drop it.

@@ -93,7 +93,8 @@ render as upstream when `EX_HOST` is not `isambard3`.
 ### Version — vn3.1 → vn3.2
 
 The stager runs `rose app-upgrade -C lfric_atm vn3.2` and `-C mesh vn3.2` before the site
-patch, against the vendored LFRic rose-meta. The patch is diffed against that upgraded
+patch, against the release's rose-meta (the module's `LFRIC_ROSE_META_PATH`; the
+vendored LFRic trees if that is unset). The patch is diffed against that upgraded
 tree. The upgrade also rewrites each opt config as a minimal diff against the upgraded
 main config, and normalises trigger states: for example, `namelist:blayer` becomes
 trigger-ignored where `boundary_layer='none'`. Checked by loading every opt config, and

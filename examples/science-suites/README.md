@@ -93,7 +93,7 @@ version it claims.**
 
 ```bash
 . examples/science-suites/site/activate-env.sh
-export ROSE_META_PATH=$(find vendor/lfric_apps vendor/lfric_core -type d -name rose-meta | tr '\n' ':')
+export ROSE_META_PATH=$LFRIC_ROSE_META_PATH   # the release's rose-meta, from the module
 cd <suite>/app && rose app-upgrade -y -C lfric_atm vn3.2 && rose macro --validate
 ```
 
@@ -324,9 +324,12 @@ square subdomains — **24, 54, 96** all fit one node; 108 works but gives each 
   suites' build **inherits** the compiler from the loaded module (`flow.cylc` does
   `FC = $FC` / `LDMPI = $LDMPI`), which resolves to Cray `ftn`/`CC` on `cray` or the
   view's `mpif90`/`mpic++` on `spack` — so switching variant needs no suite edit.
-- **Physics submodules initialised** (as for the minimal-compile example):
-  `git submodule update --init --jobs 4 -- vendor/physics/{casim,jules,socrates,ukca}`
-  (or `pixi run init-physics`).
+- **No LFRic source submodules for the MOSRS suites** (u-dn704, u-dt000, u-dz791).
+  They extract their sources over HTTPS, and the rose-meta their stagers upgrade
+  against comes from the module (`LFRIC_ROSE_META_PATH`, v2026.09.28 on). Older
+  environments, and offline extraction (`USE_MIRRORS=true`), still need
+  `git submodule update --init --jobs 4 -- vendor/lfric_apps vendor/lfric_core vendor/physics/{casim,jules,socrates,ukca}`
+  (or `pixi run init-sources init-physics`).
 - **For u-dr932, its suite submodule too:**
   `git submodule update --init vendor/lfric_egp_bench`. `run-suite.sh` stages and
   patches it for you; it fails with that command in the message if it is missing.
