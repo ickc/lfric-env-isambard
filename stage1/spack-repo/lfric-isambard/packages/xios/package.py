@@ -34,6 +34,16 @@ class Xios(Package):
     # Uncomment them so the remap translation unit compiles.
     patch("gcc_remap_standard_headers.patch", when="@2701")
 
+    # CMesh::createHashes turns a coordinate into an integer with a plain
+    # double -> size_t conversion, which is undefined for a negative value. x86-64
+    # wraps it and keeps the nodes distinct; aarch64 (fcvtzu) saturates every
+    # negative value to 0. On Grace every node with a negative longitude, or a
+    # negative planar x/y, then shared one hash, so the UGRID edge/node tables were
+    # wrong, and writing any edge- or node-located field segfaulted in
+    # CMesh::createMeshEpsilon (issue #38). Converting through a signed integer
+    # reproduces x86 behaviour exactly.
+    patch("mesh_hash_signed_conversion.patch", when="@2701")
+
     depends_on("c", type="build")
     depends_on("cxx", type="build")  # XIOS is heavily C++; Spack 1.x needs this declared
     depends_on("fortran", type="build")
