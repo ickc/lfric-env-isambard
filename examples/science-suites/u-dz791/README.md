@@ -123,18 +123,16 @@ and the main config's own `jules_pftparm` migration. `VN` in `rose-suite.conf` f
 The extract runs on the scheduler host (`platform = localhost`), because it is a git
 clone and needs no compute node.
 
-### Output — four initial diagnostics dropped (XIOS)
+### Output — unchanged
 
-`file_def_initial_diags.xml` loses `init_u_in_w2h`, `init_v_in_w2h`,
-`init_height_w2h` and `init_height_w0`. Writing any **edge-located (W2H) or node-located
-(W0)** field to a UGRID file segfaults XIOS r2701 in this environment, in
-`CMesh::createMeshEpsilon` during the file header write. It does so on 1 rank as on 128,
-so the model died at its initial output. Bisecting that file found it: dropping the W2H
-fields alone, or the W0 field alone, still crashes; dropping both runs. Cell-located fields write normally,
-and the science file, `lfric_crm_diag`, has none of the four (its winds are
-`u_in_w3`/`v_in_w3`). Tracked in
-[#38](https://github.com/ickc/lfric-env-isambard/issues/38). Restore the four fields
-once it is fixed.
+An earlier version of this port dropped four initial diagnostics
+(`init_{u,v}_in_w2h`, `init_height_w2h`, `init_height_w0`), because writing any edge-
+or node-located field to a UGRID file segfaulted XIOS on Grace. The cause was an XIOS
+r2701 bug that only aarch64 exposes: a double→`size_t` conversion that saturates
+negative coordinates to 0
+([#38](https://github.com/ickc/lfric-env-isambard/issues/38)). The environment's XIOS
+now carries the fix, from v2026.09.28 as rebuilt on 2026-09-30, so the file definition
+is upstream's again and all four fields are written (`u-dz791/run8`).
 
 ### Small things
 
@@ -171,6 +169,10 @@ at r368986 staged by `run-suite.sh u-dz791` (`u-dz791/run6`). The workflow shut 
 The run wrote 726 MB of UGRID output in total: `lfric_initial.nc`, and six 10-minute
 `lfric_crm_diag` files covering 00:00 to 01:00. At the end of the hour, theta is
 443.3–2720.8 K, **bit-identical** to an earlier run (`run5`) on a different day.
+
+Re-validated on 2026-09-30 after the XIOS fix, with upstream's full initial-diagnostics
+file (`u-dz791/run8`): both cycles succeed, and `lfric_initial.nc` grows from 120 MB to
+212 MB with the edge/node fields and their UGRID topology.
 
 What this establishes is that the suite runs its intended science here: the
 absolute-temperature initialisation from `profile_variable='absolute'`, H₂ gas constants,

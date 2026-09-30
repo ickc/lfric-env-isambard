@@ -28,7 +28,7 @@
 #      release this environment builds. Upstream is on 2026.03.1, which the environment's
 #      PSyclone 3.3 cannot build.
 #   2. `git apply -p1` of 43-roses-u-u-dz791-isambard3.patch, the Isambard 3 port, cut
-#      with `diff -ruN` against the UPGRADED tree -- 7 files, every hunk carrying an
+#      with `diff -ruN` against the UPGRADED tree -- 6 files, every hunk carrying an
 #      `[isambard3]` comment saying what it replaced and why.
 #
 # The suite's SCIENCE is not in either step. It is two of Alex Corbett's lfric_apps

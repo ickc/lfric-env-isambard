@@ -34,32 +34,6 @@ diff -ruN a/app/extract/rose-app.conf b/app/extract/rose-app.conf
 +tokens=merge_sources.py -d $CYLC_WORKFLOW_RUN_DIR --tokens && \
 +       =bash "$REPO_ROOT/examples/science-suites/site/patch-sources.sh" "$SOURCE_ROOT" && \
 +       =LFRIC_SRC_ROOT="$SOURCE_ROOT" bash "$REPO_ROOT/patches/optional/33-lfric_apps-dz791-profile-init-patch.sh"
-diff -ruN a/app/lfric_atm/file/file_def_initial_diags.xml b/app/lfric_atm/file/file_def_initial_diags.xml
---- a/app/lfric_atm/file/file_def_initial_diags.xml	2026-09-29 16:23:47.000000000 +0000
-+++ b/app/lfric_atm/file/file_def_initial_diags.xml	2026-09-29 17:41:04.000000000 +0000
-@@ -13,15 +13,18 @@
-       <field field_ref="init_rho"/>
-       <field field_ref="init_m_v"/>
-       <field field_ref="init_m_cl"/>
--      <field field_ref="init_u_in_w2h"/>
--      <field field_ref="init_v_in_w2h"/>
-+      <!-- [isambard3] REMOVED: init_u_in_w2h, init_v_in_w2h, init_height_w2h (edge-located,
-+           W2H) and init_height_w0 (node-located, W0). Writing any edge- or node-located
-+           field to a UGRID file segfaults XIOS r2701 in this environment
-+           (CMesh::createMeshEpsilon, during the header write, on 1 rank as on 128), so
-+           the model died at its initial output. Cell-located fields write normally. The
-+           science output, lfric_crm_diag, has none of these fields.
-+           See github.com/ickc/lfric-env-isambard/issues/38; restore them once it is fixed. -->
-       <field field_ref="init_w_in_wth"/>
-       <field field_ref="init_divergence"/>
-       <field field_ref="init_exner"/>
-       <field field_ref="init_height_w3"/>
-       <field field_ref="init_height_wth"/>
--      <field field_ref="init_height_w2h"/>
--      <field field_ref="init_height_w0"/>
-     </field_group>
-   </file>
- 
 diff -ruN a/app/lfric_atm/rose-app.conf b/app/lfric_atm/rose-app.conf
 --- a/app/lfric_atm/rose-app.conf	2026-09-29 16:32:45.000000000 +0000
 +++ b/app/lfric_atm/rose-app.conf	2026-09-29 17:07:27.000000000 +0000
