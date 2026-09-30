@@ -79,6 +79,15 @@ shumlib_prefix="$(resolve_prefix shumlib)"
 python_prefix="$(resolve_prefix python)"
 psyclone_prefix="$(resolve_prefix py-psyclone)"
 rose_picker_prefix="$(resolve_prefix py-rose-picker)"
+# pFUnit installs under a versioned subdirectory (PFUNIT-<major>.<minor>/), and that
+# subdirectory is what lfric_core's pfunit.mk wants as $PFUNIT
+# ($(PFUNIT)/bin/funitproc, $(PFUNIT)/include/driver.F90).
+pfunit_prefix="$(resolve_prefix pfunit)"
+pfunit_root=""
+if [ -n "$pfunit_prefix" ]; then
+  for _d in "$pfunit_prefix"/PFUNIT-*; do [ -x "$_d/bin/funitproc" ] && pfunit_root="$_d"; done
+  [ -n "$pfunit_root" ] || warn "no PFUNIT-*/bin/funitproc under $pfunit_prefix — PFUNIT will be unset"
+fi
 
 shumlib_lib=""
 for d in "$shumlib_prefix/lib" "$shumlib_prefix/lib64"; do
@@ -163,6 +172,7 @@ ${cray_loads}local data = {
   psyclone        = $(lua_qn "$psyclone_prefix"),
   psyclone_cfg    = $(lua_qn "$psyclone_cfg"),
   rose_picker     = $(lua_qn "$rose_picker_prefix"),
+  pfunit          = $(lua_qn "$pfunit_root"),
   rose_site_conf  = $(lua_q  "$rose_site_dir"),
   cylc_site_conf  = $(lua_q  "$cylc_site_dir"),
   site_bin        = $(lua_q  "$site_bin_dir"),

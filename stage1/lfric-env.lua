@@ -13,7 +13,7 @@
 --   * the toolchain            FC, CXX, LDMPI, FPP, LFRIC_TARGET_PLATFORM
 --   * where to find the env    PATH, PYTHONPATH (+ the cylc/rose variants),
 --                              LD_LIBRARY_PATH, LIBRARY_PATH, FFLAGS, LDFLAGS,
---                              SHUMLIB_ROOT, PSYCLONE_CONFIG, SPACK_ENV
+--                              SHUMLIB_ROOT, PSYCLONE_CONFIG, PFUNIT, SPACK_ENV
 --   * the Rose site config     ROSE_SITE_CONF_PATH, unless already set
 --   * the Cylc site config     CYLC_SITE_CONF_PATH, unless already set
 --   * which module this is     LFRIC_ENV_MODULE, LFRIC_ENV_MODULEPATH, so a
@@ -152,6 +152,11 @@ if d.psyclone then
 end
 if d.rose_picker then
   prepend_path("PATH", d.rose_picker .. "/bin")
+end
+-- pFUnit, for lfric_core's unit tests (rose-stem's unit_tests tasks): pfunit.mk
+-- reads $(PFUNIT)/bin/funitproc and $(PFUNIT)/include/driver.F90 (#37).
+if d.pfunit then
+  setenv("PFUNIT", d.pfunit)
 end
 
 -- The Rose site config: just the rosie prefix map, so `rosie checkout u-...`

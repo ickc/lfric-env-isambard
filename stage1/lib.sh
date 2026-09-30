@@ -280,6 +280,10 @@ lfric_smoke_test() {
   [ "$ver" = slurm ] \
     || die "cylc has no isambard3 Slurm platform after loading $MODULE_NAME: $ver"
   info "cylc isambard3 -> $ver"
+  # pFUnit for lfric_core's unit tests: pfunit.mk runs $PFUNIT/bin/funitproc.
+  [ -x "${PFUNIT:-/nonexistent}/bin/funitproc" ] \
+    || die "PFUNIT=${PFUNIT:-UNSET} has no bin/funitproc after loading $MODULE_NAME"
+  info "PFUNIT=$PFUNIT"
   info "FC=${FC:-UNSET}  CXX=${CXX:-UNSET}  LDMPI=${LDMPI:-UNSET}"
   # The toolchain is the contract, so treat a missing compiler as a build failure
   # rather than something the first consumer discovers.
