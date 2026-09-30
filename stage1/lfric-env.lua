@@ -158,6 +158,21 @@ end
 if d.pfunit then
   setenv("PFUNIT", d.pfunit)
 end
+-- ...and its Fortran modules and static libraries (pFUnit, fargparse,
+-- gftl-shared), which live in versioned subdirectories outside the view.
+-- Appended, like shumlib's, so the view's own flags keep precedence.
+if d.unit_test_incs and #d.unit_test_incs > 0 then
+  local ff = ""
+  for _, dir in ipairs(d.unit_test_incs) do ff = ff .. " -I" .. dir end
+  local cur = os.getenv("FFLAGS")
+  pushenv("FFLAGS", (cur and cur ~= "" and (cur .. ff)) or ff:sub(2))
+end
+if d.unit_test_libs and #d.unit_test_libs > 0 then
+  local ld = ""
+  for _, dir in ipairs(d.unit_test_libs) do ld = ld .. " -L" .. dir end
+  local cur = os.getenv("LDFLAGS")
+  pushenv("LDFLAGS", (cur and cur ~= "" and (cur .. ld)) or ld:sub(2))
+end
 
 -- The Rose site config: just the rosie prefix map, so `rosie checkout u-...`
 -- works after a bare `module load` (#21). A site fact, not a suite setting.
