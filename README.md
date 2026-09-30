@@ -141,10 +141,15 @@ repo readable. Compiling and running do not.) Loading one variant/version swaps
 out the other; bare `module load lfric-env` resolves to the most-recently-built
 version's `cray`, and `module load lfric-env/<version>` to that version's `cray`.
 
-### Optional: configure cylc (only if you will run rose/cylc suites)
+### Cylc: nothing to configure
 
-This writes a run directory + an `isambard3` Slurm platform into `~/.cylc`. It is
-opt-in (building the environment never touches your home directory):
+The module ships a Cylc site config (`CYLC_SITE_CONF_PATH`): an `isambard3` Slurm
+platform, and run directories under `$PROJECTDIR/$USER/cylc-run` instead of `$HOME`.
+Your own `~/.cylc/flow/global.cylc`, if any, is merged on top and wins. Check with
+`cylc config -i '[platforms][isambard3]'`.
+
+Environments older than v2026.09.28 do not ship it. For those, write the same two
+settings into `~/.cylc` yourself:
 
 ```bash
 bash scripts/setup-cylc.sh

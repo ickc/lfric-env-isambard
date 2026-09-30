@@ -16,8 +16,9 @@
 #      checkout (u-dn704, u-dt000, u-dz791): the Isambard 3 site patch, preceded by a
 #      `rose app-upgrade` for the suites that still lag the environment's LFRic.
 #      Idempotent; needs the env from step 1, hence the order.
-#   3. Installs the Cylc site config (the `isambard3` Slurm platform + a roomy
-#      cylc-run dir) via the repo's opt-in scripts/setup-cylc.sh.
+#   3. Checks the Cylc site config (the `isambard3` Slurm platform + a roomy
+#      cylc-run dir) is in place. The environment ships it; for an older one,
+#      falls back to the repo's opt-in scripts/setup-cylc.sh.
 #   4. Runs `cylc vip` (validate-install-play) on the suite, injecting LFRIC_STACK/
 #      LFRIC_PREFIX/ACTIVATE_ENV so its tasks load our env.
 #
@@ -116,9 +117,16 @@ info "cylc $(cylc version 2>/dev/null) | rose $(rose version 2>/dev/null | awk '
 info "staging $SUITE: $(basename "$SUITE_PATCH")"
 bash "$SUITE_PATCH" || die "suite patch failed: $SUITE_PATCH"
 
-# 3. Cylc site config: the `isambard3` Slurm platform + a roomy cylc-run dir.
-#    Reuse the repo's opt-in setup-cylc.sh (idempotent; writes ~/.cylc/flow).
-bash "$REPO_ROOT/scripts/setup-cylc.sh" || die "setup-cylc.sh failed"
+# 3. Cylc site config: the `isambard3` Slurm platform + a run dir off $HOME. The
+#    environment ships it (CYLC_SITE_CONF_PATH, from v2026.09.28 on), so ask cylc
+#    whether the platform is already defined, from there or from your own
+#    ~/.cylc, and only fall back to writing ~/.cylc/flow/global.cylc when it is not
+#    (an older environment).
+if [ "$(cylc config -i '[platforms][isambard3]job runner' 2>/dev/null)" = slurm ]; then
+  info "cylc: isambard3 platform already configured (${CYLC_SITE_CONF_PATH:-~/.cylc})"
+else
+  bash "$REPO_ROOT/scripts/setup-cylc.sh" || die "setup-cylc.sh failed"
+fi
 
 # `cylc install` runs the cylc.post_install.log_vc_info plugin, which records the source's
 # version control state -- `svn info`/`svn diff` for the MOSRS checkouts, `git diff` for

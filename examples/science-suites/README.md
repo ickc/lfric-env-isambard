@@ -249,10 +249,11 @@ changes, so it runs against *our* env on Isambard 3:
    The script itself only initialises Lmod, preserves the source/target vars the
    suite owns, and adds the Lustre HDF5 file-locking workaround — the
    science-suite-example analogue of upstream's `env_lfric/activate.sh`.
-3. **Cylc platform → Slurm.** `run-suite.sh` runs the repo's opt-in
-   `scripts/setup-cylc.sh`, which writes the `isambard3` platform
-   (`job runner = slurm`, on `localhost`) and a roomy `cylc-run` dir into
-   `~/.cylc/flow/` (idempotent; the same setup `pixi run setup-cylc` does).
+3. **Cylc platform → Slurm.** The module's Cylc site config
+   (`CYLC_SITE_CONF_PATH`) defines the `isambard3` platform (`job runner = slurm`,
+   on `localhost`) and a run directory under `$PROJECTDIR/$USER`. `run-suite.sh`
+   checks the platform is defined, and only for an older environment falls back to
+   `scripts/setup-cylc.sh`, which writes the same into `~/.cylc/flow/`.
 
 ### Placement and MPI transport — the contract
 
@@ -357,8 +358,9 @@ mechanism — it does four things you could do by hand:
 #    they sit outside patch-all.sh's stack. LFRIC_SUITE_DIR moves the target.
 bash patches/40-lfric_egp_bench-u-dr932-patch.sh
 
-# 3. write the `isambard3` Slurm platform + a roomy cylc-run dir into ~/.cylc/flow
-bash scripts/setup-cylc.sh
+# 3. nothing: the module's Cylc site config defines the `isambard3` platform and the
+#    run dir. (Environments older than v2026.09.28: bash scripts/setup-cylc.sh.)
+cylc config -i '[platforms][isambard3]job runner'    # -> slurm
 
 # 4. validate, install and play, telling the suite which environment to load.
 #    NOTE the path: it is the STAGED SUITE, never a directory under

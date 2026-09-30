@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # setup-cylc.sh — configure cylc for running suites on Isambard 3.
 #
+# A FALLBACK for environments older than v2026.09.28. From that version the module
+# sets CYLC_SITE_CONF_PATH to a site config with the same two settings
+# (stage1/site/cylc/flow/global.cylc), so there is nothing to write.
+#
 # This is OPT-IN and OPTIONAL. It writes two managed blocks into one file in your
 # HOME, idempotently:
 #   ~/.cylc/flow/global.cylc   a [symlink dirs] run directory, and an `isambard3`
@@ -12,8 +16,10 @@
 #
 #   bash scripts/setup-cylc.sh
 #
-# Overridable: CYLC_RUN_BASE (the run directory; default
-# $PROJECTDIR/$USER/cylc-run), CYLC_USER_CONF (default ~/.cylc/flow/global.cylc).
+# Overridable: CYLC_RUN_BASE (default $PROJECTDIR/$USER; cylc appends
+# cylc-run/<workflow> itself), CYLC_USER_CONF (default ~/.cylc/flow/global.cylc).
+# An older version of this script defaulted to $PROJECTDIR/$USER/cylc-run, so runs
+# landed in .../cylc-run/cylc-run/<workflow>. Re-running rewrites the block.
 set -uo pipefail
 
 info() { echo "INFO: $*"; }
@@ -21,7 +27,7 @@ warn() { echo "WARN: $*" >&2; }
 die()  { echo "ERROR: $*" >&2; exit 1; }
 
 run_base_root="${CYLC_RUN_BASE_ROOT:-${PROJECTDIR:-${SCRATCH:-$HOME}}}"
-run_base="${CYLC_RUN_BASE:-$run_base_root/${USER}/cylc-run}"
+run_base="${CYLC_RUN_BASE:-$run_base_root/${USER}}"
 conf="${CYLC_USER_CONF:-$HOME/.cylc/flow/global.cylc}"
 conf_dir="$(dirname "$conf")"
 run_start="# BEGIN LFRIC_CYLC_RUN_DIR";   run_end="# END LFRIC_CYLC_RUN_DIR"
