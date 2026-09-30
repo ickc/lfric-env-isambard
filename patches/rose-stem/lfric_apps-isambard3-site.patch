@@ -567,10 +567,10 @@ index 00000000..dd5fb07b
 +{% do LOG.debug("Finished in site/isambard3/suite_config.cylc") %}
 diff --git a/rose-stem/site/isambard3/variables.cylc b/rose-stem/site/isambard3/variables.cylc
 new file mode 100644
-index 00000000..d1392fe7
+index 00000000..beee70e7
 --- /dev/null
 +++ b/rose-stem/site/isambard3/variables.cylc
-@@ -0,0 +1,19 @@
+@@ -0,0 +1,23 @@
 +{% do LOG.debug("Entered site/isambard3/variables.cylc") %}
 +
 +{% do site_vars.update({"known_applications": ["gungho_model",
@@ -584,6 +584,10 @@ index 00000000..d1392fe7
 +{% do site_vars.update({"site_platforms": ["isambard3"]}) %}
 +
 +{% do site_vars.update({"scripts_platform": "isambard3"}) %}
++
++{# Clone the dependencies.yaml sources over https: they are git@github.com: URLs, and a
++   trainee has no GitHub SSH key here. All the repositories are public. #}
++{% do site_vars.update({"USE_TOKENS": true}) %}
 +
 +{% do site_vars.update({"mesh_build": {"isambard3": "gnu_fast-debug-64bit"} }) %}
 +

@@ -51,7 +51,11 @@ was not provided`. Validated against `main` @ `801edbfa` (2026-09-28).
    and every application needs one. This follows `uoe-epic`, which links to
    `meto-ex1a` in the same way: the Met Office's Cray EX set, which the science suites
    here already build with.
-5. **No KGO checks.** There are no Isambard 3 known-good answers yet
+5. **`USE_TOKENS`** (#40). rose-stem's `export-source` clones the `dependencies.yaml`
+   sources, which are `git@github.com:` URLs, and rewrites them to https only when the
+   site sets `USE_TOKENS`. A trainee has no GitHub SSH key here, and every repository
+   is public, so the site sets it.
+6. **No KGO checks.** There are no Isambard 3 known-good answers yet
    (`site/isambard3/kgos/`). A first validated run's checksums can seed them.
 
 ## Validated
