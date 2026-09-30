@@ -32,7 +32,8 @@ scripts/                # shared helpers for the examples
   print-versions.sh     #   `pixi run activate`: report rose/cylc/psyclone
   patch-all.sh / unpatch.sh
   stage-physics.sh      #   set physics + lfric_core submodules to dependencies.yaml refs
-  setup-cylc.sh         #   opt-in: write ~/.cylc run dir + isambard3 platform
+  setup-cylc.sh         #   fallback for envs < v2026.09.28: write the Cylc site
+                        #   config (stage1/site/cylc/) into ~/.cylc instead
 vendor/                 # pinned submodules — the LFRic SOURCES the examples compile
   lfric_apps/  lfric_core/                     #   (Stage 1's own submodules are in stage1/vendor/)
   physics/{casim,jules,socrates,ukca}/

@@ -1,0 +1,25 @@
+#!Jinja2
+# Cylc site config shipped with the LFRic environment (#31). The module points
+# CYLC_SITE_CONF_PATH at the directory above flow/, unless it is already set, so a
+# bare `module load` is enough to run the science suites and rose-stem. Anything in
+# your own ~/.cylc/flow/global.cylc is merged on top and wins.
+
+[platforms]
+    # Isambard 3's compute nodes, through Slurm. The suite ports and the rose-stem
+    # site submit to this platform by name.
+    [[isambard3]]
+        hosts = localhost
+        job runner = slurm
+        install target = localhost
+
+{# Run directories on the project filesystem, not in $HOME, which is small. Cylc
+   appends cylc-run/<workflow> itself, so this is $PROJECTDIR/$USER, not
+   .../cylc-run. Left to Cylc's default (~/cylc-run) where PROJECTDIR is unset. #}
+{% set projectdir = environ.get('PROJECTDIR', '') %}
+{% set user = environ.get('USER', '') %}
+{% if projectdir and user %}
+[install]
+    [[symlink dirs]]
+        [[[localhost]]]
+            run = {{ projectdir }}/{{ user }}
+{% endif %}

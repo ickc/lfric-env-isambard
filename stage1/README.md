@@ -198,6 +198,13 @@ stage1/
 │                       Version-controlled and reviewable; snapshotted next to
 │                       the generated modulefiles so loading needs no repo.
 │
+├── site/               site config shipped IN the environment, installed per
+│                       version by gen-modulefile.sh and pointed at by the
+│                       module only when the user has not set their own:
+│                       rose.conf (the rosie prefix map, ROSE_SITE_CONF_PATH),
+│                       cylc/flow/global.cylc (the isambard3 Slurm platform and
+│                       the run dir, CYLC_SITE_CONF_PATH), bin/ (mosrs-cache-password).
+│
 ├── spack-env/          the Spack manifests: common.yaml (repos, the gcc
 │                       external, python) + one per variant (MPI and parallel
 │                       I/O). Templates — instantiated under LFRIC_PREFIX.

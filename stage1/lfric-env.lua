@@ -15,6 +15,7 @@
 --                              LD_LIBRARY_PATH, LIBRARY_PATH, FFLAGS, LDFLAGS,
 --                              SHUMLIB_ROOT, PSYCLONE_CONFIG, SPACK_ENV
 --   * the Rose site config     ROSE_SITE_CONF_PATH, unless already set
+--   * the Cylc site config     CYLC_SITE_CONF_PATH, unless already set
 --   * which module this is     LFRIC_ENV_MODULE, LFRIC_ENV_MODULEPATH, so a
 --                              workflow can load the same one in its jobs
 --   * site helpers on PATH     mosrs-cache-password
@@ -162,6 +163,17 @@ if d.rose_site_conf then
   local cur = os.getenv("ROSE_SITE_CONF_PATH")
   if cur == nil or cur == "" or cur == d.rose_site_conf then
     setenv("ROSE_SITE_CONF_PATH", d.rose_site_conf)
+  end
+end
+
+-- The Cylc site config: the `isambard3` Slurm platform and a run directory on the
+-- project filesystem, so a bare `module load` runs the science suites and rose-stem
+-- without a ~/.cylc (#31). ~/.cylc/flow/global.cylc still merges on top and wins.
+-- Same unset-or-ours guard as ROSE_SITE_CONF_PATH, for the same reasons.
+if d.cylc_site_conf then
+  local cur = os.getenv("CYLC_SITE_CONF_PATH")
+  if cur == nil or cur == "" or cur == d.cylc_site_conf then
+    setenv("CYLC_SITE_CONF_PATH", d.cylc_site_conf)
   end
 end
 
