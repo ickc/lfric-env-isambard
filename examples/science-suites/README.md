@@ -152,7 +152,7 @@ Upstream comes in two kinds, because the suites have two kinds of home:
 | u-dr932 | submodule `vendor/lfric_egp_bench` @ `e6ee57a` | `patches/40-lfric_egp_bench-u-dr932-patch.sh` | 419 lines, 5 files |
 | u-dt000 | MOSRS `roses-u/d/t/0/0/0/trunk` @ r348703 | `patches/suites/41-roses-u-u-dt000-patch.sh` | 434 lines, 5 files |
 | u-dn704 | MOSRS `roses-u/d/n/7/0/4/trunk` @ r361458 | `patches/suites/42-roses-u-u-dn704-patch.sh` | 455 lines, 7 files |
-| u-dz791 | MOSRS `roses-u/d/z/7/9/1/trunk` @ r368986 | `patches/suites/43-roses-u-u-dz791-patch.sh` | 431 lines, 5 files |
+| u-dz791 | MOSRS `roses-u/d/z/7/9/1/trunk` @ r368986 | `patches/suites/43-roses-u-u-dz791-patch.sh` | 480 lines, 7 files |
 
 u-dr932 is Denis Sergeev's, on GitHub, so it is a pinned submodule. **u-dn704,
 u-dt000 and u-dz791 are Met Office rose suites and live in MOSRS subversion** — and are staying

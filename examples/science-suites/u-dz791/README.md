@@ -123,6 +123,30 @@ and the main config's own `jules_pftparm` migration. `VN` in `rose-suite.conf` f
 The extract runs on the scheduler host (`platform = localhost`), because it is a git
 clone and needs no compute node.
 
+### Output — four initial diagnostics dropped (XIOS)
+
+`file_def_initial_diags.xml` loses `init_u_in_w2h`, `init_v_in_w2h`,
+`init_height_w2h` and `init_height_w0`. Writing any **edge-located (W2H) or node-located
+(W0)** field to a UGRID file segfaults XIOS r2701 in this environment, in
+`CMesh::createMeshEpsilon` during the file header write. It does so on 1 rank as on 128,
+so the model died at its initial output. Bisecting that file found it: dropping the W2H
+fields alone, or the W0 field alone, still crashes; dropping both runs. Cell-located fields write normally,
+and the science file, `lfric_crm_diag`, has none of the four (its winds are
+`u_in_w3`/`v_in_w3`). Tracked in
+[#38](https://github.com/ickc/lfric-env-isambard/issues/38). Restore the four fields
+once it is fixed.
+
+### Small things
+
+- `BUILD_ROOT` is the task's work directory, not `${TMPDIR}`. On a Grace node `TMPDIR`
+  is `/local/user/<uid>`, which outlives the job. A later run on the same node found an
+  earlier run's build tree, and the dependency analyser aborted on a module that the
+  old source had at another path (`UNIQUE constraint failed:
+  fortran_program_unit.unit`).
+- `[file:spec]` reads the GA9 spectra from `$SOURCE_ROOT/socrates`, not through the
+  `fcm:socrates.xm_tr` keyword into MOSRS, as upstream u-dn704 already does. Rose
+  installs every `[file:]` entry, so this is needed even with radiation off.
+
 ### Placement
 
 `LPPN` is 144, a Grace node, not the Met Office EX's 128. `lfric_atm` gets
