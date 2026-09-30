@@ -103,6 +103,17 @@ for _pkg in pfunit fargparse gftl-shared; do
   done
 done
 
+# The release's Rose metadata (lfric-rose-meta): every rose-meta directory under its
+# share/rose-meta, as a ROSE_META_PATH-style list. Absolute, because rose resolves
+# entries relative to wherever it runs (an app directory, for app-upgrade).
+rose_meta_dirs=()
+rose_meta_prefix="$(resolve_prefix lfric-rose-meta)"
+if [ -n "$rose_meta_prefix" ]; then
+  while IFS= read -r _d; do rose_meta_dirs+=("$_d"); done \
+    < <(find "$rose_meta_prefix/share/rose-meta" -mindepth 1 -type d -name rose-meta -prune 2>/dev/null | sort)
+  [ ${#rose_meta_dirs[@]} -gt 0 ] || warn "no rose-meta under $rose_meta_prefix — LFRIC_ROSE_META_PATH will be unset"
+fi
+
 shumlib_lib=""
 for d in "$shumlib_prefix/lib" "$shumlib_prefix/lib64"; do
   [ -n "$shumlib_prefix" ] && [ -d "$d" ] && { shumlib_lib="$d"; break; }
@@ -191,6 +202,7 @@ ${cray_loads}local data = {
   unit_test_libs  = $(lua_list "${unit_test_libs[@]}"),
   rose_site_conf  = $(lua_q  "$rose_site_dir"),
   cylc_site_conf  = $(lua_q  "$cylc_site_dir"),
+  rose_meta       = $(lua_list "${rose_meta_dirs[@]}"),
   site_bin        = $(lua_q  "$site_bin_dir"),
   modulefiles_dir = $(lua_q  "$MODULEFILES_DIR"),
   pythonpath      = $pythonpath_lua,

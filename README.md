@@ -141,6 +141,14 @@ repo readable. Compiling and running do not.) Loading one variant/version swaps
 out the other; bare `module load lfric-env` resolves to the most-recently-built
 version's `cray`, and `module load lfric-env/<version>` to that version's `cray`.
 
+### Rose metadata
+
+The module exports `LFRIC_ROSE_META_PATH`: the rose-meta of the LFRic release the
+environment builds (lfric_apps, lfric_core, JULES). The science-suite stagers use it for
+`rose app-upgrade`. It is deliberately not `ROSE_META_PATH`, which would shadow the
+metadata of a newer lfric_apps clone (rose-stem). For `rose edit` or `rose macro` on a
+suite at this release, opt in: `export ROSE_META_PATH=$LFRIC_ROSE_META_PATH`.
+
 ### Cylc: nothing to configure
 
 The module ships a Cylc site config (`CYLC_SITE_CONF_PATH`): an `isambard3` Slurm

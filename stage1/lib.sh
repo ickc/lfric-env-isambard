@@ -284,6 +284,11 @@ lfric_smoke_test() {
   [ -x "${PFUNIT:-/nonexistent}/bin/funitproc" ] \
     || die "PFUNIT=${PFUNIT:-UNSET} has no bin/funitproc after loading $MODULE_NAME"
   info "PFUNIT=$PFUNIT"
+  # The release's rose-meta, which the science-suite stagers' rose app-upgrade reads.
+  case ":${LFRIC_ROSE_META_PATH:-}:" in
+    *"/jules/rose-meta:"*) info "LFRIC_ROSE_META_PATH has $(tr ':' '\n' <<< "$LFRIC_ROSE_META_PATH" | wc -l) rose-meta dirs" ;;
+    *) die "LFRIC_ROSE_META_PATH has no jules rose-meta after loading $MODULE_NAME: ${LFRIC_ROSE_META_PATH:-UNSET}" ;;
+  esac
   info "FC=${FC:-UNSET}  CXX=${CXX:-UNSET}  LDMPI=${LDMPI:-UNSET}"
   # The toolchain is the contract, so treat a missing compiler as a build failure
   # rather than something the first consumer discovers.
