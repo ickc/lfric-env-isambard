@@ -381,15 +381,15 @@ index 00000000..92fa9510
 +{% do LOG.debug("Finished in site/isambard3/common/suite_config_isambard3.cylc") %}
 diff --git a/rose-stem/site/isambard3/groups.cylc b/rose-stem/site/isambard3/groups.cylc
 new file mode 100644
-index 00000000..794ba534
+index 00000000..371d9cad
 --- /dev/null
 +++ b/rose-stem/site/isambard3/groups.cylc
-@@ -0,0 +1,38 @@
+@@ -0,0 +1,39 @@
 +{% do LOG.debug("Entered site/isambard3/groups.cylc") %}
 +
 +{# The script checks run anywhere the module is loaded. The model groups mirror
-+   site/uoe's. The gungho unit tests are left out: they need pFUnit, which the
-+   lfric-env module does not provide yet. #}
++   site/uoe's. The unit tests need PFUNIT, which the lfric-env module sets from
++   v2026.09.28 (regenerated 2026-09-30) on. #}
 +
 +{%- do site_groups.update({
 +    "all": [
@@ -409,6 +409,7 @@ index 00000000..794ba534
 +        "macro_chains_checker",
 +    ],
 +    "gungho_isambard3_unitandintegration_tests": [
++        "gungho_unit_tests_isambard3_gnu_64bit",
 +        "gungho_integration_tests_isambard3_gnu_64bit",
 +    ],
 +    "gungho_model_isambard3_exoplanet": [
