@@ -275,6 +275,11 @@ lfric_smoke_test() {
   ver="$(rose config rosie-id prefix-location.u 2>&1)" \
     || die "rose has no rosie prefix map after loading $MODULE_NAME: $ver"
   info "rosie u -> $ver"
+  # and cylc needs the isambard3 platform from the site config CYLC_SITE_CONF_PATH names.
+  ver="$(cylc config -i '[platforms][isambard3]job runner' 2>&1)"
+  [ "$ver" = slurm ] \
+    || die "cylc has no isambard3 Slurm platform after loading $MODULE_NAME: $ver"
+  info "cylc isambard3 -> $ver"
   info "FC=${FC:-UNSET}  CXX=${CXX:-UNSET}  LDMPI=${LDMPI:-UNSET}"
   # The toolchain is the contract, so treat a missing compiler as a build failure
   # rather than something the first consumer discovers.
