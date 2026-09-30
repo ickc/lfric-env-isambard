@@ -13,7 +13,7 @@
 --   * the toolchain            FC, CXX, LDMPI, FPP, LFRIC_TARGET_PLATFORM
 --   * where to find the env    PATH, PYTHONPATH (+ the cylc/rose variants),
 --                              LD_LIBRARY_PATH, LIBRARY_PATH, FFLAGS, LDFLAGS,
---                              SHUMLIB_ROOT, PSYCLONE_CONFIG, SPACK_ENV
+--                              SHUMLIB_ROOT, PSYCLONE_CONFIG, PFUNIT, SPACK_ENV
 --   * the Rose site config     ROSE_SITE_CONF_PATH, unless already set
 --   * the Cylc site config     CYLC_SITE_CONF_PATH, unless already set
 --   * which module this is     LFRIC_ENV_MODULE, LFRIC_ENV_MODULEPATH, so a
@@ -152,6 +152,26 @@ if d.psyclone then
 end
 if d.rose_picker then
   prepend_path("PATH", d.rose_picker .. "/bin")
+end
+-- pFUnit, for lfric_core's unit tests (rose-stem's unit_tests tasks): pfunit.mk
+-- reads $(PFUNIT)/bin/funitproc and $(PFUNIT)/include/driver.F90 (#37).
+if d.pfunit then
+  setenv("PFUNIT", d.pfunit)
+end
+-- ...and its Fortran modules and static libraries (pFUnit, fargparse,
+-- gftl-shared), which live in versioned subdirectories outside the view.
+-- Appended, like shumlib's, so the view's own flags keep precedence.
+if d.unit_test_incs and #d.unit_test_incs > 0 then
+  local ff = ""
+  for _, dir in ipairs(d.unit_test_incs) do ff = ff .. " -I" .. dir end
+  local cur = os.getenv("FFLAGS")
+  pushenv("FFLAGS", (cur and cur ~= "" and (cur .. ff)) or ff:sub(2))
+end
+if d.unit_test_libs and #d.unit_test_libs > 0 then
+  local ld = ""
+  for _, dir in ipairs(d.unit_test_libs) do ld = ld .. " -L" .. dir end
+  local cur = os.getenv("LDFLAGS")
+  pushenv("LDFLAGS", (cur and cur ~= "" and (cur .. ld)) or ld:sub(2))
 end
 
 -- The Rose site config: just the rosie prefix map, so `rosie checkout u-...`

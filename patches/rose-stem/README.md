@@ -65,11 +65,11 @@ On lfric_apps `main` @ `801edbfa`, env v2026.09.28/cray, 2026-09-29:
 | Group | Result |
 |---|---|
 | `scripts` (Practical 3) | all 11 tasks pass. The Met Office's own list minus `local_build_test`, which needs the Met Office Intel build family. |
-| `gungho_isambard3_unitandintegration_tests` | the gungho build and **integration tests pass**. The **unit tests are left out**: they need pFUnit, which the environment does not ship yet (#37). |
+| `gungho_isambard3_unitandintegration_tests` | **passes**: gungho **unit tests (265, OK)** and integration tests. The unit tests need `PFUNIT` and the pFUnit/fargparse/gftl-shared flags from the module, which v2026.09.28 has (regenerated in place 2026-09-30, #37). |
 | `lfric_atm_isambard3_exoplanets`, `gungho_model_isambard3_exoplanet` | the `lfric_atm`, `gungho_model` and mesh builds pass, all four meshes generate, and the single-column `scm_hd209458b` model runs. **The four 3D model runs crash in XIOS** during the UGRID header write (#38). |
 
 So Practical 3's `scripts` group works. The Met Office `developer` group is not defined
-for this site, because it would inherit both gaps above.
+for this site yet. It waits on the XIOS fix for the 3D runs (#38).
 
 ## Upstream
 

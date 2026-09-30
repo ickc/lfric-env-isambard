@@ -79,6 +79,29 @@ shumlib_prefix="$(resolve_prefix shumlib)"
 python_prefix="$(resolve_prefix python)"
 psyclone_prefix="$(resolve_prefix py-psyclone)"
 rose_picker_prefix="$(resolve_prefix py-rose-picker)"
+# pFUnit installs under a versioned subdirectory (PFUNIT-<major>.<minor>/), and that
+# subdirectory is what lfric_core's pfunit.mk wants as $PFUNIT
+# ($(PFUNIT)/bin/funitproc, $(PFUNIT)/include/driver.F90).
+pfunit_prefix="$(resolve_prefix pfunit)"
+pfunit_root=""
+if [ -n "$pfunit_prefix" ]; then
+  for _d in "$pfunit_prefix"/PFUNIT-*; do [ -x "$_d/bin/funitproc" ] && pfunit_root="$_d"; done
+  [ -n "$pfunit_root" ] || warn "no PFUNIT-*/bin/funitproc under $pfunit_prefix — PFUNIT will be unset"
+fi
+# The unit tests then compile against funit.mod and link, by name, pfunit, funit,
+# fargparse and gftl-shared-v2 (lfric_core tests.mk). All three packages install
+# into a versioned subdirectory the Spack view does not expose, so collect each
+# one's include/ (and gftl-shared's include/v2) and lib/ for FFLAGS/LDFLAGS.
+unit_test_incs=(); unit_test_libs=()
+for _pkg in pfunit fargparse gftl-shared; do
+  _p="$(resolve_prefix "$_pkg")"; [ -n "$_p" ] || continue
+  for _d in "$_p"/*/; do
+    _d="${_d%/}"
+    [ -d "$_d/lib" ] && [ -d "$_d/include" ] || continue
+    unit_test_incs+=("$_d/include"); unit_test_libs+=("$_d/lib")
+    [ -d "$_d/include/v2" ] && unit_test_incs+=("$_d/include/v2")
+  done
+done
 
 shumlib_lib=""
 for d in "$shumlib_prefix/lib" "$shumlib_prefix/lib64"; do
@@ -163,6 +186,9 @@ ${cray_loads}local data = {
   psyclone        = $(lua_qn "$psyclone_prefix"),
   psyclone_cfg    = $(lua_qn "$psyclone_cfg"),
   rose_picker     = $(lua_qn "$rose_picker_prefix"),
+  pfunit          = $(lua_qn "$pfunit_root"),
+  unit_test_incs  = $(lua_list "${unit_test_incs[@]}"),
+  unit_test_libs  = $(lua_list "${unit_test_libs[@]}"),
   rose_site_conf  = $(lua_q  "$rose_site_dir"),
   cylc_site_conf  = $(lua_q  "$cylc_site_dir"),
   site_bin        = $(lua_q  "$site_bin_dir"),
