@@ -24,7 +24,7 @@ _lfric_submodule_present() { [ -e "$REPO_ROOT/vendor/$1/.git" ]; }
 #
 # NOT here, and both deliberately:
 #
-#   patches/suites/* — u-dn704 and u-dt000 are MOSRS checkouts in the user's home,
+#   patches/suites/* — u-dn704, u-dt000 and u-dz791 are MOSRS checkouts in the user's home,
 #   not submodules. Their unpatch is the native one, in the checkout:
 #       svn revert -R ~/roses/u-dn704
 #   This script will not reach into $HOME.
@@ -44,4 +44,4 @@ for sub in lfric_core lfric_apps lfric_egp_bench; do
 done
 echo "unpatch complete: lfric_core, lfric_apps, lfric_egp_bench restored."
 echo "(Stage 1's own patch reverts separately: git -C stage1/vendor/spack-packages checkout .)"
-echo "    (u-dn704/u-dt000 are MOSRS checkouts: svn revert -R ~/roses/<suite>)"
+echo "    (u-dn704/u-dt000/u-dz791 are MOSRS checkouts: svn revert -R ~/roses/<suite>)"

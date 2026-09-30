@@ -77,12 +77,12 @@ example} × {`cray`, `spack`}. This is the one outcome that must stay green. The
 - `examples/minimal-compile/{build.sh,build.sbatch}` — the minimal-compile example.
 - `examples/science-suites/{run-suite.sh,site/,u-*/}` — the science-suite examples
   (Cylc-driven; per-suite source via `dependencies.yaml`). `site/patch-sources.sh`
-  applies the LFRic patch stack to a suite's extracted tree; all three suites use
+  applies the LFRic patch stack to a suite's extracted tree; all four suites use
   the upstream `merge_sources.py` extract.
 - `vendor/` — pinned submodules, two classes. **Science suite:** lfric_egp_bench
-  (Denis Sergeev's repo — u-dr932). u-dn704 and u-dt000 are NOT here and must not
-  be: they are Met Office rose suites living in MOSRS subversion
-  (`roses-u/d/n/7/0/4/trunk`, `d/t/0/0/0/trunk`), fetched with `rosie checkout`
+  (Denis Sergeev's repo — u-dr932). u-dn704, u-dt000 and u-dz791 are NOT here and
+  must not be: they are Met Office rose suites living in MOSRS subversion
+  (`roses-u/d/n/7/0/4/trunk`, `d/t/0/0/0/trunk`, `d/z/7/9/1/trunk`), fetched with `rosie checkout`
   into `~/roses/<id>` and patched there. Do not vendor a third party's copy of
   them — this repo supersedes the UniExeterRSE one, and that copy is upstream plus
   *their* port. **LFRic source (the examples build from these):** lfric_apps,
@@ -96,15 +96,16 @@ example} × {`cray`, `spack`}. This is the one outcome that must stay green. The
   `git apply` of the site diff); it is inert without `rose`, so `run-suite.sh` re-runs it
   with the env activated. Three subdirectories are **outside** that stack, all on purpose:
   `patches/suites/` — the stagers for the MOSRS suites (`41-roses-u-u-dt000-*`,
-  `42-roses-u-u-dn704-*`). They patch a checkout in the user's `$HOME`, which an
-  environment build must never rewrite; `run-suite.sh` runs them. u-dn704's has no
+  `42-roses-u-u-dn704-*`, `43-roses-u-u-dz791-*`). They patch a checkout in the user's
+  `$HOME`, which an environment build must never rewrite; `run-suite.sh` runs them. u-dn704's has no
   `rose app-upgrade` step (upstream is already vn3.2) and applies `-p0` (`svn diff`);
-  u-dt000's has one and applies `-p1` (`diff -ruN a b`).
+  u-dt000's and u-dz791's have one and apply `-p1` (`diff -ruN a b`).
   `patches/rose-stem/` — a patch to a *user's own* lfric_apps clone adding an Isambard 3
   rose-stem site and SSH-free source reading; applied by hand, see its README.
   `patches/optional/` — per-suite LFRic-source patches a single suite opts into by path
   from its own extract task, because applying them everywhere would break the other
-  suites. Currently one — the u-dt000 ice-giants forcing.
+  suites. Currently two — the u-dt000 ice-giants forcing (`32-*`) and the u-dz791
+  profile initialisation (`33-*`).
 - `staging/<investigation>/` — reproductions of reported problems, with their evidence
   and conclusion. Off the invariant; nothing in `stage1/`/`scripts/`/`examples/`
   may depend on it. See `staging/README.md`.

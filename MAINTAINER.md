@@ -22,10 +22,10 @@ examples/science-suites/ # run real Rose/Cylc LFRic suites
   site/patch-sources.sh  #   apply the LFRic patch stack to a suite's extracted tree
   site/bin/launch-exe    #   srun launcher (drop-in for the MO one; XIOS-server MPMD)
   site/rose.conf         #   rosie's `u-` prefix map, so `rosie checkout` works here
-  u-dn704/ u-dr932/ u-dt000/  # only README + known-issues: the SUITES live upstream.
+  u-dn704/ u-dr932/ u-dt000/ u-dz791/  # only README + known-issues: the SUITES live upstream.
                           #   u-dr932 = submodule vendor/lfric_egp_bench (patches/40-*);
-                          #   u-dn704 + u-dt000 = MOSRS checkouts in ~/roses
-                          #   (patches/suites/42-*, 41-*)
+                          #   u-dn704, u-dt000, u-dz791 = MOSRS checkouts in ~/roses
+                          #   (patches/suites/42-*, 41-*, 43-*)
 scripts/                # shared helpers for the examples
   common.sh             #   which built environment to load, and where its modulefiles are
   activate.sh           #   `module load $MODULE_NAME` (pixi auto-activation)
@@ -39,7 +39,7 @@ vendor/                 # pinned submodules — the LFRic SOURCES the examples c
   lfric_egp_bench/                             #   upstream science suite (u-dr932), patched
 patches/                # one *-patch.sh per upstream patch (applied in sorted order)
                         #   patch-all.sh is -maxdepth 1: BOTH subdirs below are outside it
-  suites/               #   stagers for the MOSRS suites (41-u-dt000, 42-u-dn704) + their
+  suites/               #   stagers for the MOSRS suites (41-u-dt000, 42-u-dn704, 43-u-dz791) + their
                         #   .patch files. Out of the stack because they patch a checkout
                         #   in the user's $HOME; run-suite.sh runs them, not patch-all.sh
   optional/             #   per-suite source patches, OUTSIDE the stack — a suite opts
