@@ -157,7 +157,26 @@ no `mpiexec` in the cray environment.
 
 ## What was observed on this environment
 
-_Filled in from the validating run._
+Validated on the **cray** environment, v2026.09.28, 2026-09-30, from a pristine checkout
+at r368986 staged by `run-suite.sh u-dz791` (`u-dz791/run6`). The workflow shut down
+`AUTOMATIC` with every task succeeded:
+
+| Task | Wallclock |
+|---|---|
+| `extract` (clone, merge, patch stack, patch 33) | ~1 min, on the login node |
+| `build_lfric_atm` (`production`, 24 cpus) | 11 min 12 s |
+| `lfric_atm`, cycle 1: 180 steps of 10 s, 128 ranks on one Grace node | 1 min 37 s |
+| `lfric_atm`, cycle 2: restart from cycle 1's checkpoint | 1 min 40 s |
+
+The run wrote 726 MB of UGRID output in total: `lfric_initial.nc`, and six 10-minute
+`lfric_crm_diag` files covering 00:00 to 01:00. At the end of the hour, theta is
+443.3–2720.8 K, **bit-identical** to an earlier run (`run5`) on a different day.
+
+What this establishes is that the suite runs its intended science here: the
+absolute-temperature initialisation from `profile_variable='absolute'`, H₂ gas constants,
+and a restart. **The science is not validated.** There is no Met Office reference run of
+this configuration on 2026.07.1 to compare against, and the forward-ported branches are
+Alex Corbett's work in progress.
 
 ## Running it
 
