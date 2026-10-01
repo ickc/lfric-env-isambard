@@ -60,16 +60,16 @@ was not provided`. Validated against `main` @ `801edbfa` (2026-09-28).
 
 ## Validated
 
-On lfric_apps `main` @ `801edbfa`, env v2026.09.28/cray, 2026-09-29:
+On lfric_apps `main` @ `801edbfa`, env v2026.09.28/cray, 2026-09-29 to 2026-10-01:
 
 | Group | Result |
 |---|---|
 | `scripts` (Practical 3) | all 11 tasks pass. The Met Office's own list minus `local_build_test`, which needs the Met Office Intel build family. |
 | `gungho_isambard3_unitandintegration_tests` | **passes**: gungho **unit tests (265, OK)** and integration tests. The unit tests need `PFUNIT` and the pFUnit/fargparse/gftl-shared flags from the module, which v2026.09.28 has (regenerated in place 2026-09-30, #37). |
-| `lfric_atm_isambard3_exoplanets`, `gungho_model_isambard3_exoplanet` | the `lfric_atm`, `gungho_model` and mesh builds pass, all four meshes generate, and the single-column `scm_hd209458b` model runs. **The four 3D model runs crash in XIOS** during the UGRID header write (#38). |
+| `lfric_atm_isambard3_exoplanets`, `gungho_model_isambard3_exoplanet` | **pass**, plots included (2026-10-01): every build, mesh and model run, and the three `plot_*` tasks. The 3D runs needed the XIOS fix (#38, in v2026.09.28 since 2026-09-30) and the plots the environment's iris/matplotlib stack (#49). exo-hs-C24 runs at its upstream length: its plot reads the 300-day `lfric_averages.nc`, which a shorter run never writes. |
 
-So Practical 3's `scripts` group works. The Met Office `developer` group is not defined
-for this site yet. It waits on the XIOS fix for the 3D runs (#38).
+So Practical 3's `scripts` group and the exoplanet groups work. The Met Office
+`developer` group is not defined for this site yet.
 
 ## Upstream
 
