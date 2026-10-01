@@ -191,7 +191,7 @@ diff -ruN a/flow.cylc b/flow.cylc
  
      [[EX1A]]
      {% if COMPILER == 'cce' %}
-@@ -108,10 +159,45 @@
+@@ -108,10 +159,50 @@
              RUN_METHOD = mpiexec
              TOTAL_RANKS_REQ = {{TOTAL_RANKS_REQ}}
  
@@ -206,7 +206,12 @@ diff -ruN a/flow.cylc b/flow.cylc
 +                        """
 +        platform = isambard3
 +        [[[environment]]]
-+            BUILD_ROOT = ${TMPDIR}
++            {# [isambard3] CHANGED: ${TMPDIR} -> the task's own work dir. TMPDIR on a Grace
++               node is /local/user/<uid>, which OUTLIVES the job: a later run landing on
++               the same node finds the previous build's tree, and the dependency analyser
++               aborts on a module the old source had at another path ("UNIQUE constraint
++               failed: fortran_program_unit.unit"). The task work dir is fresh per run. #}
++            BUILD_ROOT = $CYLC_TASK_WORK_DIR
 +            CORES_PER_NODE = {{LPPN}}
 +            HYPERTHREADS = 1
 +            NUMA_REGIONS_PER_NODE = 2
@@ -237,7 +242,7 @@ diff -ruN a/flow.cylc b/flow.cylc
              COMPILER = {{COMPILER}}
              PROFILE = 'production'
              TARGET = build
-@@ -126,13 +212,33 @@
+@@ -126,13 +217,33 @@
              R_PHYS_PRECISION = 64
              PRE_PROCESS_MACROS = ""
          [[[directives]]]
@@ -271,7 +276,7 @@ diff -ruN a/flow.cylc b/flow.cylc
          script = "rose task-run --app-key=extract"
          [[[environment]]]
              MIRROR_LOC = {{ MIRROR_LOC }}
-@@ -141,11 +247,13 @@
+@@ -141,11 +252,13 @@
  {% elif USE_TOKENS %}
              ROSE_APP_COMMAND_KEY = tokens
  {% endif %}
@@ -285,7 +290,7 @@ diff -ruN a/flow.cylc b/flow.cylc
  
  
      [[build_mesh]]
-@@ -167,21 +275,44 @@
+@@ -167,21 +280,44 @@
  
  
      [[generate_mesh]]
@@ -330,7 +335,7 @@ diff -ruN a/flow.cylc b/flow.cylc
          script = """
              echo "====Forecast times===="
              echo "Forecast start date="${STARTDATE}
-@@ -214,6 +345,33 @@
+@@ -214,6 +350,33 @@
  
              ROSE_APP_OPT_CONF_KEYS = {{CASE_SETUP}} {{PHYSICS_CONF}} {{LFRIC_LEVS}}
              TASK_OUTPUT_DIR = $OUTPUT_ROOT/lfric_atm
