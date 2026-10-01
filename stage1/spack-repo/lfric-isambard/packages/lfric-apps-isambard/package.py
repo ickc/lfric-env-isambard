@@ -61,6 +61,25 @@ class LfricAppsIsambard(Package):
     depends_on("py-pytest")
     depends_on("py-ansimarkup")
     depends_on("py-colorama")
+    # The analysis stack the rest of rose-stem's Python tasks import (#49): plot
+    # (matplotlib, numpy, scipy, pandas, six, iris), validate_output_file_metadata
+    # (iris, netCDF4) and generate_weights (mule, um_utils, f90nml, netCDF4). Kept
+    # to what those import: iris needs only dask's array part (its dataframe and
+    # distributed parts pull in Arrow), and pandas' +performance pulls in numba
+    # and through it LLVM.
+    depends_on("py-numpy")
+    depends_on("py-scipy")
+    depends_on("py-matplotlib")
+    depends_on("py-pandas~performance")
+    depends_on("py-six")
+    depends_on("py-netcdf4")
+    depends_on("py-f90nml")
+    depends_on("py-cartopy+plotting")
+    depends_on("py-dask+array~dataframe~distributed")
+    depends_on("py-scitools-iris@3.16.1")
+    depends_on("py-mule@2026.09.1")
+    depends_on("py-um-packing@2026.09.1")
+    depends_on("py-um-utils@2026.09.1")
     # The release's rose-meta, so `rose app-upgrade` of a suite (the science-suite
     # stagers) needs no source checkout. The module exports it as LFRIC_ROSE_META_PATH.
     depends_on("lfric-rose-meta@2026.07.1")

@@ -76,9 +76,7 @@ resolve_prefix() {
   fi
 }
 shumlib_prefix="$(resolve_prefix shumlib)"
-python_prefix="$(resolve_prefix python)"
 psyclone_prefix="$(resolve_prefix py-psyclone)"
-rose_picker_prefix="$(resolve_prefix py-rose-picker)"
 # pFUnit installs under a versioned subdirectory (PFUNIT-<major>.<minor>/), and that
 # subdirectory is what lfric_core's pfunit.mk wants as $PFUNIT
 # ($(PFUNIT)/bin/funitproc, $(PFUNIT)/include/driver.F90).
@@ -122,10 +120,6 @@ psyclone_cfg=""
 [ -n "$psyclone_prefix" ] && [ -f "$psyclone_prefix/share/psyclone/psyclone.cfg" ] \
   && psyclone_cfg="$psyclone_prefix/share/psyclone/psyclone.cfg"
 
-# The view's python site-packages (normally one; globbed against a version bump).
-pythonpath=()
-for sp in "$view"/lib/python*/site-packages; do [ -d "$sp" ] && pythonpath+=("$sp"); done
-
 # --- The compiler the module will hand out ---------------------------------
 # cray: the Cray wrappers (ftn/CC), which need their PE modules loaded — so the
 #       generated file load()s them (see the note at the emit step below).
@@ -153,7 +147,6 @@ if [ "$LFRIC_STACK" = cray ]; then
   IFS=$_OLDIFS
 fi
 
-pythonpath_lua='{}'; [ ${#pythonpath[@]} -gt 0 ] && pythonpath_lua="$(lua_list "${pythonpath[@]}")"
 cray_libs_lua='{}';  [ ${#cray_libs[@]}  -gt 0 ] && cray_libs_lua="$(lua_list "${cray_libs[@]}")"
 
 # --- Emit ------------------------------------------------------------------
@@ -193,10 +186,7 @@ ${cray_loads}local data = {
   view            = $(lua_q  "$view"),
   shumlib         = $(lua_qn "$shumlib_prefix"),
   shumlib_lib     = $(lua_qn "$shumlib_lib"),
-  python          = $(lua_qn "$python_prefix"),
-  psyclone        = $(lua_qn "$psyclone_prefix"),
   psyclone_cfg    = $(lua_qn "$psyclone_cfg"),
-  rose_picker     = $(lua_qn "$rose_picker_prefix"),
   pfunit          = $(lua_qn "$pfunit_root"),
   unit_test_incs  = $(lua_list "${unit_test_incs[@]}"),
   unit_test_libs  = $(lua_list "${unit_test_libs[@]}"),
@@ -205,7 +195,6 @@ ${cray_loads}local data = {
   rose_meta       = $(lua_list "${rose_meta_dirs[@]}"),
   site_bin        = $(lua_q  "$site_bin_dir"),
   modulefiles_dir = $(lua_q  "$MODULEFILES_DIR"),
-  pythonpath      = $pythonpath_lua,
   cray_libs       = $cray_libs_lua,
   target_platform = $(lua_q  "${LFRIC_TARGET_PLATFORM:-meto-spice}"),
   fpp             = $(lua_q  "${FPP:-cpp -traditional-cpp}"),

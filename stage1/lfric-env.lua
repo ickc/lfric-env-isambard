@@ -11,7 +11,7 @@
 -- THE CONTRACT. Loading this module must be sufficient to compile and run
 -- against the environment, and must do nothing else. Concretely, it sets:
 --   * the toolchain            FC, CXX, LDMPI, FPP, LFRIC_TARGET_PLATFORM
---   * where to find the env    PATH, PYTHONPATH (+ the cylc/rose variants),
+--   * where to find the env    PATH (no PYTHONPATH: see below),
 --                              LD_LIBRARY_PATH, LIBRARY_PATH, FFLAGS, LDFLAGS,
 --                              SHUMLIB_ROOT, PSYCLONE_CONFIG, PFUNIT, SPACK_ENV
 --   * the Rose site config     ROSE_SITE_CONF_PATH, unless already set
@@ -102,24 +102,13 @@ do
   prepend_path("LD_LIBRARY_PATH", view .. "/lib")
 end
 
--- Spack's package scripts (psyclone, ...) shebang the base python, whose
--- sys.path does not include the environment's site-packages.
-for _, p in ipairs(d.pythonpath) do
-  prepend_path("PYTHONPATH", p)
-end
-
--- cylc and rose both STRIP every PYTHONPATH entry from sys.path at startup
--- (cylc-flow #5124, pythonpath_manip()) so PYTHONPATH cannot contaminate them.
--- That drops the site-packages just added, and breaks both: cylc cannot import
--- its own dependencies (ModuleNotFoundError: ansimarkup), and rose loses its
--- rose.commands entry points, so `rose task-run` stops existing — fatal to any
--- suite. Each re-adds its OWN variable before the strip, and the strip removes
--- only one occurrence, so mirroring into both leaves them importable. Other
--- tools ignore these variables.
-for _, p in ipairs(d.pythonpath) do
-  prepend_path("CYLC_PYTHONPATH", p)
-  prepend_path("ROSE_PYTHONPATH", p)
-end
+-- Python: view/bin (on PATH above) is the whole story. The view's python3 is
+-- Spack's python-venv, which finds the view's site-packages by itself, and Spack
+-- rewrites every script in the view (cylc, rose, psyclone, rose_picker, ...) to
+-- run on it. So this module sets NO PYTHONPATH (nor CYLC_/ROSE_PYTHONPATH): an
+-- earlier version put the base python and some package prefixes ahead of the
+-- view and patched the result up with PYTHONPATH, which then leaked the view's
+-- packages into any other Python in the shell, e.g. a conda env's (#49).
 
 if d.shumlib then
   setenv("SHUMLIB_ROOT", d.shumlib)
@@ -139,20 +128,10 @@ for i = #d.cray_libs, 1, -1 do
   prepend_path("LD_LIBRARY_PATH", d.cray_libs[i])
 end
 
--- These are in the view too, but their own prefixes go ahead of view/bin so the
--- right launcher wins.
-if d.python then
-  prepend_path("PATH", d.python .. "/bin")
-end
-if d.psyclone then
-  prepend_path("PATH", d.psyclone .. "/bin")
-  if d.psyclone_cfg then
-    -- The psyclone launcher's shebang python cannot find its own config.
-    setenv("PSYCLONE_CONFIG", d.psyclone_cfg)
-  end
-end
-if d.rose_picker then
-  prepend_path("PATH", d.rose_picker .. "/bin")
+if d.psyclone_cfg then
+  -- psyclone finds the view's copy by itself; this names it for anything else
+  -- that reads PSYCLONE_CONFIG.
+  setenv("PSYCLONE_CONFIG", d.psyclone_cfg)
 end
 -- pFUnit, for lfric_core's unit tests (rose-stem's unit_tests tasks): pfunit.mk
 -- reads $(PFUNIT)/bin/funitproc and $(PFUNIT)/include/driver.F90 (#37).

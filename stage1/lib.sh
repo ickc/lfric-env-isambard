@@ -262,6 +262,7 @@ lfric_gen_modulefile() {
 lfric_smoke_test() {
   command -v module >/dev/null 2>&1 || . /opt/cray/pe/lmod/lmod/init/bash
   module use "$MODULEFILES_DIR"
+  local pythonpath_before="${PYTHONPATH:-}"
   module load "$MODULE_NAME" || die "could not load the modulefile we just wrote ($MODULE_NAME)"
   local tool ver
   for tool in rose cylc psyclone; do
@@ -289,6 +290,16 @@ lfric_smoke_test() {
     *"/jules/rose-meta:"*) info "LFRIC_ROSE_META_PATH has $(tr ':' '\n' <<< "$LFRIC_ROSE_META_PATH" | wc -l) rose-meta dirs" ;;
     *) die "LFRIC_ROSE_META_PATH has no jules rose-meta after loading $MODULE_NAME: ${LFRIC_ROSE_META_PATH:-UNSET}" ;;
   esac
+  # The Python rose-stem's tasks import (plot, generate_weights, ...), from the
+  # view's python3 alone: the module sets no PYTHONPATH, so a conda env activated
+  # alongside it stays unaffected.
+  [ "${PYTHONPATH:-}" = "$pythonpath_before" ] \
+    || die "$MODULE_NAME changed PYTHONPATH to ${PYTHONPATH:-UNSET}; it must leave it alone"
+  ver="$(python3 -c 'import matplotlib; matplotlib.use("Agg")
+import iris, iris.plot, cartopy.crs, cf_units, scipy, pandas, netCDF4, f90nml, mule, um_packing, um_utils.cutout
+print("iris", iris.__version__, "cf_units", cf_units.__version__, "mule", mule.__version__)' 2>&1)" \
+    || die "python3 cannot import the rose-stem analysis stack after loading $MODULE_NAME: $ver"
+  info "python3: $ver"
   info "FC=${FC:-UNSET}  CXX=${CXX:-UNSET}  LDMPI=${LDMPI:-UNSET}"
   # The toolchain is the contract, so treat a missing compiler as a build failure
   # rather than something the first consumer discovers.

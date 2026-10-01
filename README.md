@@ -149,6 +149,18 @@ environment builds (lfric_apps, lfric_core, JULES). The science-suite stagers us
 metadata of a newer lfric_apps clone (rose-stem). For `rose edit` or `rose macro` on a
 suite at this release, opt in: `export ROSE_META_PATH=$LFRIC_ROSE_META_PATH`.
 
+### Python, and using it with conda
+
+The module's `python3` has what rose-stem's Python tasks import: iris, cartopy,
+matplotlib, scipy, pandas, netCDF4, f90nml and mule/um_utils, alongside cylc, rose and
+psyclone. The module sets no `PYTHONPATH`: every tool in it runs on the
+environment's own Python whatever else is on `PATH`.
+
+So it can be loaded alongside a conda env. What is left to choose is which `python3`
+comes first on `PATH`; whichever was loaded last wins. For analysis in a conda env,
+load the module first and activate conda second. Note that LFRic's build scripts run
+`python3` and import jinja2, so compile with the module's Python in front.
+
 ### Cylc: nothing to configure
 
 The module ships a Cylc site config (`CYLC_SITE_CONF_PATH`): an `isambard3` Slurm
