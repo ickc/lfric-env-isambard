@@ -447,10 +447,10 @@ index 00000000..85efa7df
 +{% do LOG.debug("Finised in site/isambard3/gungho_model/tasks_gungho_model.cylc") %}
 diff --git a/rose-stem/site/isambard3/gungho_model/tasks_gungho_model_isambard3.cylc b/rose-stem/site/isambard3/gungho_model/tasks_gungho_model_isambard3.cylc
 new file mode 100644
-index 00000000..28930442
+index 00000000..3d97a590
 --- /dev/null
 +++ b/rose-stem/site/isambard3/gungho_model/tasks_gungho_model_isambard3.cylc
-@@ -0,0 +1,17 @@
+@@ -0,0 +1,13 @@
 +{# ########################################################################### #}
 +{# (c) Crown copyright 2024 Met Office. All rights reserved. #}
 +{# The file LICENCE, distributed with this code, contains details of the terms #}
@@ -458,14 +458,10 @@ index 00000000..28930442
 +{# ########################################################################### #}
 +{% do LOG.debug("Entered site/isambard3/gungho_model/tasks_gungho_model_isambard3.cylc") %}
 +
-+{% if task_ns.conf_name == "exo-hs-C24_MG" %}
-+
-+    {% do task_dict.update({
-+        "tsteps": 1080,
-+        "crun": 2,
-+    }) %}
-+
-+{% endif %}
++{# No per-task overrides: the exoplanet runs keep the common lengths. In
++   particular exo-hs-C24_MG must keep its 21600 steps over 3 cruns: io_clim writes
++   lfric_averages.nc every 300 days, one per 7200-step crun, and its plot task reads
++   that file. A shortened run writes none, and the plot fails. #}
 +
 +{% do LOG.debug("Finised in site/isambard3/gungho_model/tasks_gungho_model_isambard3.cylc") %}
 diff --git a/rose-stem/site/isambard3/lfric_atm/tasks_lfric_atm.cylc b/rose-stem/site/isambard3/lfric_atm/tasks_lfric_atm.cylc

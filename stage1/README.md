@@ -214,7 +214,10 @@ stage1/
 │                       has_code=False bundle spec
 │                       that names every dependency of the environment. Plus
 │                       py-* overrides that only add versions upstream lacks
-│                       (the cylc 8.6 set, rose-picker); each says when to drop it.
+│                       (the cylc 8.6 set, rose-picker, cf-units 3); each says when
+│                       to drop it. And Python packages upstream lacks entirely:
+│                       py-scitools-iris, and py-mule/py-um-packing/py-um-utils
+│                       (MetOffice/mule, packaged nowhere else).
 ├── patches/            applied to the vendored trees before every phase, so
 │                       there is no "forgot to patch" state. One patch: gdbm
 │                       1.26 ships mismatched autotools timestamps.
