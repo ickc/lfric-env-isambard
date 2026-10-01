@@ -297,9 +297,15 @@ lfric_smoke_test() {
     || die "$MODULE_NAME changed PYTHONPATH to ${PYTHONPATH:-UNSET}; it must leave it alone"
   ver="$(python3 -c 'import matplotlib; matplotlib.use("Agg")
 import iris, iris.plot, cartopy.crs, cf_units, scipy, pandas, netCDF4, f90nml, mule, um_packing, um_utils.cutout
-print("iris", iris.__version__, "cf_units", cf_units.__version__, "mule", mule.__version__)' 2>&1)" \
+print("iris", iris.__version__, "cf_units", cf_units.__version__, "mule", mule.__version__)
+import netCDF4, sys; print(netCDF4.__file__)' 2>&1)" \
     || die "python3 cannot import the rose-stem analysis stack after loading $MODULE_NAME: $ver"
-  info "python3: $ver"
+  # ...and from THIS environment's view, not one a stale PYTHONPATH points at.
+  case "$ver" in
+    *"$SPACK_ENV_DIR/.spack-env/view/"*) ;;
+    *) die "python3 imports the stack from outside $SPACK_ENV_DIR's view: $ver" ;;
+  esac
+  info "python3: ${ver%%$'\n'*}"
   info "FC=${FC:-UNSET}  CXX=${CXX:-UNSET}  LDMPI=${LDMPI:-UNSET}"
   # The toolchain is the contract, so treat a missing compiler as a build failure
   # rather than something the first consumer discovers.
