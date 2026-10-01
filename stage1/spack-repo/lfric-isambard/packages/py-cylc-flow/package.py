@@ -13,3 +13,12 @@ from spack.package import *
 
 class PyCylcFlow(BuiltinPyCylcFlow):
     version("8.6.6", sha256="1ed390e5ea58d50c487fe79cfb84edadf9b1f950daf19a00bafd105e68356bcc")
+
+    # The job script prepends the run dir to PYTHONPATH with
+    # `...:${PYTHONPATH:-}`, so with PYTHONPATH unset (the module deliberately
+    # leaves it unset, to compose with conda) the trailing empty entry puts each
+    # task's work dir on sys.path. rose-stem's style_checker then imports its own
+    # `stylist.py` config instead of the stylist package (#55). Append the
+    # existing value only when non-empty. Upstream still has the line; drop this
+    # once a release fixes it -- the patch failing to apply is the signal.
+    patch("job-sh-pythonpath.patch", when="@8.6:")
