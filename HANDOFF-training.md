@@ -92,6 +92,10 @@ Known differences from upstream, all marked `[isambard3]` in the suite: LFRic is
    ([#49](https://github.com/ickc/lfric-env-isambard/issues/49)). The training's own
    Python env for Iris is probably the answer.
 
+3. **u-dt000 stale build tree: FIXED** (PR #52). Its builds now use the task's own work
+   directory, as u-dz791's do, so a later run on the same node can no longer trip over an
+   old tree in `$TMPDIR`.
+
 ## Not done / blocked
 
 | What | Status |
