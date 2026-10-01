@@ -21,7 +21,7 @@ module load lfric-env/v2026.09.28/cray
 | **rose-stem site sets `USE_TOKENS`** | #40 / PR #43 | Drop the manual "append `USE_TOKENS` to `variables.cylc`" step. `git apply <repo>/patches/rose-stem/lfric_apps-isambard3-site.patch` is enough. Verified with SSH disabled for git: 11/11. |
 | **Cylc site config ships in the module** | #31 / PR #44, #45 | No `~/.cylc` needed, and no `setup-cylc.sh`. The module sets `CYLC_SITE_CONF_PATH`, which gives the `isambard3` Slurm platform and run dirs at `$PROJECTDIR/$USER/cylc-run/<workflow>` (each user's own). A user's `~/.cylc/flow/global.cylc` still overrides it. Verified as a fresh user (empty `HOME`, no SSH): Practical 3 `scripts` group 12/12. Check with `cylc config -i '[platforms][isambard3]'`. |
 | **u-dz791 (idealised practicals) runs** | #26 / PR #42 | See "How a trainee runs u-dz791" below. Validated end-to-end, 2 cycles with a restart, about 1 min 40 s each on one node. |
-| **rose-stem model groups on Slurm** | PR #39, #47, #48 | Builds, meshes, **unit tests (265 OK)**, integration tests, the SCM run and all four **3D exoplanet runs** pass. Only the `plot_*` tasks fail (#49). |
+| **rose-stem model groups on Slurm** | PR #39, #47, #48 | Builds, meshes, **unit tests (265 OK)**, integration tests, the SCM run and all four **3D exoplanet runs** pass, and so do the `plot_*` tasks since PR #54. |
 
 ### How a trainee runs u-dz791
 
@@ -86,15 +86,17 @@ Known differences from upstream, all marked `[isambard3]` in the suite: LFRic is
    - u-dz791 writes its full upstream initial diagnostics again (PR #50);
    - the build invariant is green: `BUILD_OK` and `LFRIC_ATM_OK` on cray and spack.
 
-   Still open for a full `developer`-style group: rose-stem's **`plot_*` tasks** now run
-   and fail on `import matplotlib`. They need an iris/matplotlib env, as the Met Office
-   uses scitools
-   ([#49](https://github.com/ickc/lfric-env-isambard/issues/49)). The training's own
-   Python env for Iris is probably the answer.
-
 3. **u-dt000 stale build tree: FIXED** (PR #52). Its builds now use the task's own work
    directory, as u-dz791's do, so a later run on the same node can no longer trip over an
    old tree in `$TMPDIR`.
+
+4. **rose-stem plots: FIXED** (PR #54, 2026-10-01, rebuilt in place). The module's
+   `python3` now has iris 3.16, cartopy, matplotlib, scipy, pandas, netCDF4, f90nml and
+   mule, so rose-stem's `plot_*` tasks pass on `module load` alone. No conda pre-script
+   needed. The module also no longer sets `PYTHONPATH`, so the training conda env can be
+   used alongside it: load the module first, then `micromamba activate`. A shell that had
+   the module loaded before the rebuild keeps a stale `PYTHONPATH` even after
+   `module purge`; log in again.
 
 ## Not done / blocked
 
