@@ -110,6 +110,26 @@ apply_patch() { ( cd "$SUITE_DIR" && git apply -p0 "$@" "$PATCH_FILE" ); }
 if apply_patch --reverse --check >/dev/null 2>&1; then
   exit 0   # already applied
 fi
+# The reverse check fails too once someone edits a line the patch carries as context,
+# which the training asks learners to do (LFRIC_LEVS in rose-suite.conf, #53). So also
+# look for the port's own markers: every file the patch touches gains an `[isambard3]`
+# line. All marked = already staged, plus local edits, which are kept. None = pristine,
+# so apply below. Some = partly reverted, which is an error.
+_files=0 _marked=0
+while IFS=$'\t' read -r _ _ _f; do
+  _files=$((_files + 1))
+  grep -q '\[isambard3\]' "$SUITE_DIR/$_f" 2>/dev/null && _marked=$((_marked + 1))
+done < <(apply_patch --numstat)
+if [ "$_files" -gt 0 ] && [ "$_marked" -eq "$_files" ]; then
+  info "$SUITE_ID is already staged; keeping its local edits."
+  exit 0
+fi
+if [ "$_marked" -gt 0 ]; then
+  fail "$SUITE_DIR is partly staged: $_marked of the $_files files the site patch"
+  fail "  touches carry its [isambard3] markers. Start clean and re-run:"
+  fail "    svn revert -R $SUITE_DIR"
+  exit 1
+fi
 if ! apply_patch --check >/dev/null 2>&1; then
   fail "site patch does not apply to $SUITE_DIR."
   fail "  Most likely the checkout is not at r$SUITE_REV, or it has local edits."
