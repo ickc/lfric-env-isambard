@@ -94,7 +94,7 @@ sbatch build.sbatch      # the build itself, ~1 h -> BUILD_OK
 ```
 
 Everything installs **outside the repo**, under a versioned prefix
-`$LFRIC_BASE/<version>` (default base `$PROJECTDIR/$USER/opt/Linux-aarch64`,
+`$LFRIC_BASE/<version>` (default base `$PROJECTDIR/lfric-env/Linux-aarch64`,
 version read from `stage1/VERSION`). The version keeps independent builds in
 distinct trees, so a rebuild never silently overwrites an environment others are
 loading.
@@ -114,13 +114,20 @@ supplies the Python that Spack must run under (Spack 1.0 needs CPython
 Once Stage 1 has finished, load the environment in any shell — no pixi, no Spack:
 
 ```bash
-# Point at the base you built into (the default is shown):
-export LFRIC_BASE="$PROJECTDIR/$USER/opt/$(uname -sm | tr ' ' -)"
-
-module use "$LFRIC_BASE/modulefiles"
+# The released environment, v2026.10.08 on (a build of your own: its LFRIC_BASE)
+module use "$PROJECTDIR/lfric-env/Linux-aarch64/modulefiles"
 module avail lfric-env              # list every built version × variant
-module load lfric-env/v2026.09.28/cray     # or: .../v2026.09.28/spack
+module load lfric-env/v2026.10.08/cray     # or: .../v2026.10.08/spack
 rose --version; cylc --version; psyclone --version
+```
+
+Versions up to **v2026.09.28** stay where they were built, under the builder's own
+project directory. They are frozen and still load, but are not moved:
+
+```bash
+# Legacy environments, v2026.09.28 and older
+module use "$PROJECTDIR/khcheung.u35v/opt/Linux-aarch64/modulefiles"
+module load lfric-env/v2026.09.28/cray
 ```
 
 The modulefiles live in ONE shared tree (`$LFRIC_BASE/modulefiles`) keyed by
@@ -285,8 +292,8 @@ also where the defaults below are set. The examples read only the last few.
 | Variable | Default | What it controls |
 |----------|---------|------------------|
 | `LFRIC_STACK` | `cray` | Dependency variant: `cray` or `spack`. |
-| `LFRIC_ENV_VERSION` | contents of `stage1/VERSION` (e.g. `v2026.09.28`) | **Environment version** (CalVer). Selects the versioned install prefix `$LFRIC_BASE/<version>` and the module name `lfric-env/<version>/<variant>`. Bump it by editing `stage1/VERSION`. Distinct from any LFRic apps/core version. The root `VERSION` must be kept in step — it is what the examples use to name the module they load. |
-| `LFRIC_BASE` | `$PROJECTDIR/$USER/opt/<arch>` | The per-arch container, shared across versions. The shared modulefiles tree (`$LFRIC_BASE/modulefiles`) and the source/misc download caches sit here and are version-independent. Outside the repo. |
+| `LFRIC_ENV_VERSION` | contents of `stage1/VERSION` (e.g. `v2026.10.08`) | **Environment version** (CalVer). Selects the versioned install prefix `$LFRIC_BASE/<version>` and the module name `lfric-env/<version>/<variant>`. Bump it by editing `stage1/VERSION`. Distinct from any LFRic apps/core version. The root `VERSION` must be kept in step — it is what the examples use to name the module they load. |
+| `LFRIC_BASE` | `$PROJECTDIR/lfric-env/<arch>` | The per-arch container, shared across versions. Names no person, so the released path survives a change of builder; export it for a private build (e.g. `$PROJECTDIR/$USER/opt/<arch>`, the default up to v2026.09.28). The shared modulefiles tree (`$LFRIC_BASE/modulefiles`) and the source/misc download caches sit here and are version-independent. Outside the repo. |
 | `LFRIC_PREFIX` | `$LFRIC_BASE/<version>` | The versioned install: the Spack install tree, and the per-variant environment + view. Derived, not set. |
 | `LFRIC_WORKING_DIR` | `$LOCALDIR/lfric-build-<variant>` | **Transient** Spack build/compile scratch, on node-local NVMe so the build stays off the shared Lustre. Safe to delete anytime. |
 | `PROJECTDIR`, `LOCALDIR` | *(required)* | Site paths. Stage 1 checks them rather than guessing — a wrong guess installs gigabytes in the wrong filesystem. |

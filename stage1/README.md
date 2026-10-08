@@ -4,8 +4,8 @@ This directory builds one thing: an **Lmod modulefile** that gives you a complet
 LFRic Apps toolchain on Isambard 3.
 
 ```
-module use $PROJECTDIR/$USER/opt/Linux-aarch64/modulefiles
-module load lfric-env/v2026.09.28/cray
+module use $PROJECTDIR/lfric-env/Linux-aarch64/modulefiles
+module load lfric-env/v2026.10.08/cray
 ```
 
 Those two lines are the entire product. Everything else in this repo — compiling
@@ -75,11 +75,11 @@ different reasons:
 
 ```mermaid
 flowchart LR
-    subgraph P["$PROJECTDIR/$USER/opt/Linux-aarch64 = LFRIC_BASE"]
+    subgraph P["$PROJECTDIR/lfric-env/Linux-aarch64 = LFRIC_BASE"]
         direction TB
         M["modulefiles/<br/><b>the product</b><br/><i>one module use lists every build</i>"]
         C["source-cache/ misc-cache/<br/><i>shared across versions</i>"]
-        V["v2026.09.28/ = LFRIC_PREFIX<br/>├── opt/  <i>install tree, both variants</i><br/>└── spack-env/{cray,spack}/  <i>env + view</i>"]
+        V["v2026.10.08/ = LFRIC_PREFIX<br/>├── opt/  <i>install tree, both variants</i><br/>└── spack-env/{cray,spack}/  <i>env + view</i>"]
     end
     subgraph L["$LOCALDIR = node-local NVMe"]
         W["lfric-build-&lt;variant&gt;<br/><i>Spack build stage only</i>"]
@@ -145,7 +145,7 @@ sbatch build.sbatch                                    # -> BUILD_OK, ~1 h
 tail -f logs/build-<jobid>.out
 
 # --- the result: this is all the examples ever need -----------------------
-module use "$PROJECTDIR/$USER/opt/Linux-aarch64/modulefiles"
+module use "$PROJECTDIR/lfric-env/Linux-aarch64/modulefiles"
 module load lfric-env/"$(cat VERSION)"/cray
 
 rose --version                # all three come from the module, nothing else

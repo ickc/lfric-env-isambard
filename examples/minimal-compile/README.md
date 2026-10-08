@@ -59,7 +59,7 @@ process limit), set the variant + prefix to match what you built, then run:
 
 ```bash
 export LFRIC_STACK=cray                              # or spack
-export LFRIC_PREFIX="$PROJECTDIR/$USER/opt/Linux-aarch64"   # the prefix you built into
+export LFRIC_PREFIX="$PROJECTDIR/lfric-env/Linux-aarch64"   # the prefix you built into
 module use "$LFRIC_PREFIX/modulefiles"
 module load "lfric-env/$(cat VERSION)/$LFRIC_STACK"
 bash examples/minimal-compile/build.sh
@@ -75,7 +75,7 @@ A successful run ends with `LFRIC_ATM_OK`. The build log is written to
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `LFRIC_STACK` | `cray` | Which built variant to compile against (`cray`/`spack`). Must match a built environment. |
-| `LFRIC_PREFIX` | `$PROJECTDIR/$USER/opt/<arch>` | The prefix Stage 1 installed into (where the modulefile + view live). |
+| `LFRIC_PREFIX` | `$PROJECTDIR/lfric-env/<arch>` | The prefix Stage 1 installed into (where the modulefile + view live). |
 | `MAKE_JOBS` | `8` (sbatch: `$SLURM_CPUS_PER_TASK`) | Parallel make jobs. |
 | `PSYCLONE_TRANSFORMATION` | `minimum` | PSyclone optimisation set under `applications/lfric_atm/optimisation/`. |
 | `PROJECT` | `lfric_atm` | The application to build/run. |

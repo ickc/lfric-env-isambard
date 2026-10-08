@@ -2,7 +2,7 @@
 /.pixi/
 
 # All build output lands OUTSIDE the repo, under LFRIC_BASE/LFRIC_PREFIX
-# (default $PROJECTDIR/$USER/opt/<arch>; see stage1/env.sh), so nothing
+# (default $PROJECTDIR/lfric-env/<arch>; see stage1/env.sh), so nothing
 # build-related is tracked. The spack-env templates live in stage1/spack-env/
 # and are instantiated under LFRIC_PREFIX, never in place.
 
