@@ -11,19 +11,17 @@
 # this build DERIVES from it (all overridable by exporting the var beforehand).
 
 # --- 1. What the site must provide -----------------------------------------
-# Isambard 3 sets all three in the default login environment. They are checked
+# Isambard 3 sets both in the default login environment. They are checked
 # rather than defaulted: a wrong guess here silently installs gigabytes in the
 # wrong filesystem, and the right value is not inferable.
 #
-#   PROJECTDIR  shared project space (/projects/u35v) — the install lives here,
-#               group-readable, so colleagues can `module load` it.
+#   PROJECTDIR  shared project space (/projects/<project>) — the install lives
+#               here, group-readable, so colleagues can `module load` it.
 #   LOCALDIR    node-local NVMe (/local/user/<uid>) — the transient Spack build
 #               stage. Metadata-heavy; on contended Lustre the install crawls.
-#   USER        your username; namespaces the install under PROJECTDIR.
 _lfric_missing=""
 [ -n "${PROJECTDIR:-}" ] || _lfric_missing="$_lfric_missing PROJECTDIR"
 [ -n "${LOCALDIR:-}" ]   || _lfric_missing="$_lfric_missing LOCALDIR"
-[ -n "${USER:-}" ]       || _lfric_missing="$_lfric_missing USER"
 if [ -n "$_lfric_missing" ]; then
   echo "ERROR: stage1/env.sh: unset site variable(s):$_lfric_missing" >&2
   echo "       On Isambard 3 these come from the default login environment." >&2
@@ -82,14 +80,18 @@ export LFRIC_ENV_VERSION
 # Where everything lands.
 #   LFRIC_BASE         per-architecture container, SHARED across env versions.
 #                      Holds the modulefiles and the download caches, so a new
-#                      version reuses already-downloaded sources.
+#                      version reuses already-downloaded sources. The default is
+#                      the project's release location, which names no person, so
+#                      the path users `module use` survives a change of builder
+#                      (#46). For a private build, export LFRIC_BASE first, e.g.
+#                      $PROJECTDIR/$USER/opt/<arch> (the default up to v2026.09.28).
 #   LFRIC_PREFIX       this version's install: $LFRIC_BASE/$LFRIC_ENV_VERSION.
 #                      Both variants share its opt/ (Spack's store is content-
 #                      addressed — though in practice the two variants share
 #                      only about a fifth of their specs; see README §2).
 #   LFRIC_WORKING_DIR  transient Spack build stage, node-local. Disposable —
 #                      point LOCALDIR elsewhere if a node has no local disk.
-export LFRIC_BASE="${LFRIC_BASE:-$PROJECTDIR/$USER/opt/$(uname -sm | tr ' ' -)}"
+export LFRIC_BASE="${LFRIC_BASE:-$PROJECTDIR/lfric-env/$(uname -sm | tr ' ' -)}"
 export LFRIC_PREFIX="$LFRIC_BASE/$LFRIC_ENV_VERSION"
 export LFRIC_WORKING_DIR="$LOCALDIR/lfric-build-$LFRIC_STACK"
 

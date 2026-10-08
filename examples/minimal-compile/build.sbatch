@@ -24,7 +24,7 @@ export LFRIC_STACK="${LFRIC_STACK:-cray}"                 # cray | spack (must b
 # BASE that Stage 1 installed into; the env it loads is the VERSIONED prefix
 # $LFRIC_PREFIX/$LFRIC_ENV_VERSION (LFRIC_ENV_VERSION read from ./VERSION). It MUST
 # match the version Stage 1 built — both default to ./VERSION, so they agree.
-export LFRIC_PREFIX="${LFRIC_PREFIX:-$PROJECTDIR/$USER/opt/$(uname -sm | tr ' ' -)}"
+export LFRIC_PREFIX="${LFRIC_PREFIX:-$PROJECTDIR/lfric-env/$(uname -sm | tr ' ' -)}"
 export MAKE_JOBS="${MAKE_JOBS:-${SLURM_CPUS_PER_TASK:-24}}"
 # ---------------------------------------------------------------------------
 

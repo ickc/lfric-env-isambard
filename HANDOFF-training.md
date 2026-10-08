@@ -1,16 +1,26 @@
 # Handoff: lfric-env-isambard → the training-site agent
 
-From the agent maintaining `lfric-env-isambard`. Last updated 2026-09-30 23:35 UTC.
-Environment: **`lfric-env/v2026.09.28`**. It is not yet announced, and it is being
-updated **in place**, not re-released under a new date.
+From the agent maintaining `lfric-env-isambard`. Last updated 2026-10-08.
+Environment: **`lfric-env/v2026.10.08`**, released from the shared, non-personal base
+(#46). Built versions are **frozen** for the course: no in-place rebuilds. A fix
+goes into a new version, and the training pins that.
 
 ```bash
-module use /projects/u35v/khcheung.u35v/opt/Linux-aarch64/modulefiles
-module load lfric-env/v2026.09.28/cray
+module use "$PROJECTDIR/lfric-env/Linux-aarch64/modulefiles"
+module load lfric-env/v2026.10.08/cray
 ```
 
-(That path spells a personal username. Moving it is tracked in
-[#46](https://github.com/ickc/lfric-env-isambard/issues/46); until then, keep using it.)
+`modulefiles/` and `conda/` sit side by side under `$PROJECTDIR/lfric-env/Linux-aarch64`,
+which is the directory to give learners as `LFRIC_TRAINING_PREFIX`. Its
+`conda/envs/lfric-training-v2026.09.28` is recreated from that env's
+`conda-explicit.txt`, so it has the same 480 packages.
+
+v2026.09.28 and older stay at their original, personal path, frozen:
+
+```bash
+module use "$PROJECTDIR/khcheung.u35v/opt/Linux-aarch64/modulefiles"
+module load lfric-env/v2026.09.28/cray
+```
 
 ---
 
@@ -43,8 +53,9 @@ For `rose edit` on the staged suite, `export ROSE_META_PATH=$LFRIC_ROSE_META_PAT
 `run-suite.sh` runs `rose app-upgrade` (vn3.1→vn3.2) and applies the site patch to
 `~/roses/u-dz791`. The extract task applies the science forward-port
 (`patches/optional/33-*`). Output: `lfric_crm_diag_*.nc` (UGRID), 10-minute files.
-Practical edits (`PHYSICS_CONF`, levels, namelists) work as the training describes;
-pass template variables with `-S`.
+Practical edits (`PHYSICS_CONF`, levels, namelists) work as the training describes.
+Editing `LFRIC_LEVS` in `rose-suite.conf` and relaunching works since #53 (PR #57): the
+stager keeps the edit, so the `-S "LFRIC_LEVS=..."` workaround is no longer needed.
 
 Known differences from upstream, all marked `[isambard3]` in the suite: LFRic is
 2026.07.1, with Alex Corbett's two branches forward-ported. The output is upstream's
@@ -105,10 +116,9 @@ Known differences from upstream, all marked `[isambard3]` in the suite: LFRic is
 | u-dz612 (global practicals, #24) | **Blocked on Met Office data.** It is the coupled GC6 model (UM + NEMO/SI3 + OASIS, via `fcm make`), needing Monsoon-only training data. Not a site port. For the global practicals, use **u-dn704** (GAL9 C12), which runs here. |
 | u-by395 (regional practicals, #25) | **Blocked on Met Office data** (UK 1.5 km ancils, N1280 analyses from MASS). No real-data LAM runs here. |
 | Upstream the rose-stem patch (#32) | Not started. It needs a PR to MetOffice/lfric_apps; the maintainer is to say go. Until then `patches/rose-stem/` tracks lfric_apps `main` and can drift. |
-| Shared, non-personal release prefix (#46) | Filed. Access is fine: trainees are u35v members, who can read it. Only the path (it names a person) is the issue. |
 
 ## If something breaks
 
 File an issue on `ickc/lfric-env-isambard` with the exact command, the environment
 (`echo $LFRIC_ENV_MODULE`), and the failing job's `job.err`. Do not edit
-`/projects/u35v/khcheung.u35v/opt/...` directly.
+`$PROJECTDIR/lfric-env/...` directly.

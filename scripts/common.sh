@@ -26,7 +26,7 @@ export LFRIC_ENV_VERSION="${LFRIC_ENV_VERSION:-unversioned}"
 export LFRIC_STACK="${LFRIC_STACK:-cray}"
 
 # Where Stage 1 installed it (stage1/env.sh derives the same paths).
-export BASE="${LFRIC_PREFIX:-${PROJECTDIR:-${SCRATCH:-$HOME}}/$USER/opt/$(uname -sm | tr ' ' -)}"
+export BASE="${LFRIC_PREFIX:-${PROJECTDIR:-${SCRATCH:-$HOME}}/lfric-env/$(uname -sm | tr ' ' -)}"
 export PREFIX="$BASE/$LFRIC_ENV_VERSION"
 export ENV_NAME="lfric-apps-isambard-$LFRIC_STACK"
 

@@ -4,8 +4,8 @@ A patch to **your own `lfric_apps` clone** (not to anything in this repo), so th
 the standard developer command works here:
 
 ```bash
-module use /projects/u35v/khcheung.u35v/opt/Linux-aarch64/modulefiles
-module load lfric-env/v2026.09.28/cray          # cylc 8.6, stylist, fortitude, pytest
+module use "$PROJECTDIR/lfric-env/Linux-aarch64/modulefiles"
+module load lfric-env/v2026.10.08/cray          # cylc 8.6, stylist, fortitude, pytest
 
 cd <your lfric_apps clone>
 git apply <lfric-env-isambard>/patches/rose-stem/lfric_apps-isambard3-site.patch

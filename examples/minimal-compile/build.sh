@@ -21,7 +21,7 @@
 #
 # Set the variant + prefix EXPLICITLY to match the environment you built:
 #   LFRIC_STACK=cray|spack   LFRIC_PREFIX=<the prefix you built into>
-# (defaults: cray, and the same $PROJECTDIR/$USER/opt/<arch> default as Stage 1.)
+# (defaults: cray, and the same $PROJECTDIR/lfric-env/<arch> default as Stage 1.)
 set -uo pipefail
 
 # This script lives in examples/minimal-compile/; the shared scripts are in scripts/.
