@@ -46,6 +46,11 @@ SUITE_ID="u-dn704"
 # The revision this patch was cut and validated against. Overridable, but only
 # deliberately: see the revision check below.
 SUITE_REV="${LFRIC_SUITE_REV:-361458}"
+# The last commit to the suite at or before r$SUITE_REV. A checkout at any later
+# revision whose last change is still this one has the same content, so it is
+# accepted too: `rosie checkout` gives HEAD, and needs no `svn update -r` while
+# upstream has not moved (#41). Only used with the default SUITE_REV.
+SUITE_CHANGED_REV=361458
 SUITE_URL="https://code.metoffice.gov.uk/svn/roses-u/d/n/7/0/4/trunk"
 SUITE_DIR="${LFRIC_SUITE_DIR:-$HOME/roses/$SUITE_ID}"
 PATCH_FILE="$_here/42-roses-u-u-dn704-isambard3.patch"
@@ -77,8 +82,13 @@ fi
 # deliberately, say so: LFRIC_SUITE_REV=<rev> (and expect to re-cut the patch).
 if command -v svn >/dev/null 2>&1 && [ -d "$SUITE_DIR/.svn" ]; then
   _rev="$(svn info --show-item revision "$SUITE_DIR" 2>/dev/null | tr -d '[:space:]')"
+  _changed="$(svn info --show-item last-changed-revision "$SUITE_DIR" 2>/dev/null | tr -d '[:space:]')"
+  if [ -z "${LFRIC_SUITE_REV:-}" ] && [ "$_changed" = "$SUITE_CHANGED_REV" ]; then
+    _rev="$SUITE_REV"
+  fi
   if [ -n "$_rev" ] && [ "$_rev" != "$SUITE_REV" ]; then
-    fail "$SUITE_DIR is at r$_rev; this patch was cut and validated against r$SUITE_REV."
+    fail "$SUITE_DIR is at r$_rev (last changed in r$_changed); this patch was cut and"
+    fail "  validated against r$SUITE_REV (last changed in r$SUITE_CHANGED_REV)."
     fail "  Pin the checkout back:"
     fail "    svn update -r $SUITE_REV $SUITE_DIR"
     fail "  or base on r$_rev deliberately (re-cut the patch first -- see"

@@ -47,6 +47,28 @@ reside … we recommend keeping them in the roses repository for the time being.
 as a trac link. So the suite is **checked out**, not vendored — see
 [`../README.md`](../README.md), "Getting a suite from MOSRS".
 
+### The revision pin
+
+The patch was cut and validated against **r361458**, the last commit to the suite (on
+2026-07-17, when the Met Office took it to vn3.2). The stager refuses a checkout with
+different content: a site patch that still applies to a later revision would run a suite
+nobody validated. A checkout at any later revision is fine as long as the suite's
+last-changed revision is still r361458, which is the case today.
+
+For anything that copies the commands (the LFRic training pages, for one): keep
+`svn update -r 361458 ~/roses/u-dn704` after `rosie checkout`. It is a no-op while
+upstream is unchanged and the only thing that works once it moves. When this repo moves
+the pin, it changes `SUITE_REV` and `SUITE_CHANGED_REV` in
+`patches/suites/42-roses-u-u-dn704-patch.sh` together with the patch, and copies of the
+old number go stale. `run-suite.sh u-dn704` always prints the current commands when the
+checkout is missing, so pointing readers at its output avoids copying the number.
+
+To see whether upstream has moved (needs MOSRS credentials):
+
+```bash
+svn info --show-item last-changed-revision https://code.metoffice.gov.uk/svn/roses-u/d/n/7/0/4/trunk
+```
+
 ### The wrong answer, and how it was caught
 
 An earlier version of this branch pinned
