@@ -208,6 +208,10 @@ for your own suite.
 
 ## Run your own science suite (business as usual)
 
+> **Porting a suite to Isambard 3?** [`PORTING.md`](PORTING.md) is the full checklist:
+> module, platform, placement, Lustre, version alignment. This section is the toolchain
+> part of it.
+
 Already have your own LFRic Rose/Cylc suite? You do **not** need anything under
 `examples/` to run it against this environment — those directories are integration
 tests and adaptation templates, not a required layer. Point your own suite at the
@@ -346,4 +350,5 @@ generally cleared with the node; delete it directly if you want it gone sooner.
   minimal-compile example and how to adapt it.
 - [`examples/science-suites/README.md`](examples/science-suites/README.md) — the
   science-suite examples: running real Rose/Cylc LFRic suites on the built env.
+- [`PORTING.md`](PORTING.md) — porting your own Rose/Cylc suite to Isambard 3.
 - [`CLAUDE.md`](CLAUDE.md) — orientation for AI coding agents working in this repo.
