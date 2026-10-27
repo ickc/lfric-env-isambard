@@ -426,6 +426,9 @@ MOSRS suites, `~/roses/<suite>`, or wherever `LFRIC_SUITE_DIR` points).
 
 ## Adapting this for your own suite
 
+To run *your* suite on Isambard 3, start from [`PORTING.md`](../../PORTING.md), the
+checklist. This section is about adding a suite to this repo as a further example.
+
 **Never copy the suite in.** A copy drifts silently, which is exactly how the two
 u-dr932s came to differ. Carry a *pin plus a patch* instead, and take the pin from the
 suite's own upstream. Which mechanism that is depends on where the suite really lives,
