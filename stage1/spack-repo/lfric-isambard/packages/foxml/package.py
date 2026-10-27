@@ -34,3 +34,9 @@ class Foxml(CMakePackage):
     # language build deps to be declared so the compiler wrappers get configured.
     depends_on("c", type="build")
     depends_on("fortran", type="build")
+
+    def cmake_args(self):
+        # The examples copy their XML inputs into a shared directory with PRE_BUILD
+        # commands, which race under parallel make: a v2026.10.08 build failed with
+        # "Error copying file .../examples/h2o.xml". Nothing installs or uses them.
+        return [self.define("FoX_ENABLE_EXAMPLES", False)]
