@@ -1,0 +1,56 @@
+--- a/src/node/mesh.cpp
++++ b/src/node/mesh.cpp
+@@ -438,7 +438,7 @@ namespace xios {
+       unsigned long nodeCount = nbNodes_;
+       unsigned long nodeStart, nbNodes;
+       MPI_Scan(&nodeCount, &nodeStart, 1, MPI_UNSIGNED_LONG, MPI_SUM, comm);
+-      int nNodes = nodeStart;
++      unsigned long nNodes = nodeStart;
+       MPI_Bcast(&nNodes, 1, MPI_UNSIGNED_LONG, mpiSize-1, comm);
+       nbNodesGlo = nNodes;
+ 
+@@ -619,7 +619,7 @@ namespace xios {
+          unsigned long nodeCount = nodeIdx2Idx.size();
+          unsigned long nodeStart, nbNodes;
+          MPI_Scan(&nodeCount, &nodeStart, 1, MPI_UNSIGNED_LONG, MPI_SUM, comm);
+-         int nNodes = nodeStart;
++         unsigned long nNodes = nodeStart;
+          MPI_Bcast(&nNodes, 1, MPI_UNSIGNED_LONG, mpiSize-1, comm);
+          nbNodesGlo = nNodes;
+ 
+@@ -843,7 +843,7 @@ namespace xios {
+ 
+         unsigned long edgeStart, nbEdges;
+         MPI_Scan(&edgeCount, &edgeStart, 1, MPI_UNSIGNED_LONG, MPI_SUM, comm);
+-        int nEdges = edgeStart;
++        unsigned long nEdges = edgeStart;
+         MPI_Bcast(&nEdges, 1, MPI_UNSIGNED_LONG, mpiSize-1, comm);
+         nbEdgesGlo = nEdges;
+ 
+@@ -1064,7 +1064,7 @@ namespace xios {
+         unsigned long edgeCount = edgeIdx2Idx.size();
+         unsigned long edgeStart, nbEdges;
+         MPI_Scan(&edgeCount, &edgeStart, 1, MPI_UNSIGNED_LONG, MPI_SUM, comm);
+-        int nEdges = edgeStart;
++        unsigned long nEdges = edgeStart;
+         MPI_Bcast(&nEdges, 1, MPI_UNSIGNED_LONG, mpiSize-1, comm);
+         nbEdgesGlo = nEdges;
+ 
+@@ -1334,7 +1334,7 @@ namespace xios {
+         unsigned long nodeCount = nodeIdx2Idx.size();
+         unsigned long nodeStart, nbNodes;
+         MPI_Scan(&nodeCount, &nodeStart, 1, MPI_UNSIGNED_LONG, MPI_SUM, comm);
+-        int nNodes = nodeStart;
++        unsigned long nNodes = nodeStart;
+         MPI_Bcast(&nNodes, 1, MPI_UNSIGNED_LONG, mpiSize-1, comm);
+         nbNodesGlo = nNodes;
+ 
+@@ -1455,7 +1455,7 @@ namespace xios {
+         unsigned long edgeCount = edgeIdx2Idx.size();
+         unsigned long edgeStart, nbEdges;
+         MPI_Scan(&edgeCount, &edgeStart, 1, MPI_UNSIGNED_LONG, MPI_SUM, comm);
+-        int nEdges = edgeStart;
++        unsigned long nEdges = edgeStart;
+         MPI_Bcast(&nEdges, 1, MPI_UNSIGNED_LONG, mpiSize-1, comm);
+         nbEdgesGlo = nEdges;
+ 
