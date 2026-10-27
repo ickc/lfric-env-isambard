@@ -184,10 +184,14 @@ rosie checkout u-dn704                       # -> ~/roses/u-dn704
 svn update -r 361458 ~/roses/u-dn704         # the revision the patch is cut against
 ```
 
-That `svn update` is not optional: the stagers read `svn info` and **refuse** a checkout
-at any other revision, because a site patch that happens to apply to a neighbouring
-revision would hand you a suite nobody validated. To base on a different revision
-deliberately, re-cut the patch and say so with `LFRIC_SUITE_REV=<rev>`.
+The stagers read `svn info` and **refuse** a checkout whose content differs from the
+revision the patch was validated against, because a site patch that happens to apply to
+a neighbouring revision would hand you a suite nobody validated. They compare the
+suite's *last-changed* revision, not the checkout's: while upstream has not touched the
+suite since the pin, a plain `rosie checkout` (which gives HEAD) has the same content and
+is accepted (#41). Once upstream moves, only the `svn update -r` gets you back, so keep
+it in anything you hand to others. To base on a different revision deliberately, re-cut
+the patch and say so with `LFRIC_SUITE_REV=<rev>`.
 
 `rosie checkout` shells out to `svn checkout`; stock `/usr/bin/svn` on the login nodes is
 enough (the Met Office's patched svn matters for FCM keywords and commits, not for
