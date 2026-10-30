@@ -44,6 +44,14 @@ class Xios(Package):
     # reproduces x86 behaviour exactly.
     patch("mesh_hash_signed_conversion.patch", when="@2701")
 
+    # Six MPI_Bcast calls in CMesh send one MPI_UNSIGNED_LONG (8 bytes) from and into
+    # an int (4 bytes), so each overwrites the 4 bytes after it on the stack. Upstream
+    # fixed it on the XIOS2 branch (MR !51, commit 8b6a14f); this is only those hunks.
+    # The same MR also folds the longitude into [0, 360) before hashing, which is not
+    # taken: the conversion above already covers negative longitudes, and the fold
+    # would move a planar mesh's negative x.
+    patch("mesh_bcast_unsigned_long.patch", when="@2701")
+
     depends_on("c", type="build")
     depends_on("cxx", type="build")  # XIOS is heavily C++; Spack 1.x needs this declared
     depends_on("fortran", type="build")
