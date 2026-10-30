@@ -118,7 +118,9 @@ fi
 # is SHARED across variants (and not per-variant), so build one variant at a time:
 # two concurrent runs corrupt each other (stale handles, a locked dependency DB).
 LOCAL_BUILD_WORKING_DIR="$APPS_ROOT_DIR/applications/lfric_atm/working"
-LOCAL_BUILD_LOG="$PREFIX/lfric_atm-make.log"
+# Overridable because $PREFIX is not always writable: in the container it is
+# inside the read-only image (container/tests/minimal-compile.sbatch).
+LOCAL_BUILD_LOG="${LOCAL_BUILD_LOG:-$PREFIX/lfric_atm-make.log}"
 [ "${CLEAN_BUILD_WORKING:-1}" != "0" ] && rm -rf "$LOCAL_BUILD_WORKING_DIR/build_lfric_atm"
 
 build_lfric_atm() {
