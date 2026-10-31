@@ -17,3 +17,4 @@ Only ever read from those; snapshot the parts needed to reproduce.
 | directory | what |
 |---|---|
 | [`dr932-mpi-scaling/`](dr932-mpi-scaling/) | u-dr932 reported 3–4× slower on Isambard 3 than Monsoon. Rank placement left to Slurm (108 ranks over 9–32 nodes) on top of an MPI with no Slingshot support. |
+| [`container-mpi-bridge/`](container-mpi-bridge/) | Can the container's from-source MPICH reach Slingshot by swapping host libraries in? Yes via cray-mpich's MPICH ABI (`mpi_f08` included); a libfabric-only swap needs the image's libfabric pinned to the host's ABI and the file itself replaced (RPATH). |

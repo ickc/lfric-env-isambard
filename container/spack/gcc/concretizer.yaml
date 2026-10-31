@@ -1,0 +1,4 @@
+# Generic aarch64, as for the environment itself (see ../env/concretizer.yaml).
+concretizer:
+  targets:
+    granularity: generic

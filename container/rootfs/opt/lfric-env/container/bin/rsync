@@ -1,0 +1,13 @@
+#!/bin/sh
+# rsync — the system rsync, never setting a file's group.
+#
+# In an unprivileged (user-namespace) container only your own primary group is
+# mapped. A file whose group is anyone else's shows as nogroup (65534), and you
+# appear to be a member of nogroup too, so `rsync -a` — which only sets groups
+# you belong to — tries to chgrp the copy to 65534, the kernel refuses, and
+# rsync exits 23. Rose installs a task's files with `rsync -a`, so that failed
+# every task staging shared data (u-dn704's lfric_atm). Outside the container
+# rsync would have skipped those groups as not yours; --no-group skips them
+# here, and a copy gets your primary group either way. It goes last so it
+# overrides the -g that -a implies.
+exec /usr/bin/rsync "$@" --no-group

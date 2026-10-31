@@ -109,6 +109,15 @@ example} × {`cray`, `spack`}. This is the one outcome that must stay green. The
 - `staging/<investigation>/` — reproductions of reported problems, with their evidence
   and conclusion. Off the invariant; nothing in `stage1/`/`scripts/`/`examples/`
   may depend on it. See `staging/README.md`.
+- `container/` — the environment as an OCI image (`ghcr.io/ickc/lfric-env`), run with
+  Apptainer. A third sibling of the examples: it depends only on Stage 1, which its
+  `Containerfile` runs *unmodified* (`pixi run build-spack` inside a Debian 13 build
+  stage); the image's only changes to the env are the Spack overlay in
+  `container/spack/env/` (generic aarch64, `libfabric@2.3.1`). `container/rootfs/` is
+  the in-image layer (activation, the Slurm/srun shims, a Cylc site config that
+  re-enters the container in each job); `container/bin/lfric-container` is the host
+  helper (site binds, host Slurm, MPI library swap, the Apptainer instance for Cylc).
+  Off the invariant, but `container/tests/` is how to check it. See `container/README.md`.
 
 ## Conventions (the design rules of this repo)
 

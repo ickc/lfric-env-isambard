@@ -1,0 +1,7 @@
+# Build for generic aarch64, not the build host's neoverse_v2, so the image runs
+# on any Arm64 machine (Grace, Graviton, Ampere, Apple Silicon). Together with
+# packages:all:target in packages.yaml this puts every spec on target=aarch64
+# (checked by the `concretize` step of container/build.sh's smoke test).
+concretizer:
+  targets:
+    granularity: generic
