@@ -106,13 +106,20 @@ ls -l "$sif"
 if [ "$push" = 1 ]; then
   registry="${repo%%/*}"
   owner="${repo#*/}"; owner="${owner%%/*}"
-  # The token is gh's, with the write:packages scope (gh auth refresh -s write:packages).
-  gh auth token | "$podman" login "$registry" --username "$owner" --password-stdin \
+  # The token is gh's, with the write:packages scope (gh auth refresh -s
+  # write:packages). It is handed to each push for that push only — a throwaway
+  # auth file for podman, environment variables for apptainer — and never
+  # stored: `podman login`/`apptainer registry login` would write it, in plain
+  # text, to the user's home.
+  token="$(gh auth token)" || die "no gh token (gh auth login)"
+  authfile="$work/auth.json"
+  trap 'rm -f "$authfile"' EXIT
+  printf '%s' "$token" | "$podman" login --authfile "$authfile" "$registry" --username "$owner" --password-stdin \
     || die "could not log in to $registry as $owner"
-  "$podman" push "$repo:$tag" || die "push of $repo:$tag failed"
-  apptainer registry login --username "$owner" --password "$(gh auth token)" "oras://$registry" \
-    || die "apptainer could not log in to oras://$registry"
-  apptainer push "$sif" "oras://$repo:$tag-sif" || die "push of the SIF failed"
+  "$podman" push --authfile "$authfile" "$repo:$tag" || die "push of $repo:$tag failed"
+  rm -f "$authfile"
+  APPTAINER_DOCKER_USERNAME="$owner" APPTAINER_DOCKER_PASSWORD="$token" \
+    apptainer push "$sif" "oras://$repo:$tag-sif" || die "push of the SIF failed"
   echo "pushed: docker://$repo:$tag  oras://$repo:$tag-sif"
 fi
 
