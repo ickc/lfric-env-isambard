@@ -1,0 +1,26 @@
+#!/bin/sh
+# host-slurm — run the HOST's Slurm client from inside the container.
+# Installed as sbatch, squeue, scancel, scontrol, sacct and sinfo (symlinks);
+# srun has its own wrapper (./srun) that also puts each task in the container,
+# and calls this as `host-slurm srun ...`.
+#
+# Why not a Slurm client in the image: the client must match the site's Slurm
+# version and configuration, which no portable image can know. Why not just bind
+# the host's binaries in: they are linked against the host's glibc (2.38 on
+# Isambard 3's SLES), newer than any distribution the image could standardize on.
+#
+# So the host helper (lfric-container) binds the host's binaries, its dynamic
+# loader and its library directories under /host/slurm, and this runs each one
+# through the HOST's loader with the HOST's libraries — a host process in all
+# but its mount namespace. The Slurm configuration it needs (configless cache,
+# munge socket) is bound at its usual paths by the same helper.
+h=/host/slurm
+name="$(basename "$0")"
+if [ "$name" = host-slurm ]; then name="$1"; shift; fi
+if [ ! -x "$h/ld.so" ] || [ ! -e "$h/bin/$name" ]; then
+  echo "$name: the host's Slurm is not available in this container." >&2
+  echo "  Start the container with the lfric-container helper on a Slurm host;" >&2
+  echo "  it binds the host's Slurm client in (container/README.md, \"Slurm\")." >&2
+  exit 127
+fi
+exec "$h/ld.so" --library-path "$h/lib64:$h/usr/lib64:/usr/lib64/slurm" "$h/bin/$name" "$@"

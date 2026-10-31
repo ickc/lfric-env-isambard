@@ -1,0 +1,50 @@
+#!/bin/bash
+# lfric-container-check — the image's own acceptance test, run as the last step
+# of the image build (Containerfile) and by the tests (container/tests/). It
+# checks that each way into the container yields the environment Stage 1's
+# smoke test accepted: a login shell (what a Cylc job uses) and the entrypoint
+# (what podman/docker run uses). Ends with CONTAINER_CHECK_OK.
+set -uo pipefail
+fail() { echo "FAIL: $*" >&2; exit 1; }
+
+check='set -e
+for t in cylc rose rosie psyclone rose_picker xios_server.exe mpif90 mpic++ gfortran-14 svn rsync /usr/bin/time; do
+  command -v "$t" >/dev/null || { echo "missing: $t"; exit 1; }
+done
+# LFRic make recipes need bash as /bin/sh, as on SLES.
+[ "$(readlink -f /bin/sh)" = /usr/bin/bash ] || { echo "/bin/sh is not bash"; exit 1; }
+[ "$FC" = mpif90 ] && [ "$CXX" = mpic++ ] && [ "$LDMPI" = mpif90 ]
+"$FC" --version | head -1
+cylc --version
+[ "$(cylc config -i "[platforms][isambard3]job runner")" = slurm ]
+cylc config -i "[platforms][isambard3]global init-script" | grep -q lfric-container
+python3 -c "import iris, netCDF4, mule; print(\"iris\", iris.__version__)"
+[ -x "$PFUNIT/bin/funitproc" ]
+echo "$LFRIC_ENV_MODULE"'
+
+# A login shell, from a deliberately hostile starting environment: host-style
+# Lmod/Cray state that activate.sh must drop.
+env -i HOME=/tmp PATH=/usr/bin:/bin LMOD_CMD=/nonexistent/lmod CRAY_LD_LIBRARY_PATH=/nonexistent \
+    FFLAGS=-host-flag BASH_ENV=/nonexistent/bash_env \
+  bash -l -c "$check" || fail "a login shell does not have the environment"
+env -i HOME=/tmp PATH=/usr/bin:/bin /opt/lfric-env/container/bin/entrypoint bash -c "$check" \
+  || fail "the entrypoint does not give the environment"
+env -i HOME=/tmp FFLAGS=-host-flag CRAY_LD_LIBRARY_PATH=/nonexistent bash -l -c '[ "${FFLAGS#-I}" != "$FFLAGS" ] && [ -z "${CRAY_LD_LIBRARY_PATH:-}" ]' \
+  || fail "host state survived activation"
+# binutils must have gcc's LTO plugin: without it `ar` indexes no symbols of an
+# LTO object, and whatever links that archive silently gets none of it.
+t="$(mktemp -d)"
+echo 'int lfric_lto_probe(void) { return 1; }' > "$t/p.c"
+( cd "$t" && gcc -flto -c p.c && ar rcs libp.a p.o && nm -s libp.a | grep -q lfric_lto_probe ) \
+  || fail "ar cannot index LTO objects (is gcc's liblto_plugin.so in /usr/lib/bfd-plugins?)"
+rm -rf "$t"
+# Without the helper, the Slurm shims must say why rather than fail obscurely;
+# with it (the host's Slurm bound in), sbatch must run.
+out="$(env -i HOME=/tmp bash -l -c 'sbatch --version' 2>&1)"; rc=$?
+if [ -e /host/slurm/ld.so ]; then
+  [ "$rc" = 0 ] || fail "sbatch with the host's Slurm bound in: rc=$rc: $out"
+else
+  [ "$rc" = 127 ] && grep -q "not available in this container" <<< "$out" \
+    || fail "sbatch without the host's Slurm: expected the explanatory error, got rc=$rc: $out"
+fi
+echo CONTAINER_CHECK_OK
