@@ -1,0 +1,7 @@
+# Generic aarch64, as for the environment itself (../env/packages.yaml). The gcc
+# spec itself (version, languages, ~bootstrap) is on the `spack install` line
+# in the Containerfile, not a requirement here: a requirement on gcc would also
+# bind the bootstrap compiler (Debian's gcc 14.2), and nothing would satisfy it.
+packages:
+  all:
+    target: [aarch64]

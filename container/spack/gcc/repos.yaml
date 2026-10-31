@@ -1,0 +1,5 @@
+# The vendored, pinned builtin package repo — the same one Stage 1 uses
+# (stage1/spack-env/common.yaml) — instead of Spack 1.0's default of cloning
+# spack-packages from GitHub at whatever revision is current.
+repos:
+  builtin: /opt/lfric-env/src/stage1/vendor/spack-packages/repos/spack_repo/builtin

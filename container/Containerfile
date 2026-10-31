@@ -1,0 +1,164 @@
+# container/Containerfile — the LFRic Apps environment as an OCI image.
+#
+# Build it with container/build.sh (on a compute node: container/build.sbatch);
+# the build context is the REPO ROOT, filtered by /.containerignore.
+#
+# What is inside is Stage 1's `spack` variant, built by Stage 1 itself: the same
+# stage1/ tree, the same `pixi run build-spack`, the same smoke test. The image
+# adds only what a container needs on top — see container/README.md. Three stages:
+#
+#   gcc      gcc@14.3.0 built by Spack, with Debian's gcc as the bootstrap
+#            compiler. Its own stage so the env build never sees Debian's gcc.
+#   build    Stage 1's spack variant against that gcc, with a container overlay
+#            (generic aarch64 target, libfabric pinned to the host's ABI).
+#   runtime  the install tree + gcc on a fresh Debian, plus the activation hooks
+#            and the Slurm/MPI shims that let it run on the host's Slurm.
+#
+# Base: Debian 13, EESSI's build-node distribution. Not 12: the host's Slingshot
+# libraries (libcxi, libfabric) need glibc >= 2.38 and Debian 12 has 2.36, so a
+# Debian 12 container cannot load them at all. Debian 13 has 2.41.
+
+ARG DEBIAN_IMAGE=docker.io/library/debian:13
+
+# ---------------------------------------------------------------------------
+FROM ${DEBIAN_IMAGE} AS base
+# What Spack needs from the OS to build, and Lmod for Stage 1's smoke test.
+# Deliberately no compiler here: each stage brings its own.
+RUN apt-get update \
+ && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      binutils bzip2 ca-certificates curl file git gzip libc6-dev lmod make \
+      patch procps tar unzip xz-utils zstd \
+ && rm -rf /var/lib/apt/lists/*
+# pixi supplies the Python that runs Spack (Spack 1.0 needs < 3.12; Debian 13
+# ships 3.13). Same version as the host's, so stage1/pixi.lock resolves the same.
+ARG PIXI_VERSION=0.72.2
+RUN curl -fsSL -o /usr/local/bin/pixi \
+      "https://github.com/prefix-dev/pixi/releases/download/v${PIXI_VERSION}/pixi-$(uname -m)-unknown-linux-musl" \
+ && chmod +x /usr/local/bin/pixi && pixi --version
+# Stage 1 lives here in every stage, so the absolute paths it writes into the
+# environment (the instantiated spack.yaml's include, the modulefile) stay valid.
+WORKDIR /opt/lfric-env/src/stage1
+COPY stage1/pixi.toml stage1/pixi.lock ./
+RUN pixi install --frozen
+
+# ---------------------------------------------------------------------------
+FROM base AS gcc
+RUN apt-get update \
+ && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends g++ gfortran \
+ && rm -rf /var/lib/apt/lists/*
+COPY stage1/vendor/spack vendor/spack
+COPY stage1/vendor/spack-packages vendor/spack-packages
+COPY container/spack/gcc /opt/gcc/spack-config
+# C, C++ and Fortran, as the SLES gcc-14 on Isambard 3 is. ~bootstrap: the
+# bootstrap compiler (Debian's gcc 14.2) is a recent gcc already, so the 3-stage
+# self-build buys nothing but time. The Spack cache mount persists across builds
+# (container/build.sh binds it), so a rebuild reinstalls gcc from the binary
+# cache instead of recompiling it.
+ARG SPACK_JOBS=16
+RUN export SPACK_USER_CONFIG_PATH=/opt/gcc/spack-config SPACK_USER_CACHE_PATH=/tmp/spack-cache \
+           SPACK_PYTHON="$PWD/.pixi/envs/default/bin/python3" \
+ && . vendor/spack/share/spack/setup-env.sh \
+ && spack compiler find /usr/bin \
+ && spack install -j "$SPACK_JOBS" --fail-fast "gcc@14.3.0 languages=c,c++,fortran ~bootstrap %gcc@14.2.0" \
+ && ln -s "$(spack location -i gcc@14.3.0)" /opt/gcc/14.3.0 \
+ && rm -rf /opt/gcc/spack-config /tmp/spack-cache /tmp/spack-stage \
+ && /opt/gcc/14.3.0/bin/gfortran --version | head -1
+
+# ---------------------------------------------------------------------------
+# The compiler as the rest of the image sees it. stage1/spack-env/common.yaml
+# declares gcc@14.3.0 as an external at /usr/bin/{gcc,g++,gfortran}-14 — the
+# SLES layout on Isambard 3 — so it is installed under exactly those names, and
+# the env template is used unmodified. gcc resolves its own install from a
+# symlinked argv[0], so plain symlinks suffice. Its runtime libraries go on the
+# loader's default path, and its LTO plugin where binutils looks for one, as the
+# system gcc's do on SLES (and Debian's own gcc package does). Without the plugin,
+# `ar` cannot index LTO objects: an archive of them gets no symbols, and linking
+# against it silently pulls nothing in (matplotlib, built with b_lto, lost all of
+# its bundled agg that way).
+FROM base AS toolchain
+COPY --from=gcc /opt/gcc /opt/gcc
+RUN for t in gcc g++ gfortran cpp; do \
+      ln -s "/opt/gcc/14.3.0/bin/$t" "/usr/bin/$t-14"; ln -s "$t-14" "/usr/bin/$t"; \
+    done \
+ && ln -s gcc /usr/bin/cc && ln -s g++ /usr/bin/c++ \
+ && echo /opt/gcc/14.3.0/lib64 > /etc/ld.so.conf.d/gcc-14.3.0.conf && ldconfig \
+ && mkdir -p /usr/lib/bfd-plugins \
+ && ln -s "$(gcc-14 -print-prog-name=liblto_plugin.so)" /usr/lib/bfd-plugins/liblto_plugin.so \
+ && gfortran-14 --version | head -1
+
+# ---------------------------------------------------------------------------
+FROM toolchain AS build
+COPY stage1 .
+# stage1/env.sh's two site variables, set explicitly (it refuses to guess them),
+# and the install base. The caches are on the persistent build mount.
+ENV PROJECTDIR=/opt/lfric-env \
+    LOCALDIR=/tmp/lfric-build \
+    LFRIC_BASE=/opt/lfric-env \
+    LFRIC_SOURCE_CACHE=/var/cache/lfric/source-cache \
+    LFRIC_MISC_CACHE=/var/cache/lfric/misc-cache
+# Stage 1's spack variant build, then the frozen module (container/build-env.sh).
+# The container's Spack overlay is the only change to the environment.
+COPY container/spack/env /opt/lfric-env/build/spack-overlay
+COPY container/gen-env.sh /opt/lfric-env/build/gen-env.sh
+COPY container/build-env.sh /opt/lfric-env/build/build-env.sh
+ARG SPACK_JOBS=16
+RUN SPACK_JOBS="$SPACK_JOBS" bash /opt/lfric-env/build/build-env.sh
+
+# ---------------------------------------------------------------------------
+FROM ${DEBIAN_IMAGE} AS runtime
+# What the env leaves to the OS (as SLES does on the host): the C runtime and
+# binutils for compiling, svn for `rosie checkout`, rsync for `cylc install`,
+# GNU time (LFRic's compile.mk runs every compile under /usr/bin/time), and Lmod
+# so `module` works for those who want it. The Slingshot libraries' Debian
+# counterparts (libcurl4, libjson-c5, libnl-3-200) let the host's libcxi and
+# libfabric resolve their dependencies inside the container.
+RUN apt-get update \
+ && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      binutils bzip2 ca-certificates curl file git gzip less libc6-dev \
+      libcurl4t64 libjson-c5 libnl-3-200 lmod make openssh-client patch \
+      procps rsync subversion tar time unzip vim-tiny xz-utils zstd \
+ && rm -rf /var/lib/apt/lists/*
+# /bin/sh is bash, as on SLES: LFRic's make recipes use bash's [[ ]], and under
+# Debian's default (dash) they fail one by one with "[[: not found".
+# (Debian 13 dropped dash's debconf switch; a local diversion keeps a dash
+# upgrade from restoring the link.)
+RUN dpkg-divert --local --no-rename --divert /usr/bin/sh.distrib --add /usr/bin/sh \
+ && ln -sf bash /usr/bin/sh \
+ && [ "$(readlink -f /bin/sh)" = /usr/bin/bash ]
+# gcc as in the toolchain stage, its names recreated here rather than COPYed:
+# COPY follows symlinks, and a gcc binary copied to /usr/bin cannot find its
+# own cc1 ("cannot execute 'cc1'").
+COPY --from=toolchain /opt/gcc /opt/gcc
+RUN for t in gcc g++ gfortran cpp; do \
+      ln -s "/opt/gcc/14.3.0/bin/$t" "/usr/bin/$t-14"; ln -s "$t-14" "/usr/bin/$t"; \
+    done \
+ && ln -s gcc /usr/bin/cc && ln -s g++ /usr/bin/c++ \
+ && echo /opt/gcc/14.3.0/lib64 > /etc/ld.so.conf.d/gcc-14.3.0.conf && ldconfig \
+ && mkdir -p /usr/lib/bfd-plugins \
+ && ln -s "$(gcc-14 -print-prog-name=liblto_plugin.so)" /usr/lib/bfd-plugins/liblto_plugin.so \
+ && echo 'int main(void) { return 0; }' > /tmp/t.c && gcc-14 -o /tmp/t /tmp/t.c && /tmp/t && rm -f /tmp/t /tmp/t.c
+# The install tree, and Stage 1's sources minus pixi's Python (the instantiated
+# spack.yaml includes stage1/spack-env/common.yaml by absolute path).
+COPY --from=build /opt/lfric-env /opt/lfric-env
+RUN rm -rf /opt/lfric-env/src/stage1/.pixi /opt/lfric-env/*/spack-cache /opt/lfric-env/build
+# Slurm's client resolves SlurmUser by name when it parses slurm.conf, and the
+# host's /etc/passwd is not visible in here. Any uid will do.
+RUN useradd --system --no-create-home --shell /usr/sbin/nologin slurm
+# The container layer: activation, the Slurm/MPI shims, the container's Cylc
+# site config. Activation is hooked into every way in: login shells
+# (/etc/profile.d), `apptainer exec|run|shell` (/.singularity.d/env), and
+# `podman|docker run` (the entrypoint).
+COPY container/rootfs/ /
+RUN ln -s /opt/lfric-env/container/activate.sh /etc/profile.d/zz-lfric-env.sh \
+ && mkdir -p /.singularity.d/env \
+ && ln -s /opt/lfric-env/container/activate.sh /.singularity.d/env/90-lfric-env.sh \
+ && /opt/lfric-env/container/bin/lfric-container-check
+
+ARG LFRIC_ENV_VERSION
+LABEL org.opencontainers.image.title="lfric-env" \
+      org.opencontainers.image.description="LFRic Apps environment (Stage 1 spack variant, gcc 14.3, generic aarch64)" \
+      org.opencontainers.image.source="https://github.com/ickc/lfric-env-isambard" \
+      org.opencontainers.image.licenses="BSD-3-Clause" \
+      org.opencontainers.image.version="${LFRIC_ENV_VERSION}"
+ENTRYPOINT ["/opt/lfric-env/container/bin/entrypoint"]
+CMD ["/bin/bash", "-l"]
