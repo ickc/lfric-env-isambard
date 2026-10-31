@@ -16,6 +16,11 @@
 # so any variable set in the container would also be set in that first,
 # host-side pass. The LFRIC_CONTAINER_* variables the helper needs are copied
 # into the job explicitly ("copyable environment variables").
+#
+# The job file is re-run as "$0", Slurm's copy of it under /var/spool/slurmd
+# (which the helper binds in for Slurm's own use). Not by its path in the run
+# directory: Cylc sets CYLC_TASK_JOB, which that path needs, only later in the
+# job script than this runs.
 %include 'site.cylc'
 
 [platforms]
@@ -25,6 +30,6 @@
             # [container] re-run this job inside the LFRic container (lfric-container).
             if [[ ! -e /opt/lfric-env/container/env.sh ]]; then
                 exec "${LFRIC_CONTAINER_HELPER:?LFRIC_CONTAINER_HELPER unset: start the workflow with lfric-container}" \
-                    exec -- bash -l "${CYLC_RUN_DIR:-$HOME/cylc-run}/${CYLC_WORKFLOW_ID}/log/job/${CYLC_TASK_JOB}/job" noreinvoke
+                    exec -- bash -l "$0" noreinvoke
             fi
         """
