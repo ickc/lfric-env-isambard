@@ -11,6 +11,9 @@ check='set -e
 for t in cylc rose rosie psyclone rose_picker xios_server.exe mpif90 mpic++ gfortran-14 svn rsync /usr/bin/time; do
   command -v "$t" >/dev/null || { echo "missing: $t"; exit 1; }
 done
+# rsync must be the shim (bin/rsync): a group the user namespace does not map
+# makes plain `rsync -a` fail, and Rose installs with it.
+[ "$(command -v rsync)" = /opt/lfric-env/container/bin/rsync ] || { echo "rsync is not the container shim"; exit 1; }
 # LFRic make recipes need bash as /bin/sh, as on SLES.
 [ "$(readlink -f /bin/sh)" = /usr/bin/bash ] || { echo "/bin/sh is not bash"; exit 1; }
 [ "$FC" = mpif90 ] && [ "$CXX" = mpic++ ] && [ "$LDMPI" = mpif90 ]
