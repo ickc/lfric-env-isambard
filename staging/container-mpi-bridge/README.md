@@ -52,5 +52,7 @@ All in `container/`:
   - `LFRIC_CONTAINER_MPI=host` (default): cray-mpich for libmpi/libmpifort, plus
     host libfabric, with the default `srun` plugin;
   - `LFRIC_CONTAINER_MPI=libfabric`: host libfabric only, `srun --mpi=pmi2`.
-- `container/tests/mpi.sbatch` measures all three modes inside the container; its
-  results are in `container/README.md`.
+- `container/tests/mpi.sbatch` measures all three modes inside the container
+  (job 5868477): cray-mpich swapped in 2.8 µs, host libfabric swapped in 3.2 µs,
+  the image's own TCP 18 µs — so with the pin and the file-level swap, the
+  libfabric-only route that failed here works too.
