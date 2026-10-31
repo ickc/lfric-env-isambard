@@ -1,0 +1,214 @@
+#!/usr/bin/env bash
+# lfric-container — run the LFRic environment container on Isambard 3.
+#
+#   lfric-container shell                 an interactive shell in the container
+#   lfric-container exec CMD [ARGS...]    run CMD in the container
+#   lfric-container exec --instance CMD   run CMD in this login node's persistent
+#                                         instance, so anything it leaves running
+#                                         (a Cylc scheduler) keeps working
+#   lfric-container cylc ARGS...          = exec --instance cylc ARGS...
+#   lfric-container instance status|stop  that instance
+#   lfric-container info                  the image, MPI mode and binds in use
+#
+# Plain `apptainer exec lfric-env.sif CMD` already gives you the environment —
+# compile, run serial tools, `rose`, `cylc validate`. What this adds is what a
+# portable image cannot carry and a bare apptainer call does not set up:
+#
+#   * the site's filesystems (PROJECTDIR, SCRATCHDIR, LOCALDIR, the cwd);
+#   * the host's Slurm client, so sbatch/squeue/scancel/srun work INSIDE the
+#     container (Cylc submits jobs from there) — see bin/host-slurm in the image;
+#   * MPI over Slingshot: each rank srun starts inside the container gets the
+#     host's cray-mpich swapped in for the container's MPICH (MPICH ABI), or
+#     just the host's libfabric (LFRIC_CONTAINER_MPI below);
+#   * for cylc, a persistent instance: a process left running by a plain
+#     `apptainer exec` loses the image's filesystem once the command returns,
+#     and a Cylc scheduler is exactly such a process.
+#
+# Configuration — environment variables, all printed by `lfric-container info`:
+#
+#   LFRIC_CONTAINER_IMAGE  the image: a .sif path (or anything apptainer takes,
+#                          e.g. docker://ghcr.io/ickc/lfric-env:<tag>). Required.
+#   LFRIC_CONTAINER_MPI    how ranks reach the interconnect:
+#                            host       the host's cray-mpich (default)
+#                            libfabric  the container's MPICH + host libfabric
+#                            none       the container's MPICH as built (TCP)
+#   LFRIC_CONTAINER_BINDS  extra bind paths, comma-separated (apptainer syntax).
+#   APPTAINER              the apptainer CLI. Default: apptainer.
+#
+# The host paths it binds are Isambard 3's, named in the SITE section below;
+# porting to another Cray EX means editing that section, nothing else.
+set -euo pipefail
+die() { echo "lfric-container: $*" >&2; exit 2; }
+
+# --- SITE: Isambard 3 (HPE Cray EX, SLES 15 SP7, Slurm, Slingshot 11) --------
+# Site filesystems: the directories these variables name, when set.
+site_dir_vars="PROJECTDIR SCRATCHDIR LOCALDIR"
+# The Slurm client (bin/host-slurm in the image runs it with the host's loader).
+slurm_bins="sbatch squeue scancel scontrol sacct sinfo srun"
+host_loader=/lib/ld-linux-aarch64.so.1
+host_libdirs="/lib64 /usr/lib64"
+slurm_plugindir=/usr/lib64/slurm
+# munge's socket, the configless config cache (/run/slurm/conf links into
+# /var/spool/slurmd), and the cray_shasta MPI plugin's per-job files.
+slurm_state="/run/munge /run/slurm /var/spool/slurmd"
+# MPI: the host's cray-mpich (GNU build; the MPICH-ABI sonames are links to
+# these), its PMI/PALS, and the Slingshot libfabric + libcxi. Pinned versions,
+# as stage1/lib.sh pins the cray variant's modules.
+cray_mpich_lib=/opt/cray/pe/mpich/9.1.0/ofi/gnu/12.3/lib
+host_libfabric=/opt/cray/libfabric/2.3.1/lib64/libfabric.so.1
+# libnl-3 goes with libcxi: Debian's would satisfy it, with a "no version
+# information available" warning from every rank.
+slingshot_libs="/usr/lib64/libcxi.so.1 /usr/lib64/libnl-3.so.200"
+host_mpi_deps="/opt/cray/pe/lib64/libpmi.so.0 /opt/cray/pe/lib64/libpmi2.so.0 /opt/cray/pals/1.8/lib/libpals.so.0 $slingshot_libs"
+# ---------------------------------------------------------------------------
+
+apptainer="${APPTAINER:-apptainer}"
+mpi="${LFRIC_CONTAINER_MPI:-host}"
+case "$mpi" in host|libfabric|none) ;; *) die "LFRIC_CONTAINER_MPI must be host, libfabric or none (got '$mpi')" ;; esac
+image="${LFRIC_CONTAINER_IMAGE:-}"
+self="$(readlink -f -- "${BASH_SOURCE[0]}")"
+# Inside the container, the image's swap targets (container/gen-env.sh).
+swap=/opt/lfric-env/container/lib/swap
+
+need_image() {
+  [ -n "$image" ] || die "LFRIC_CONTAINER_IMAGE unset: point it at the image, e.g.
+  export LFRIC_CONTAINER_IMAGE=/path/to/lfric-env_<version>.sif"
+  case "$image" in
+    *://*) ;;
+    *) [ -f "$image" ] || die "LFRIC_CONTAINER_IMAGE=$image: no such file"
+       image="$(readlink -f -- "$image")" ;;
+  esac
+}
+
+# The bind list, as repeated --bind arguments in the array `binds`.
+binds=()
+bind() { binds+=(--bind "$1"); }
+
+# $1 = 1: also bind the current directory. Not for the instance, whose binds
+# are fixed when it starts and must not depend on where that happened.
+bind_site() {
+  local v d seen=" "
+  for v in $site_dir_vars; do
+    d="${!v:-}"; [ -n "$d" ] && [ -d "$d" ] || continue
+    # Both the path as named and where it really is: /scratch/... on Isambard 3
+    # is a link into /lfs1i3, and paths of either spelling end up in run dirs.
+    for d in "$d" "$(readlink -f -- "$d")"; do
+      case "$seen" in *" $d "*) continue ;; esac
+      seen+="$d "; bind "$d"
+    done
+  done
+  if [ "${1:-1}" = 1 ]; then
+    d="$(pwd -P)"
+    case "$seen" in *" $d "*) ;; *) bind "$d" ;; esac
+  fi
+  if [ -n "${LFRIC_CONTAINER_BINDS:-}" ]; then bind "$LFRIC_CONTAINER_BINDS"; fi
+}
+
+bind_slurm() {
+  command -v sbatch >/dev/null 2>&1 || return 0   # not a Slurm host
+  local b p d
+  bind "$host_loader:/host/slurm/ld.so"
+  for d in $host_libdirs; do bind "$d:/host/slurm$d"; done
+  bind "$slurm_plugindir"
+  for b in $slurm_bins; do
+    p="$(command -v "$b")" || continue
+    bind "$p:/host/slurm/bin/$b"
+  done
+  for d in $slurm_state; do [ -e "$d" ] && bind "$d"; done
+  return 0
+}
+
+# Only for MPI ranks (exec --rank): replace the container's MPI libraries with
+# the host's by binding the host file over the container's (a stable link in
+# the image, see container/gen-env.sh). Binding over the file, not prepending a
+# directory to LD_LIBRARY_PATH, because the environment's own libraries find
+# libmpi/libfabric through RPATH, which LD_LIBRARY_PATH does not override. The
+# host libraries' own dependencies go in /.singularity.d/libs, which Apptainer
+# puts on LD_LIBRARY_PATH.
+bind_mpi() {
+  local f
+  case "$mpi" in
+    host)
+      bind "$cray_mpich_lib/libmpi_gnu.so.12:$swap/libmpi.so.12"
+      bind "$cray_mpich_lib/libmpifort_gnu.so.12:$swap/libmpifort.so.12"
+      bind "$host_libfabric:$swap/libfabric.so.1"
+      for f in $host_mpi_deps; do bind "$f:/.singularity.d/libs/${f##*/}"; done ;;
+    libfabric)
+      bind "$host_libfabric:$swap/libfabric.so.1"
+      for f in $slingshot_libs; do bind "$f:/.singularity.d/libs/${f##*/}"; done ;;
+    none) ;;
+  esac
+}
+
+# Apptainer exports the bind list it was given into the container, so a rank
+# that srun starts from inside one arrives here carrying the parent's binds and
+# would bind everything twice. The binds are this script's to decide.
+unset APPTAINER_BIND APPTAINER_BINDPATH SINGULARITY_BIND SINGULARITY_BINDPATH
+
+# What the container needs to know about the helper, passed in its environment
+# (Apptainer passes the caller's environment through).
+export LFRIC_CONTAINER_HELPER="$self" LFRIC_CONTAINER_MPI="$mpi"
+
+instance_name() { printf 'lfric-env-%s' "$(printf '%s' "$image" | md5sum | cut -c1-8)"; }
+
+instance_running() {
+  "$apptainer" instance list 2>/dev/null | awk 'NR > 1 { print $1 }' | grep -qx "$1"
+}
+
+cmd="${1:-}"; [ $# -gt 0 ] && shift
+case "$cmd" in
+  shell)
+    need_image; export LFRIC_CONTAINER_IMAGE="$image"
+    bind_site; bind_slurm
+    exec "$apptainer" exec "${binds[@]}" "$image" bash -l "$@" ;;
+
+  exec|cylc)
+    rank=0 instance=0
+    if [ "$cmd" = cylc ]; then
+      instance=1; set -- cylc "$@"
+    else
+      while [ $# -gt 0 ]; do
+        case "$1" in
+          --rank) rank=1; shift ;;
+          --instance) instance=1; shift ;;
+          --) shift; break ;;
+          *) break ;;
+        esac
+      done
+    fi
+    [ $# -gt 0 ] || die "exec: no command"
+    need_image; export LFRIC_CONTAINER_IMAGE="$image"
+    if [ "$instance" = 1 ]; then
+      # A per-user, per-image instance on this login node, started on first
+      # use. Its binds are fixed at start; the environment is passed per command.
+      name="$(instance_name)"
+      if ! instance_running "$name"; then
+        bind_site 0; bind_slurm
+        echo "lfric-container: starting instance $name on $(hostname) (stop it with: lfric-container instance stop)" >&2
+        "$apptainer" instance start "${binds[@]}" "$image" "$name" >/dev/null \
+          || die "could not start the instance $name"
+      fi
+      exec "$apptainer" exec "instance://$name" "$@"
+    fi
+    bind_site; bind_slurm
+    [ "$rank" = 1 ] && bind_mpi
+    exec "$apptainer" exec "${binds[@]}" "$image" "$@" ;;
+
+  instance)
+    need_image; name="$(instance_name)"
+    case "${1:-status}" in
+      status) if instance_running "$name"; then echo "$name: running on $(hostname)"; else echo "$name: not running on $(hostname)"; fi ;;
+      stop)   "$apptainer" instance stop "$name" ;;
+      *)      die "instance: status or stop" ;;
+    esac ;;
+
+  info)
+    need_image; bind_site; bind_slurm
+    printf 'image:   %s\nmpi:     %s\nhelper:  %s\nbinds:  ' "$image" "$mpi" "$self"
+    printf ' %s' "${binds[@]}"; echo ;;
+
+  ''|-h|--help|help)
+    sed -n '2,/^set -euo/{/^set -euo/d;s/^# \{0,1\}//;p}' "$self" ;;
+
+  *) die "unknown command '$cmd' (try: lfric-container help)" ;;
+esac
