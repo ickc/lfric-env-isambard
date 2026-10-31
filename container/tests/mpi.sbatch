@@ -14,7 +14,8 @@
 #   1. the image's own acceptance test (lfric-container-check);
 #   2. compiling an mpi_f08 program with the container's toolchain;
 #   3. srun from INSIDE the container, in each MPI mode (host cray-mpich,
-#      host libfabric, the container's own MPICH), across the two nodes;
+#      host libfabric, the container's own MPICH), across the two nodes, and
+#      with two ranks on one node (on-node shared memory between containers);
 #   4. srun --multi-prog (what the science suites' launch-exe uses);
 #   5. the host's sbatch from inside the container.
 # Ends with CONTAINER_MPI_OK when all pass.
@@ -51,6 +52,16 @@ host CRAY 5
 libfabric MPICH 5
 none MPICH 100
 EOF
+
+# Two ranks on ONE node: large messages then go through on-node shared memory,
+# between two containers (two user namespaces). Without the helper turning
+# cross-memory attach off, both MPICHs abort on process_vm_readv here.
+for mode in host libfabric none; do
+  step "3b. srun on one node, LFRIC_CONTAINER_MPI=$mode"
+  out="$(LFRIC_CONTAINER_MPI=$mode "$helper" exec srun --nodes=1 --ntasks=2 "$work/pingpong" 2>&1 </dev/null)"
+  grep -E '^(library|latency|bandwidth)' <<< "$out"
+  grep -q PINGPONG_OK <<< "$out" || { echo "$out" | tail -5; fail "$mode on one node: no PINGPONG_OK"; }
+done
 
 step "4. srun --multi-prog, all four ranks"
 printf '0-3 %s\n' "$work/pingpong" > "$work/multi.conf"

@@ -191,7 +191,16 @@ case "$cmd" in
       exec "$apptainer" exec "instance://$name" "$@"
     fi
     bind_site; bind_slurm
-    [ "$rank" = 1 ] && bind_mpi
+    if [ "$rank" = 1 ]; then
+      bind_mpi
+      # Every rank is its own container, so two ranks on a node are in two user
+      # namespaces, and the kernel refuses the cross-memory attach (CMA,
+      # process_vm_readv) both MPICHs use for large on-node messages: "Operation
+      # not permitted", then an abort (u-dn704). Turn CMA off and they fall back
+      # to copying through shared memory. A value you set yourself is kept.
+      export MPICH_SMP_SINGLE_COPY_MODE="${MPICH_SMP_SINGLE_COPY_MODE:-NONE}"   # cray-mpich
+      export MPIR_CVAR_CH4_CMA_ENABLE="${MPIR_CVAR_CH4_CMA_ENABLE:-0}"          # MPICH
+    fi
     exec "$apptainer" exec "${binds[@]}" "$image" "$@" ;;
 
   instance)
