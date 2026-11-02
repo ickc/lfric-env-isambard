@@ -1,0 +1,14 @@
+# The container's overlay on Stage 1's spack variant. It is the ONLY thing the
+# image changes about the environment; the templates in stage1/spack-env/ are
+# used as they are. It sits in the user config scope, below the env's own
+# manifest, so it can add preferences but not override a requirement there.
+packages:
+  all:
+    target: [aarch64]
+  # libfabric at the host's version. MPICH links libfabric with versioned
+  # symbols, and the newest one it uses is the newest its libfabric exports:
+  # 2.6 gives FABRIC_1.9, which HPE's libfabric 2.3.1 on Isambard 3 does not
+  # have, so swapping the host's library in (container/README.md, "MPI") fails
+  # to load. Built against 2.3.1, MPICH needs nothing newer than FABRIC_1.8.
+  libfabric:
+    require: ['@2.3.1']

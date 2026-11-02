@@ -1,0 +1,6 @@
+#!/bin/sh
+# The image's ENTRYPOINT, for `podman run` / `docker run`: activate the
+# environment (activate.sh), then run the command. Apptainer does not use it;
+# it activates through /.singularity.d/env/90-lfric-env.sh instead.
+. /opt/lfric-env/container/activate.sh
+exec "$@"

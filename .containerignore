@@ -1,0 +1,10 @@
+# Build context for container/Containerfile is the repo root; send only what the
+# image is built from (Stage 1 and the container layer), not the LFRic sources,
+# logs or build output. Submodule .git FILES under stage1/vendor stay: Stage 1's
+# submodule check looks for them.
+*
+!stage1
+!container
+stage1/.pixi
+stage1/logs
+container/tests

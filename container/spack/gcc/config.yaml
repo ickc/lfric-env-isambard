@@ -1,0 +1,14 @@
+# Spack config for the image's gcc stage (Containerfile, stage "gcc"): build
+# gcc@14.3.0 into /opt/gcc, with the shared build caches on the cache mount.
+config:
+  install_tree:
+    root: /opt/gcc/store
+  build_stage:
+  - /tmp/spack-stage
+  source_cache: /var/cache/lfric/source-cache
+  misc_cache: /tmp/spack-misc-cache
+  # gcc@14.3.0 is marked deprecated in the pinned spack-packages (14.4.0 has
+  # superseded it), and Spack refuses deprecated versions unless told. 14.3.0 it
+  # must be: stage1/spack-env/common.yaml requires gcc@14.3.0 and gcc-runtime@14.3.0,
+  # the SLES gcc-14 on Isambard 3.
+  deprecated: true

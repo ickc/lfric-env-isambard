@@ -59,6 +59,11 @@ There are **two dependency variants**, chosen with `LFRIC_STACK`:
 So there are four things you can build: {the env build (Stage 1), the minimal-compile
 example} × {`cray`, `spack`}.
 
+The `spack` variant is also published as a **container image**,
+`ghcr.io/ickc/lfric-env:<version>`: built by Stage 1 inside the image, for any Arm64
+Linux, and on Isambard 3 able to run multi-node MPI over Slingshot and Cylc suites
+through Slurm. See [`container/README.md`](container/README.md).
+
 ## Prerequisites
 
 - **An Isambard 3 account**, and the basics of using it: the difference between a
@@ -351,4 +356,6 @@ generally cleared with the node; delete it directly if you want it gone sooner.
 - [`examples/science-suites/README.md`](examples/science-suites/README.md) — the
   science-suite examples: running real Rose/Cylc LFRic suites on the built env.
 - [`PORTING.md`](PORTING.md) — porting your own Rose/Cylc suite to Isambard 3.
+- [`container/README.md`](container/README.md) — the environment as a container image:
+  using it on Isambard 3 and elsewhere, how it is built, and how MPI and Cylc work in it.
 - [`CLAUDE.md`](CLAUDE.md) — orientation for AI coding agents working in this repo.

@@ -1,0 +1,102 @@
+#!/bin/bash
+# srun — the host's srun, with every task started inside this container.
+#
+# `srun [options] prog args` launches prog through slurmstepd on the HOST, where
+# nothing from the container exists. This wrapper keeps the srun command line as
+# written and inserts the host helper in front of the program:
+#
+#   srun [options] prog args
+#     -> host srun [options] lfric-container exec --rank prog args
+#
+# so each task enters a container from the same image, with the caller's
+# environment (srun's default --export=ALL carries it; activate.sh restores the
+# PATH/LD_LIBRARY_PATH Apptainer resets). `--multi-prog conf` gets the same
+# treatment line by line, in a rewritten copy of conf.
+#
+# Finding `prog` means knowing which srun options take a value. That table is
+# read from the host srun's own --help at run time, so it always matches the
+# installed Slurm, rather than being a list in here that drifts.
+#
+# MPI: with LFRIC_CONTAINER_MPI=host (the default on a Cray EX) the container's
+# MPICH is swapped for the host's cray-mpich in each task, and srun keeps the
+# site's default MPI plugin. Otherwise the container's own MPICH runs, which
+# speaks PMI-2: add --mpi=pmi2 unless the caller chose a plugin.
+set -euo pipefail
+die() { echo "srun (lfric-container): $*" >&2; exit 2; }
+
+host_srun=/opt/lfric-env/container/bin/host-slurm
+[ -n "${LFRIC_CONTAINER_HELPER:-}" ] \
+  || die "LFRIC_CONTAINER_HELPER unset: start the container with the lfric-container helper"
+
+# --- the option table, from the host's srun --help --------------------------
+# Lines look like "  -n, --ntasks=ntasks   ..." or "      --mpi=type   ...".
+# An option takes a value when its long form is written --name=...; one written
+# --name[=...] takes an OPTIONAL value, which must be attached with '=' and so
+# never consumes the next word.
+long_arg=" " short_arg=""
+while IFS= read -r line; do
+  [[ $line =~ ^[[:space:]]+(-([A-Za-z]),[[:space:]]+)?--([A-Za-z0-9-]+)(=|\[=)? ]] || continue
+  [ "${BASH_REMATCH[4]}" = "=" ] || continue
+  long_arg+="${BASH_REMATCH[3]} "
+  [ -n "${BASH_REMATCH[2]}" ] && short_arg+="${BASH_REMATCH[2]}"
+done < <("$host_srun" srun --help 2>/dev/null)
+[ "$long_arg" != " " ] || die "could not read the option table from the host's srun --help"
+
+# Does long option $1 (no leading --) take a value? getopt_long also accepts any
+# unambiguous prefix, so match those too.
+long_takes_arg() {
+  case "$long_arg" in *" $1 "*) return 0 ;; esac
+  local o n=0
+  for o in $long_arg; do [[ $o == "$1"* ]] && n=$((n + 1)); done
+  [ "$n" -eq 1 ]
+}
+
+# --- split the command line into srun's options and the program -------------
+opts=() has_mpi=0 multi_prog=0
+while [ $# -gt 0 ]; do
+  a="$1"
+  case "$a" in
+    --) shift; break ;;
+    --mpi|--mpi=*) has_mpi=1 ;;&
+    --multi-prog) multi_prog=1 ;;&
+    --*=*) opts+=("$a"); shift ;;
+    --*)   opts+=("$a"); shift
+           if long_takes_arg "${a#--}"; then
+             [ $# -gt 0 ] || die "option $a needs a value"
+             [ "$a" = --mpi ] && has_mpi=1
+             opts+=("$1"); shift
+           fi ;;
+    -?)    opts+=("$a"); shift
+           if [[ $short_arg == *"${a#-}"* ]]; then
+             [ $# -gt 0 ] || die "option $a needs a value"
+             opts+=("$1"); shift
+           fi ;;
+    -*)    opts+=("$a"); shift ;;   # a short option with its value attached
+    :)     die "heterogeneous steps (' : ') are not supported in the container" ;;
+    *)     break ;;
+  esac
+done
+[ $# -gt 0 ] || die "no program to run"
+[ -n "${SLURM_MPI_TYPE:-}" ] && has_mpi=1
+if [ "${LFRIC_CONTAINER_MPI:-host}" != host ] && [ "$has_mpi" = 0 ]; then
+  opts+=(--mpi=pmi2)
+fi
+
+# What a task needs to come back into this container as this process left it.
+export LFRIC_CONTAINER_PATH="$PATH" LFRIC_CONTAINER_LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}"
+enter=("$LFRIC_CONTAINER_HELPER" exec --rank --)
+
+if [ "$multi_prog" = 1 ]; then
+  # The program is the configuration file: "<ranks> <prog> [args]" per line.
+  # Rewrite each program line to go through the helper, next to the original
+  # (srun reads it on this node only, but a cwd is shared and debuggable).
+  conf="$1"; shift
+  [ -r "$conf" ] || die "cannot read --multi-prog file $conf"
+  new="$conf.lfric-container"
+  awk -v pre="${enter[*]}" '
+    /^[[:space:]]*(#|$)/ { print; next }
+    { r = $1; sub(/^[[:space:]]*[^[:space:]]+[[:space:]]+/, ""); print r " " pre " " $0 }
+  ' "$conf" > "$new"
+  exec "$host_srun" srun "${opts[@]}" "$new" "$@"
+fi
+exec "$host_srun" srun "${opts[@]}" "${enter[@]}" "$@"

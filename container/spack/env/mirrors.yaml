@@ -1,0 +1,10 @@
+# A binary cache on the persistent build mount (container/build.sh binds it at
+# /var/cache/lfric). Every package is pushed there as soon as it is installed,
+# so a build that dies after two hours restarts from where it was rather than
+# from scratch: a container layer is all-or-nothing, this cache is not.
+mirrors:
+  build-cache:
+    url: file:///var/cache/lfric/buildcache
+    signed: false
+    autopush: true
+    source: false
