@@ -11,7 +11,7 @@
 # in at run time? Run from a directory holding pp_spack, which is
 # container/tests/pingpong.f90 compiled with `module load lfric-env/<v>/spack`
 # and `$FC -O2 -o pp_spack pingpong.f90`. See README.md for the results.
-cd "$SLURM_SUBMIT_DIR"
+cd "$SLURM_SUBMIT_DIR" || exit
 VIEWLIB=${VIEWLIB:-$PROJECTDIR/lfric-env/Linux-aarch64/v2026.10.08/spack-env/spack/.spack-env/view/lib}
 run() { echo; echo "=== $1"; shift; timeout 120 "$@" 2>&1 | grep -vE '^\s*$' | head -25; echo "exit=${PIPESTATUS[0]}"; }
 run "own MPICH + own libfabric (tcp), pmi2" env LD_LIBRARY_PATH=$VIEWLIB srun --mpi=pmi2 ./pp_spack
